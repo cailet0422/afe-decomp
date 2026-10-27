@@ -92,14 +92,26 @@ static void aSHR_init_clip_area();
 static void aSHR_free_clip_area();
 
 static void aSHR_InitVar(SHRINE_ACTOR* shrine, GAME_PLAY* play) {
+#ifdef TARGET_PC
+    if (mSM_CheckAbleChange_unable_shutter_label(play, (uintptr_t)shrine)) {
+#else
     if (mSM_CheckAbleChange_unable_shutter_label(play, (u32)shrine)) {
+#endif
+#ifdef TARGET_PC
+        mSM_Set_unable_shutter_label(play, (uintptr_t)shrine);
+#else
         mSM_Set_unable_shutter_label(play, (u32)shrine);
+#endif
     }
     mGcgba_InitVar();
 }
 
 static void aSHR_EndComm(SHRINE_ACTOR* shrine, GAME_PLAY* play) {
+#ifdef TARGET_PC
+    if (mSM_CheckOwner_unable_shutter_label(play, (uintptr_t)shrine)) {
+#else
     if (mSM_CheckOwner_unable_shutter_label(play, (u32)shrine)) {
+#endif
         mSM_Set_unable_shutter_label(play, 0);
     }
     mGcgba_EndComm();

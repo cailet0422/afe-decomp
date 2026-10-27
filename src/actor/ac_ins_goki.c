@@ -47,7 +47,11 @@ enum {
 #define aIGK_CHANGE_WAIT_TIMER(insect) ((insect)->s32_work1)
 #define aIGK_MOVE_TIMER(insect) ((insect)->s32_work2)
 #define aIGK_GET_ITEM_P(insect) ((insect)->s32_work3)
+#ifdef TARGET_PC
+#define aIGK_SET_ITEM_P(insect, item_p) ((insect)->s32_work3 = (intptr_t)item_p)
+#else
 #define aIGK_SET_ITEM_P(insect, item_p) ((insect)->s32_work3 = (int)item_p)
+#endif
 
 static void aIGK_actor_move(ACTOR* actorx, GAME* game);
 static void aIGK_setupAction(aINS_INSECT_ACTOR* insect, int action, GAME* game);
@@ -194,7 +198,11 @@ static int aIGK_check_player_net(aINS_INSECT_ACTOR* insect) {
     if (mPlib_Check_StopNet(&net_pos) == TRUE) {
         u32 label = mPlib_Get_item_net_catch_label();
 
+#ifdef TARGET_PC
+        if (label != (uintptr_t)insect) {
+#else
         if (label != (u32)insect) {
+#endif
             f32 dX = net_pos.x - insect->tools_actor.actor_class.world.position.x;
             f32 dZ = net_pos.z - insect->tools_actor.actor_class.world.position.z;
 
@@ -272,7 +280,11 @@ static void aIGK_avoid(ACTOR* actorx, GAME* game) {
     }
 
     actorx->gravity = grav;
+#ifdef TARGET_PC
+    sAdo_OngenPos((uintptr_t)actorx, NA_SE_26, &actorx->world.position);
+#else
     sAdo_OngenPos((u32)actorx, NA_SE_26, &actorx->world.position);
+#endif
     aIGK_anime_proc(insect);
 
     if (insect->bg_type == aINS_BG_CHECK_TYPE_NONE) {
@@ -318,7 +330,11 @@ static void aIGK_move_on_flower(ACTOR* actorx, GAME* game) {
         aIGK_MOVE_TIMER(insect)--;
 
         if (aIGK_MOVE_TIMER(insect) <= 0) {
+#ifdef TARGET_PC
+            sAdo_OngenPos((uintptr_t)actorx, NA_SE_GOKI_MOVE, &actorx->world.position);
+#else
             sAdo_OngenPos((u32)actorx, NA_SE_GOKI_MOVE, &actorx->world.position);
+#endif
             insect->timer = (int)(2 * (90.0f + RANDOM_F(90.0f)));
             aIGK_setupAction(insect, aIGK_ACTION_WAIT_ON_FLOWER, game);
         } else {
@@ -424,7 +440,11 @@ static void aIGK_move_under_a_tree(ACTOR* actorx, GAME* game) {
     static s16 add_angl[] = { DEG2SHORT_ANGLE2(11.25f), DEG2SHORT_ANGLE2(-11.25f) };
     aINS_INSECT_ACTOR* insect = (aINS_INSECT_ACTOR*)actorx;
 
+#ifdef TARGET_PC
+    sAdo_OngenPos((uintptr_t)actorx, POS_SE_ECHO(NA_ONGEN_POS_SE_GOKI_MOVE), &actorx->world.position);
+#else
     sAdo_OngenPos((u32)actorx, POS_SE_ECHO(NA_ONGEN_POS_SE_GOKI_MOVE), &actorx->world.position);
+#endif
     if (aIGK_check_patience(insect) == TRUE) {
         insect->bg_type = aINS_BG_CHECK_TYPE_REG_ATTR;
         aIGK_setupAction(insect, aIGK_ACTION_AVOID, game);
@@ -445,7 +465,11 @@ static void aIGK_turn_under_a_tree(ACTOR* actorx, GAME* game) {
     static s16 add_angl[] = { DEG2SHORT_ANGLE2(11.25f), DEG2SHORT_ANGLE2(-11.25f) };
     aINS_INSECT_ACTOR* insect = (aINS_INSECT_ACTOR*)actorx;
 
+#ifdef TARGET_PC
+    sAdo_OngenPos((uintptr_t)actorx, POS_SE_ECHO(NA_ONGEN_POS_SE_GOKI_MOVE), &actorx->world.position);
+#else
     sAdo_OngenPos((u32)actorx, POS_SE_ECHO(NA_ONGEN_POS_SE_GOKI_MOVE), &actorx->world.position);
+#endif
     if (aIGK_check_patience(insect) == TRUE) {
         insect->bg_type = aINS_BG_CHECK_TYPE_REG_ATTR;
         aIGK_setupAction(insect, aIGK_ACTION_AVOID, game);
@@ -607,7 +631,11 @@ static void aIGK_actor_move(ACTOR* actorx, GAME* game) {
     aINS_INSECT_ACTOR* insect = (aINS_INSECT_ACTOR*)actorx;
     u32 label = mPlib_Get_item_net_catch_label();
 
+#ifdef TARGET_PC
+    if (label == (uintptr_t)actorx) {
+#else
     if (label == (u32)actorx) {
+#endif
         aIGK_setupAction(insect, aIGK_ACTION_LET_ESCAPE, game);
     } else if (insect->insect_flags.timeup_escape_pending == TRUE && insect->insect_flags.ignore_escape_pending == FALSE) {
         aIGK_setupAction(insect, aIGK_ACTION_LET_ESCAPE, game);

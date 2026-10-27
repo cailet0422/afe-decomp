@@ -5,7 +5,11 @@ static void fITT_ct(FTR_ACTOR* ftr_actor, u8* data) {
 static void fITT_mv(FTR_ACTOR* ftr_actor, ACTOR* my_room_actor, GAME* game, u8* data) {
     if (ftr_actor->switch_bit) {
         if (aFTR_CAN_PLAY_SE(ftr_actor)) {
+#ifdef TARGET_PC
+            sAdo_OngenPos((uintptr_t)ftr_actor, 0x5E, &ftr_actor->position);
+#else
             sAdo_OngenPos((u32)ftr_actor, 0x5E, &ftr_actor->position);
+#endif
         }
     }
 

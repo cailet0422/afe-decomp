@@ -171,7 +171,11 @@ static void aINM_actor_move(ACTOR* actorx, GAME* game) {
     ACTOR* parent;
     u32 catch_label = mPlib_Get_item_net_catch_label();
 
+#ifdef TARGET_PC
+    if (catch_label == (uintptr_t)actorx) {
+#else
     if (catch_label == (u32)actorx) {
+#endif
         actorx->drawn = TRUE;
         aINM_setupAction(insect, aINM_ACT_LET_ESCAPE, game);
         parent = actorx->parent_actor;

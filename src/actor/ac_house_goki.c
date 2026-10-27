@@ -255,7 +255,11 @@ static void aHG_away(ACTOR* actorx, GAME* game) {
             }
         }
 
+#ifdef TARGET_PC
+        sAdo_OngenPos((uintptr_t)goki, NA_SE_GOKI_MOVE, &actorx->world.position);
+#else
         sAdo_OngenPos((u32)goki, NA_SE_GOKI_MOVE, &actorx->world.position);
+#endif
     }
 }
 
@@ -314,7 +318,11 @@ static void aHG_move(ACTOR* actorx, GAME* game) {
         if (goki->timer <= 0.0f) {
             aHG_decide_next_act_idx_wait_move(goki, game);
         } else {
+#ifdef TARGET_PC
+            sAdo_OngenPos((uintptr_t)goki, NA_SE_GOKI_MOVE, &actorx->world.position);
+#else
             sAdo_OngenPos((u32)goki, NA_SE_GOKI_MOVE, &actorx->world.position);
+#endif
         }
     }
 }

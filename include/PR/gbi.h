@@ -1478,6 +1478,20 @@ typedef union {
 		{	{{ {{0,0,0},0,{0,0,0},0,{rightx,righty,rightz},0}}, \
 			{ {{0,0x80,0},0,{0,0x80,0},0,{upx,upy,upz},0}}}   }
 
+#ifdef TARGET_PC
+#include <stdint.h>
+/* A command's second word (Gwords.w1) may hold an address. In 64-bit
+ * builds it is a whole pointer, so it starts 8 bytes in: the second-word
+ * fields of the structs below follow this padding. */
+#if UINTPTR_MAX > 0xFFFFFFFFu
+#define GBI_PC_PAD_NAME_(line) pc_w1_pad##line
+#define GBI_PC_PAD_NAME(line) GBI_PC_PAD_NAME_(line)
+#define GBI_PC_W1_PAD unsigned int GBI_PC_PAD_NAME(__LINE__);
+#else
+#define GBI_PC_W1_PAD
+#endif
+
+#endif
 /*
  *  Graphics DMA Packet
  */
@@ -1486,7 +1500,8 @@ typedef struct {
 	unsigned int	len:16;
 	unsigned int	par:8;
 	int		cmd:8;
-	unsigned int	addr;
+	GBI_PC_W1_PAD
+	uintptr_t	addr;
 } Gdma;
 #else
 typedef struct {
@@ -1504,6 +1519,7 @@ typedef struct {
 typedef struct {
 		int		pad:24;
 		int		cmd:8;
+		GBI_PC_W1_PAD
 		Tri		tri;
 } Gtri;
 #else
@@ -1518,6 +1534,7 @@ typedef struct {
 typedef struct {
 		int		pad1:24;
 		int		cmd:8;
+		GBI_PC_W1_PAD
 		unsigned int	param:8;
 		int             pad2:24;
 } Gpopmtx;
@@ -1545,6 +1562,7 @@ typedef struct {
 		int		mw_index:8;
 		int		pad0:8;
 		int		cmd:8;
+		GBI_PC_W1_PAD
 		int		base:24;
 		int		pad1:8;
 } Gsegment;
@@ -1565,6 +1583,7 @@ typedef struct {
 		int		sft:8;
 		int		pad0:8;
 		int		cmd:8;
+		GBI_PC_W1_PAD
 		unsigned int	data:32;
 } GsetothermodeL;
 #else
@@ -1583,6 +1602,7 @@ typedef struct {
 		int		sft:8;
 		int		pad0:8;
 		int		cmd:8;
+		GBI_PC_W1_PAD
 		unsigned int	data:32;
 } GsetothermodeH;
 #else
@@ -1601,6 +1621,7 @@ typedef struct {
 		unsigned char	tile;
 		unsigned char	lodscale;
 		unsigned char	cmd;
+		GBI_PC_W1_PAD
 		unsigned short	t;
 		unsigned short	s;
 } Gtexture;
@@ -1619,6 +1640,7 @@ typedef struct {
 typedef struct {
 		int		pad:24;
 		int		cmd:8;
+		GBI_PC_W1_PAD
 		Tri		line;
 } Gline3D;
 #else
@@ -1633,6 +1655,7 @@ typedef struct {
 typedef struct {
 		int		pad1:24;
 		int		cmd:8;
+		GBI_PC_W1_PAD
 		short int       scale;
 		short int	pad2;
 } Gperspnorm;
@@ -1656,7 +1679,8 @@ typedef struct {
                 unsigned int    siz:2;
                 unsigned int    fmt:3;
                 int             cmd:8;
-                unsigned int    dram;
+                GBI_PC_W1_PAD
+                uintptr_t       dram;
 } Gsetimg;
 #else
 typedef struct {
@@ -1673,6 +1697,7 @@ typedef struct {
 typedef struct {
 		unsigned int	muxs0:24;
 		int		cmd:8;
+		GBI_PC_W1_PAD
 		unsigned int	muxs1:32;
 } Gsetcombine;
 #else
@@ -1689,7 +1714,8 @@ typedef struct {
 		unsigned int	prim_min_level:8;
 		unsigned int	pad:8;
 		int		cmd:8;
-		unsigned long	color;
+		GBI_PC_W1_PAD
+		unsigned int	color;
 } Gsetcolor;
 #else
 typedef struct {
@@ -1708,6 +1734,7 @@ typedef struct {
 		int		x0frac:2;
 		int		x0:10;
 		int		cmd:8;
+		GBI_PC_W1_PAD
 		int		y1frac:2;
 		int		y1:10;
 		int		x1frac:2;
@@ -1737,6 +1764,7 @@ typedef struct {
 		unsigned int	siz:2;
 		unsigned int	fmt:3;
 		int		cmd:8;
+		GBI_PC_W1_PAD
 		unsigned int	shifts:4;
 		unsigned int	masks:4;
 		unsigned int	ms:1;
@@ -1776,6 +1804,7 @@ typedef struct _Gloadtile {
 		unsigned int	tl:12;
 		unsigned int	sl:12;
 		int		cmd:8;
+		GBI_PC_W1_PAD
 		unsigned int	th:12;
 		unsigned int	sh:12;
 		unsigned int	tile:3;
@@ -1798,6 +1827,7 @@ typedef struct _Gloadblock {
 		unsigned int	tl:12;
 		unsigned int	sl:12;
 		int		cmd:8;
+		GBI_PC_W1_PAD
 		unsigned int	th:12;
 		unsigned int	sh:12;
 		unsigned int	tile:3;
@@ -1824,6 +1854,7 @@ typedef struct {
 		unsigned int	yl:12;
 		unsigned int	xl:12;
 		unsigned int	cmd:8;
+		GBI_PC_W1_PAD
 		unsigned int	yh:12;
 		unsigned int	xh:12;
 		unsigned int	tile:3;
@@ -1865,10 +1896,17 @@ typedef struct {
 /*
  * Generic Gfx Packet
  */
+#ifdef TARGET_PC
+typedef struct {
+	unsigned int w0;
+	uintptr_t w1;
+} Gwords;
+#else
 typedef struct {
 	unsigned int w0;
 	unsigned int w1;
 } Gwords;
+#endif
 
 /*
  * This union is the fundamental type of the display list.
@@ -4764,6 +4802,124 @@ typedef union {
 #define	gsDPNoOp()		gsDPNoParam(G_NOOP)
 #define	gDPNoOpTag(pkt, tag)	gDPParam(pkt, G_NOOP, tag)
 #define	gsDPNoOpTag(tag)	gsDPParam(G_NOOP, tag)
+#ifdef TARGET_PC
+
+/* The commands that carry an address keep all of it in w1 (a uintptr_t):
+ * the same macros as above with the cast widened. */
+#undef gDma0p
+#define	gDma0p(pkt, c, s, l)						\
+{									\
+	Gfx *_g = (Gfx *)(pkt);						\
+									\
+	_g->words.w0 = _SHIFTL((c), 24, 8) | _SHIFTL((l), 0, 24);	\
+	_g->words.w1 = (uintptr_t)(s);					\
+}
+#undef gsDma0p
+#define	gsDma0p(c, s, l)						\
+{{									\
+	_SHIFTL((c), 24, 8) | _SHIFTL((l), 0, 24), (uintptr_t)(s)	\
+}}
+#undef gDma1p
+#define	gDma1p(pkt, c, s, l, p)						\
+{									\
+	Gfx *_g = (Gfx *)(pkt);						\
+									\
+	_g->words.w0 = (_SHIFTL((c), 24, 8) | _SHIFTL((p), 16, 8) |	\
+			_SHIFTL((l), 0, 16));				\
+	_g->words.w1 = (uintptr_t)(s);					\
+}
+#undef gsDma1p
+#define	gsDma1p(c, s, l, p)						\
+{{									\
+	(_SHIFTL((c), 24, 8) | _SHIFTL((p), 16, 8) | 			\
+	 _SHIFTL((l), 0, 16)), 						\
+        (uintptr_t)(s)							\
+}}
+#undef gDma2p
+#define	gDma2p(pkt, c, adrs, len, idx, ofs)				\
+{									\
+	Gfx *_g = (Gfx *)(pkt);						\
+	_g->words.w0 = (_SHIFTL((c),24,8)|_SHIFTL(((len)-1)/8,19,5)|	\
+			_SHIFTL((ofs)/8,8,8)|_SHIFTL((idx),0,8));	\
+	_g->words.w1 = (uintptr_t)(adrs);				\
+}
+#undef gsDma2p
+#define	gsDma2p(c, adrs, len, idx, ofs)					\
+{{									\
+	(_SHIFTL((c),24,8)|_SHIFTL(((len)-1)/8,19,5)|			\
+	 _SHIFTL((ofs)/8,8,8)|_SHIFTL((idx),0,8)),			\
+        (uintptr_t)(adrs)						\
+}}
+#undef gSPVertex
+#define	gSPVertex(pkt, v, n, v0)					\
+{									\
+	Gfx *_g = (Gfx *)(pkt);						\
+	_g->words.w0 =							\
+	  _SHIFTL(G_VTX,24,8)|_SHIFTL((n),12,8)|_SHIFTL((v0)+(n),1,7);	\
+	_g->words.w1 = (uintptr_t)(v);					\
+}
+#undef gsSPVertex
+#define	gsSPVertex(v, n, v0)						\
+{{									\
+	(_SHIFTL(G_VTX,24,8)|_SHIFTL((n),12,8)|_SHIFTL((v0)+(n),1,7)),	\
+        (uintptr_t)(v)							\
+}}
+#undef gImmp1
+#define	gImmp1(pkt, c, p0)						\
+{									\
+	Gfx *_g = (Gfx *)(pkt);						\
+									\
+	_g->words.w0 = _SHIFTL((c), 24, 8);				\
+	_g->words.w1 = (uintptr_t)(p0);					\
+}
+#undef gsImmp1
+#define	gsImmp1(c, p0)							\
+{{									\
+	_SHIFTL((c), 24, 8), (uintptr_t)(p0)				\
+}}
+#undef gImmp21
+#define	gImmp21(pkt, c, p0, p1, dat)					\
+{									\
+	Gfx *_g = (Gfx *)(pkt);						\
+									\
+	_g->words.w0 = (_SHIFTL((c), 24, 8)  | _SHIFTL((p0), 8, 16) |	\
+			_SHIFTL((p1), 0, 8));				\
+	_g->words.w1 = (uintptr_t)(dat);				\
+}
+#undef gsImmp21
+#define	gsImmp21(c, p0, p1, dat)					\
+{{									\
+	_SHIFTL((c), 24, 8) | _SHIFTL((p0), 8, 16) | _SHIFTL((p1), 0, 8),\
+        (uintptr_t)(dat)						\
+}}
+#undef gSetImage
+#define	gSetImage(pkt, cmd, fmt, siz, width, i)				\
+{									\
+	Gfx *_g = (Gfx *)(pkt);						\
+									\
+	_g->words.w0 = _SHIFTL(cmd, 24, 8) | _SHIFTL(fmt, 21, 3) |	\
+		       _SHIFTL(siz, 19, 2) | _SHIFTL((width)-1, 0, 12);	\
+	_g->words.w1 = (uintptr_t)(i);					\
+}
+#undef gsSetImage
+#define	gsSetImage(cmd, fmt, siz, width, i)				\
+{{									\
+	_SHIFTL(cmd, 24, 8) | _SHIFTL(fmt, 21, 3) |			\
+	_SHIFTL(siz, 19, 2) | _SHIFTL((width)-1, 0, 12),		\
+	(uintptr_t)(i)							\
+}}
+#undef gSPLoadUcodeEx
+#define	gSPLoadUcodeEx(pkt, uc_start, uc_dstart, uc_dsize)		\
+{									\
+	Gfx *_g = (Gfx *)(pkt);						\
+	_g->words.w0 = _SHIFTL(G_RDPHALF_1,24,8);			\
+	_g->words.w1 = (uintptr_t)(uc_dstart);				\
+	_g = (Gfx *)(pkt);						\
+	_g->words.w0 = (_SHIFTL(G_LOAD_UCODE,24,8)|			\
+			_SHIFTL((int)(uc_dsize)-1,0,16));		\
+	_g->words.w1 = (uintptr_t)(uc_start);				\
+}
+#endif
 
 #endif /* _LANGUAGE_C */
 

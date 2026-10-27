@@ -560,7 +560,11 @@ static int mCD_write_comp_bg_next(mCD_bg_info_c* bg_info, s32 chan, s32* result,
             bg_info->length = mCD_MEMCARD_SECTORSIZE;
         }
 
+#ifdef TARGET_PC
+        bg_info->data = (void*)((uintptr_t)data + ofs);
+#else
         bg_info->data = (void*)((u32)data + ofs);
+#endif
         bzero(*read_p, mCD_MEMCARD_SECTORSIZE);
         *result = CARDReadAsync(&bg_info->fileInfo, *read_p, bg_info->length, bg_info->offset, NULL);
         if (*result == CARD_RESULT_READY) {
@@ -757,7 +761,11 @@ static int mCD_read_fg(void* buf, const char* filename, s32 length, s32 offset, 
     void* workArea;
     int res = mCD_RESULT_ERROR;
 
+#ifdef TARGET_PC
+    if (buf != NULL && IS_ALIGNED((uintptr_t)buf, 32)) {
+#else
     if (buf != NULL && IS_ALIGNED((u32)buf, 32)) {
+#endif
         int card_res = mCD_check_card(result, mCD_MEMCARD_SECTORSIZE, chan);
 
         if (card_res == mCD_RESULT_SUCCESS) {

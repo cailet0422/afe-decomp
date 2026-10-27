@@ -52,7 +52,11 @@ static void eAS2_mv(eEC_Effect_c* effect, GAME* game) {
     effect->effect_specific[0]++;
 
     if (effect->arg1 == 0) {
+#ifdef TARGET_PC
+        sAdo_OngenPos((uintptr_t)effect, 0x29, &effect->position);
+#else
         sAdo_OngenPos((u32)effect, 0x29, &effect->position);
+#endif
     }
 }
 

@@ -556,7 +556,11 @@ static u32 texture_cache_get_heap_size(texture_cache_t* cache) {
 
 static void* texture_cache_alloc(texture_cache_t* cache, u32 size) {
     cache->last_alloc_start = cache->buffer_current;
+#ifdef TARGET_PC
+    cache->last_alloc_end = (u8*)ALIGN_NEXT((uintptr_t)cache->buffer_current + size, 32);
+#else
     cache->last_alloc_end = (u8*)ALIGN_NEXT((u32)cache->buffer_current + size, 32);
+#endif
 
     if (cache->buffer_pos < cache->last_alloc_end - cache->buffer_start) {
         cache->buffer_pos = cache->last_alloc_end - cache->buffer_start;
@@ -4232,7 +4236,11 @@ void emu64::dirty_check(int tile, int n_tiles, int do_texture_matrix) {
                     img_addr = tex_info_p->img_addr;
 
                     dol_fmt.raw = cvtN64ToDol(tex_info_p->format, tex_info_p->size);
+#ifdef TARGET_PC
+                    if (((uintptr_t)img_addr & 0x1F) != 0) {
+#else
                     if (((u32)img_addr & 0x1F) != 0) {
+#endif
 #ifndef TARGET_PC
                         /* Translation: Texture (%08x) alignment isn't 32 bytes */
                         this->Printf0("テクスチャ(%08x)のアライメントが３２バイトになっていません\n", img_addr);
@@ -4349,16 +4357,29 @@ void emu64::dl_G_DL(void) {
             }
 
             if (this->DL_stack_level < DL_MAX_STACK_LEVEL) {
+#ifdef TARGET_PC
+                this->DL_stack[this->DL_stack_level++] = (uintptr_t)(this->gfx_p + 1);
+#else
                 this->DL_stack[this->DL_stack_level++] = (u32)(this->gfx_p + 1);
+#endif
             } else {
                 this->err_count++;
                 this->Printf0("*** DL stack overflow ***\n");
             }
 
+#ifdef TARGET_PC
+            this->gfx_p = (Gfx*)this->work_ptr - 1;
+            break;
+#else
             this->gfx_p = (Gfx*)((int)this->work_ptr - sizeof(Gfx));
             break;
+#endif
         case G_DL_NOPUSH:
+#ifdef TARGET_PC
+            this->gfx_p = (Gfx*)this->work_ptr - 1;
+#else
             this->gfx_p = (Gfx*)((u32)this->work_ptr - sizeof(Gfx));
+#endif
             break;
         default:
             if (this->disable_polygons == false) {
@@ -4596,7 +4617,11 @@ void emu64::dl_G_LOADTILE() {
         return;
 
     /* Determine tmem base address */
+#ifdef TARGET_PC
+    uintptr_t dram = this->now_setimg.setimg2.imgaddr;
+#else
     u32 dram = this->now_setimg.setimg2.imgaddr;
+#endif
     dram += ((loadtile.tl / 4) * EXPAND_WIDTH(this->now_setimg.setimg2.wd) + (loadtile.sl / 4)
              << this->now_setimg.setimg2.siz) /
             2;
@@ -4623,8 +4648,13 @@ void emu64::dl_G_LOADTILE() {
 
 void emu64::dl_G_LOADBLOCK() {
     int tmem_idx;
+#ifdef TARGET_PC
+    Gloadblock* loadblock = (Gloadblock*)this->gfx_p;
+    uintptr_t addr;
+#else
     Gloadblock* loadblock = (Gloadblock*)this->gfx_p;
     u32 addr;
+#endif
     int i;
 
 #ifdef EMU64_DEBUG
@@ -4799,7 +4829,11 @@ void emu64::dl_G_LOADTLUT() {
 
                 this->tlut_addresses[tlut_name] = tlut_addr;
                 if (tlut_addr != nullptr) {
+#ifdef TARGET_PC
+                    if (((uintptr_t)tlut_addr & (0x1F)) != 0) {
+#else
                     if (((u32)tlut_addr & (0x1F)) != 0) {
+#endif
 #ifndef TARGET_PC
                         /* The alignment of the palette (%08x) is not 32 bytes. */
                         EMU64_PRINTF(
@@ -4833,10 +4867,17 @@ void emu64::dl_G_LOADTLUT() {
         if (this->disable_polygons == false) {
             u16 count = ((loadtlut->words.w1 >> 14) & 0x3FF) + 1;
             void* tlut;
+#ifdef TARGET_PC
+            uintptr_t addr = this->now_setimg.setimg2.imgaddr;
+            u32 tlut_name = (settile_p->tmem / 16) & 0xF;
+
+            if (addr == (uintptr_t)this->tlut_addresses[tlut_name]) {
+#else
             u32 addr = this->now_setimg.setimg2.imgaddr;
             u32 tlut_name = (settile_p->tmem / 16) & 0xF;
 
             if (addr == (u32)this->tlut_addresses[tlut_name]) {
+#endif
                 /* Translation: ### Same TLUT address %08x %d */
                 EMU64_INFOF("### 同じTLUTアドレスです %08x %d\n", addr, tlut_name);
 #ifdef TARGET_PC
@@ -5236,7 +5277,11 @@ void emu64::dl_G_SETTIMG() {
 #endif
 
     this->now_setimg.setimg2 = *setimg2;
+#ifdef TARGET_PC
+    this->now_setimg.setimg2.imgaddr = this->seg2k0(setimg2->imgaddr);
+#else
     this->now_setimg.setimg2.imgaddr = (u32)this->seg2k0(setimg2->imgaddr);
+#endif
 }
 
 void emu64::dl_G_SETENVCOLOR() {
@@ -6583,8 +6628,13 @@ void emu64::dl_G_BRANCH_Z() {
     EMU64_WARNF("gsSPBranchLessZraw(%s, %d, 0x%08x),", this->segchk(this->rdpHalf_1), (this->gfx.words.w0 / 2) & 0x7FF,
                 this->gfx.words.w1);
 
+#ifdef TARGET_PC
+    this->gfx_p = (Gfx*)this->work_ptr - 1;
+    /* Translation: gsSPBranchLessZraw isn't implemented yet */
+#else
     this->gfx_p = (Gfx*)((int)this->work_ptr - sizeof(Gfx));
     /* Translation: gsSPBranchLessZraw isn't implemented yet */
+#endif
     this->Printf0("gsSPBranchLessZrawはまだインプリメントされていません\n");
 }
 

@@ -114,7 +114,11 @@ s32 JKRDvdFile::sync() {
     OSReceiveMessage(&this->mDvdMessageQueue, &m, OS_MESSAGE_BLOCK);
     this->mDvdThread = nullptr;
     OSUnlockMutex(&this->mDvdMutex);
+#ifdef TARGET_PC
+    return (s32)(intptr_t)m;
+#else
     return (s32)m;
+#endif
 }
 
 void JKRDvdFile::doneProcess(s32 result, DVDFileInfo* info) {

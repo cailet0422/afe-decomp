@@ -67,8 +67,8 @@ inline float fastcast_float(register short* s) {
 
 #ifdef TARGET_PC
 /* Executable image range from pc_main.c — BSS/data can collide with N64 segments */
-extern "C" unsigned int pc_image_base;
-extern "C" unsigned int pc_image_end;
+extern "C" uintptr_t pc_image_base;
+extern "C" uintptr_t pc_image_end;
 
 /* Arena range from pc_os.c — heap pointers in arena also bypass segment resolution */
 extern "C" unsigned char* pc_arena_base;
@@ -77,11 +77,11 @@ extern "C" unsigned char* pc_arena_end;
 /* Page-granularity cache for VirtualQuery results.
  * Avoids repeated syscalls for addresses in the same page. */
 #define SEG2K0_PAGE_CACHE_SIZE 32
-static struct { u32 page; u8 committed; } seg2k0_page_cache[SEG2K0_PAGE_CACHE_SIZE];
+static struct { uintptr_t page; u8 committed; } seg2k0_page_cache[SEG2K0_PAGE_CACHE_SIZE];
 static int seg2k0_cache_next = 0;
 
-static int seg2k0_is_committed(u32 addr) {
-    u32 page = addr & ~0xFFF;
+static int seg2k0_is_committed(uintptr_t addr) {
+    uintptr_t page = addr & ~(uintptr_t)0xFFF;
     /* Check cache first */
     for (int i = 0; i < SEG2K0_PAGE_CACHE_SIZE; i++) {
         if (seg2k0_page_cache[i].page == page) {
@@ -108,7 +108,7 @@ static int seg2k0_is_committed(u32 addr) {
     return committed;
 }
 
-u32 emu64::seg2k0(u32 segadr) {
+uintptr_t emu64::seg2k0(uintptr_t segadr) {
     /* Addresses above the N64 segment range (upper nibble != 0) or below
        the minimum segment address are definitely raw PC pointers. */
     if ((segadr >> 28) != 0 || segadr < 0x03000000) {
@@ -122,8 +122,8 @@ u32 emu64::seg2k0(u32 segadr) {
 
     /* Check if address falls within the main memory arena (JKRHeap, Object_Exchange
        banks, cloth data, etc.).*/
-    if (pc_arena_base && segadr >= (u32)(uintptr_t)pc_arena_base &&
-        segadr < (u32)(uintptr_t)pc_arena_end) {
+    if (pc_arena_base && segadr >= (uintptr_t)pc_arena_base &&
+        segadr < (uintptr_t)pc_arena_end) {
         return segadr;
     }
 
@@ -154,7 +154,7 @@ u32 emu64::seg2k0(u32 segadr) {
     }
 
     /* Normal segment resolution path */
-    u32 resolved = (u32)this->segments[seg] + offset;
+    uintptr_t resolved = this->segments[seg] + offset;
 
     if (seg2k0_is_committed(resolved)) {
         /* Segment resolution gave a valid address — use it (normal path) */

@@ -141,7 +141,11 @@ static void aIAB_let_escape(ACTOR* actorx, GAME* game) {
     }
 
     actorx->gravity = grav;
+#ifdef TARGET_PC
+    sAdo_OngenPos((uintptr_t)actorx, NA_ONGEN_POS_SE_25, &actorx->world.position);
+#else
     sAdo_OngenPos((u32)actorx, NA_ONGEN_POS_SE_25, &actorx->world.position);
+#endif
 }
 
 static void aIAB_move(ACTOR* actorx, GAME* game) {
@@ -305,7 +309,11 @@ static void aIAB_actor_move(ACTOR* actorx, GAME* game) {
     aINS_INSECT_ACTOR* insect = (aINS_INSECT_ACTOR*)actorx;
     u32 label = mPlib_Get_item_net_catch_label();
 
+#ifdef TARGET_PC
+    if (label == (uintptr_t)actorx) {
+#else
     if (label == (u32)actorx) {
+#endif
         switch (insect->type) {
             case aINS_INSECT_TYPE_POND_SKATER:
                 insect->alpha0 = 255;

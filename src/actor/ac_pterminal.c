@@ -71,15 +71,27 @@ static int aPT_CheckMailBoxVac(void) {
 }
 
 static void aPT_InitVar(PTERMINAL_ACTOR* actor, GAME_PLAY* play) {
+#ifdef TARGET_PC
+    if (mSM_CheckAbleChange_unable_shutter_label(play, (uintptr_t)actor)) {
+#else
     if (mSM_CheckAbleChange_unable_shutter_label(play, (u32)actor)) {
+#endif
+#ifdef TARGET_PC
+        mSM_Set_unable_shutter_label(play, (uintptr_t)actor);
+#else
         mSM_Set_unable_shutter_label(play, (u32)actor);
+#endif
     }
 
     mGcgba_InitVar();
 }
 
 static void aPT_EndComm(PTERMINAL_ACTOR* actor, GAME_PLAY* play) {
+#ifdef TARGET_PC
+    if (mSM_CheckOwner_unable_shutter_label(play, (uintptr_t)actor)) {
+#else
     if (mSM_CheckOwner_unable_shutter_label(play, (u32)actor)) {
+#endif
         mSM_Set_unable_shutter_label(play, 0);
     }
 

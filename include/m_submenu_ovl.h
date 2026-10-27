@@ -115,9 +115,15 @@ typedef struct submenu_menu_info_s {
 
     int data0;
     int data1;
+#ifdef TARGET_PC
+    void* data2;
+    intptr_t data3; /* may hold a pointer */
+} mSM_MenuInfo_c;
+#else
     void* data2;
     int data3;
 } mSM_MenuInfo_c;
+#endif
 
 typedef void (*mSM_HAND_MOVE_FUNC)(Submenu*);
 typedef void (*mSM_HAND_DRAW_FUNC)(Submenu*, GAME*);

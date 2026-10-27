@@ -4,7 +4,11 @@ static int Player_actor_request_main_demo_wait_all(GAME* game, int umbrella_flag
         mPlayer_request_demo_wait_c* req_demo_wait_p = &player->requested_main_index_data.demo_wait;
 
         req_demo_wait_p->umbrella_flag = umbrella_flag;
+#ifdef TARGET_PC
+        req_demo_wait_p->label = (uintptr_t)label;
+#else
         req_demo_wait_p->label = (u32)label;
+#endif
         Player_actor_request_main_index(game, mPlayer_INDEX_DEMO_WAIT, prio);
         return TRUE;
     }

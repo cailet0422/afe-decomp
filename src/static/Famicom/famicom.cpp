@@ -827,7 +827,11 @@ static void SetupInternalCommentImage(u8* data) {
         famicomCommon.memcard_game_header.icon_flags = 0;
     }
 
+#ifdef TARGET_PC
+    famicomCommon.memcard_game_header.comment_img_size = (u32)((uintptr_t)data - (uintptr_t)data_p);
+#else
     famicomCommon.memcard_game_header.comment_img_size = (u32)data - (u32)data_p;
+#endif
 }
 
 static s32 memcard_data_save(
@@ -1210,7 +1214,11 @@ static s32 memcard_data_load(
 
         // Reading successful!
         OSReport("読み込み成功！！\n");
+#ifdef TARGET_PC
+        FamicomSaveDataHeader* read_save_header = (FamicomSaveDataHeader*)((uintptr_t)buf + status.offsetData);
+#else
         FamicomSaveDataHeader* read_save_header = (FamicomSaveDataHeader*)((u32)buf + status.offsetData);
+#endif
         
         if (famicom_save_data_check(read_save_header, -1, comment_img) == 0) {
             // The data is normal!
@@ -2051,7 +2059,11 @@ static int SetupResBanner(const ResTIMG* img, u8* dst, size_t max_size, size_t* 
     }
 
     if (size != nullptr) {
+#ifdef TARGET_PC
+        *size = (u32)((uintptr_t)data_p - (uintptr_t)dst);
+#else
         *size = (u32)data_p - (u32)dst;
+#endif
     }
 
     if (type != nullptr) {
@@ -2111,7 +2123,11 @@ static int SetupResIcon(const ResTIMG* img, u8* dst, size_t max_size, size_t* si
     }
 
     if (size_p != nullptr) {
+#ifdef TARGET_PC
+        *size_p = (u32)((uintptr_t)data_p - (uintptr_t)dst);
+#else
         *size_p = (u32)data_p - (u32)dst;
+#endif
     }
 
     if (icon_fmt_p != nullptr) {

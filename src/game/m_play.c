@@ -478,7 +478,11 @@ extern void play_init(GAME* game) {
     play->fade_color_value.rgba8888 = 0;
 
     freebytes = game_getFreeBytes(game);
+#ifdef TARGET_PC
+    alloc = (uintptr_t)THA_alloc16(&game->tha, freebytes);
+#else
     alloc = (u32)THA_alloc16(&game->tha, freebytes);
+#endif
     aligned = ALIGN_NEXT(alloc, 16);
     size = aligned - alloc;
 

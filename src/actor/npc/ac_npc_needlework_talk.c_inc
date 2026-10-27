@@ -97,13 +97,25 @@ static void aNNW_set_slot_name(int slot, int free_str) {
 }
 
 static void aNNW_ban_shutter(NPC_NEEDLEWORK_ACTOR* actor, GAME_PLAY* play) {
+#ifdef TARGET_PC
+    if (mSM_CheckAbleChange_unable_shutter_label(play, (uintptr_t)actor)) {
+#else
     if (mSM_CheckAbleChange_unable_shutter_label(play, (u32)actor)) {
+#endif
+#ifdef TARGET_PC
+        mSM_Set_unable_shutter_label(play, (uintptr_t)actor);
+#else
         mSM_Set_unable_shutter_label(play, (u32)actor);
+#endif
     }
 }
 
 static void aNNW_release_shutter(NPC_NEEDLEWORK_ACTOR* actor, GAME_PLAY* play) {
+#ifdef TARGET_PC
+    if (mSM_CheckOwner_unable_shutter_label(play, (uintptr_t)actor)) {
+#else
     if (mSM_CheckOwner_unable_shutter_label(play, (u32)actor)) {
+#endif
         mSM_Set_unable_shutter_label(play, 0);
     }
 }

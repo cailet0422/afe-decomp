@@ -43,7 +43,11 @@ class JKRExpHeap : public JKRHeap {
             return mGroupID;
         }
         static CMemBlock* getBlock(void* data) {
+#ifdef TARGET_PC
+            return (CMemBlock*)data - 1; /* the header is bigger with 64-bit pointers */
+#else
             return (CMemBlock*)((u32)data + -0x10);
+#endif
         }
 
         u16 mUsageHeader;    // _00

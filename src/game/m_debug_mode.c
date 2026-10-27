@@ -741,7 +741,11 @@ extern void Debug_mode_output(GRAPH* graph) {
         last_gfx = gfxprint_close(print_p);
         gSPEndDisplayList(last_gfx++);
 
+#ifdef TARGET_PC
+        glist_used_bytes = (intptr_t)last_gfx - (intptr_t)start_gfx;
+#else
         glist_used_bytes = (int)last_gfx - (int)start_gfx;
+#endif
         gfxclose(start_gfx, last_gfx);
         SET_POLY_OPA_DISP(last_gfx);
         gfxprint_cleanup(print_p);

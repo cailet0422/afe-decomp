@@ -8,7 +8,11 @@ static void fTSW_mv(FTR_ACTOR* ftr_actor, ACTOR* my_room_actor, GAME* game, u8* 
     if (aFTR_CAN_PLAY_SE(ftr_actor)) {
         u32 frame = play->game_frame;
 
+#ifdef TARGET_PC
+        sAdo_OngenPos((uintptr_t)ftr_actor, 0x54, &ftr_actor->position);
+#else
         sAdo_OngenPos((u32)ftr_actor, 0x54, &ftr_actor->position);
+#endif
 
         if ((frame & 7) == 0) {
             xyz_t effect_pos = ftr_actor->position;

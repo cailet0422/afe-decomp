@@ -137,10 +137,18 @@ static int aIBT_check_ball(aINS_INSECT_ACTOR* insect) {
 static void aIBT_set_fly_se(aINS_INSECT_ACTOR* insect) {
     switch (insect->type) {
         case aINS_INSECT_TYPE_LONG_LOCUST:
+#ifdef TARGET_PC
+            sAdo_OngenPos((uintptr_t)insect, 0xA2, &insect->tools_actor.actor_class.world.position);
+#else
             sAdo_OngenPos((u32)insect, 0xA2, &insect->tools_actor.actor_class.world.position);
+#endif
             break;
         case aINS_INSECT_TYPE_MIGRATORY_LOCUST:
+#ifdef TARGET_PC
+            sAdo_OngenPos((uintptr_t)insect, 0xA3, &insect->tools_actor.actor_class.world.position);
+#else
             sAdo_OngenPos((u32)insect, 0xA3, &insect->tools_actor.actor_class.world.position);
+#endif
             break;
     }
 }
@@ -152,7 +160,11 @@ static int aIBT_check_player_net_sub(xyz_t* net_pos, aINS_INSECT_ACTOR* insect) 
     ret = FALSE;
     if (mPlib_Check_StopNet(net_pos) == TRUE) {
         u32 label = mPlib_Get_item_net_catch_label();
+#ifdef TARGET_PC
+        if (label == (uintptr_t)insect) {
+#else
         if (label == (u32)insect) {
+#endif
             ret = TRUE;
         }
     }
@@ -185,7 +197,11 @@ static int aIBT_check_player_net2(aINS_INSECT_ACTOR* insect) {
     ret = FALSE;
     if (mPlib_Check_StopNet(&pos) == TRUE) {
         u32 label = mPlib_Get_item_net_catch_label();
+#ifdef TARGET_PC
+        if (label == (uintptr_t)insect) {
+#else
         if (label == (u32)insect) {
+#endif
             insect->s32_work1 = 1;
         } else {
             x = pos.x - insect->tools_actor.actor_class.world.position.x;
@@ -423,7 +439,11 @@ static void aIBT_wait(ACTOR* actor, GAME* game) {
                     aIBT_anime_proc(insect);
                 }
                 if (insect->s32_work1 == 0) {
+#ifdef TARGET_PC
+                    sAdo_OngenPos((uintptr_t)insect, batta_sound_data[idx], &actor->world.position);
+#else
                     sAdo_OngenPos((u32)insect, batta_sound_data[idx], &actor->world.position);
+#endif
                 }
             }
         }
@@ -569,7 +589,11 @@ void aIBT_actor_move(ACTOR* actor, GAME* game) {
 
     u32 label = mPlib_Get_item_net_catch_label();
 
+#ifdef TARGET_PC
+    if (label == (uintptr_t)actor) {
+#else
     if (label == (u32)actor) {
+#endif
         aIBT_setupAction(insect, aIBT_ACTION_LET_ESCAPE, game);
     } else {
         if (insect->insect_flags.timeup_escape_pending == TRUE && insect->insect_flags.ignore_escape_pending == FALSE) {

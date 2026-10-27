@@ -230,7 +230,11 @@ struct actor_structure_s {
 
     /* general purpose members with unique usage between structure actors */
     /* 0x2B8 */ int arg0;
+#ifdef TARGET_PC
+    intptr_t arg1; /* may hold a pointer */
+#else
     /* 0x2BC */ int arg1;
+#endif
     /* 0x2C0 */ int arg2;
     /* 0x2C4 */ int arg3;
 

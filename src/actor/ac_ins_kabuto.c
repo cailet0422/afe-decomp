@@ -129,7 +129,11 @@ static int aIKB_check_player_net(ACTOR* actorx) {
     if (mPlib_Check_StopNet(&net_pos) == TRUE) {
         u32 label = mPlib_Get_item_net_catch_label();
 
+#ifdef TARGET_PC
+        if (label != (uintptr_t)actorx) {
+#else
         if (label != (u32)actorx) {
+#endif
             f32 dX = net_pos.x - actorx->world.position.x;
             f32 dZ = net_pos.z - actorx->world.position.z;
 
@@ -207,7 +211,11 @@ static void aIKB_avoid(ACTOR* actorx, GAME* game) {
             break;
     }
 
+#ifdef TARGET_PC
+    sAdo_OngenPos((uintptr_t)actorx, ongen_se, &actorx->world.position);
+#else
     sAdo_OngenPos((u32)actorx, ongen_se, &actorx->world.position);
+#endif
 
     if (insect->bg_type != 2) {
         int h_ut_x;
@@ -304,7 +312,11 @@ static void aIKB_actor_move(ACTOR* actorx, GAME* game) {
     aINS_INSECT_ACTOR* insect = (aINS_INSECT_ACTOR*)actorx;
     u32 label = mPlib_Get_item_net_catch_label();
 
+#ifdef TARGET_PC
+    if (label == (uintptr_t)actorx) {
+#else
     if (label == (u32)actorx) {
+#endif
         aIKB_setupAction(insect, aIKB_ACTION_LET_ESCAPE, game);
     } else if (insect->insect_flags.timeup_escape_pending == TRUE && insect->insect_flags.ignore_escape_pending == FALSE) {
         aIKB_setupAction(insect, aIKB_ACTION_LET_ESCAPE, game);

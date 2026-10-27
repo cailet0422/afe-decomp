@@ -13,13 +13,25 @@ static void aSTC_clip_dt(void) {
 }
 
 static void aSTC_ban_shutter(NPC_STATION_MASTER_ACTOR* master, GAME_PLAY* play) {
+#ifdef TARGET_PC
+    if (mSM_CheckAbleChange_unable_shutter_label(play, (uintptr_t)master)) {
+#else
     if (mSM_CheckAbleChange_unable_shutter_label(play, (u32)master)) {
+#endif
+#ifdef TARGET_PC
+        mSM_Set_unable_shutter_label(play, (uintptr_t)master);
+#else
         mSM_Set_unable_shutter_label(play, (u32)master);
+#endif
     }
 }
 
 static void aSTC_release_shutter(NPC_STATION_MASTER_ACTOR* master, GAME_PLAY* play) {
+#ifdef TARGET_PC
+    if (mSM_CheckOwner_unable_shutter_label(play, (uintptr_t)master)) {
+#else
     if (mSM_CheckOwner_unable_shutter_label(play, (u32)master)) {
+#endif
         mSM_Set_unable_shutter_label(play, 0);
     }
 }

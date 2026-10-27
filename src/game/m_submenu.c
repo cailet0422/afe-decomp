@@ -200,7 +200,11 @@ extern void mSM_open_submenu_new(Submenu* submenu, int type, int arg0, int arg1,
     mSM_open_submenu_new2(submenu, type, arg0, arg1, arg2, 0);
 }
 
+#ifdef TARGET_PC
+extern void mSM_open_submenu_new2(Submenu* submenu, int type, int arg0, int arg1, void* arg2, intptr_t arg3) {
+#else
 extern void mSM_open_submenu_new2(Submenu* submenu, int type, int arg0, int arg1, void* arg2, int arg3) {
+#endif
     submenu->menu_type = type;
     submenu->param0 = arg0;
     submenu->param1 = arg1;
@@ -687,7 +691,11 @@ static char* mSM_Object_Exchange_keep_new(GAME_PLAY* play, s16 bank_id, size_t s
     bank->size = size;
 
     if (exchange->bank_idx < mSc_OBJECT_BANK_NUM - 1) {
+#ifdef TARGET_PC
+        exchange->next_bank_ram_address = (char*)ALIGN_NEXT((uintptr_t)(exchange->next_bank_ram_address + size), 16);
+#else
         exchange->next_bank_ram_address = (char*)ALIGN_NEXT((u32)(exchange->next_bank_ram_address + size), 16);
+#endif
         exchange->bank_idx++;
     }
 

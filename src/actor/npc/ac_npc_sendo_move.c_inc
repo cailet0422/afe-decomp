@@ -262,7 +262,11 @@ static void aSEN_pl_ride_off_end_wait(NPC_SENDO_ACTOR* sendo, GAME_PLAY* play) {
             Common_Set(cur_island_house_p, NULL);
         }
 
+#ifdef TARGET_PC
+        if (mSM_CheckOwner_unable_shutter_label(play, (uintptr_t)sendo)) {
+#else
         if (mSM_CheckOwner_unable_shutter_label(play, (u32)sendo)) {
+#endif
             mSM_Set_unable_shutter_label(play, 0);
         }
         aSEN_setup_think_proc(sendo, play, act);
@@ -490,8 +494,16 @@ static void aSEN_change_talk_proc(NPC_SENDO_ACTOR*, u8);
 static void aSEN_setup_pl_ride_on(NPC_SENDO_ACTOR* sendo, GAME_PLAY* play) {
     sendo->next_action = aSEN_ACTION_PL_RIDE_ON_END_WAIT;
     mDemo_Set_talk_return_demo_wait(TRUE);
+#ifdef TARGET_PC
+    if (mSM_CheckAbleChange_unable_shutter_label(play, (uintptr_t)sendo)) {
+#else
     if (mSM_CheckAbleChange_unable_shutter_label(play, (u32)sendo)) {
+#endif
+#ifdef TARGET_PC
+        mSM_Set_unable_shutter_label(play, (uintptr_t)sendo);
+#else
         mSM_Set_unable_shutter_label(play, (u32)sendo);
+#endif
     }
 }
 

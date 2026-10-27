@@ -261,7 +261,11 @@ extern u32 mAP_make_send_data(u8* buf, mActor_name_t npc0_name, mActor_name_t np
     bcopy(&distinguish, buf + ANIMAL_NAME_LEN * 5 + PLAYER_NAME_LEN + sizeof(u16) * 4, sizeof(u16));
     bcopy(pid, buf + ANIMAL_NAME_LEN * 5 + PLAYER_NAME_LEN + sizeof(u16) * 5, sizeof(PersonalID_c));
     size =
+#ifdef TARGET_PC
+        ((uintptr_t)buf + ANIMAL_NAME_LEN * 5 + PLAYER_NAME_LEN + sizeof(u16) * 5 + sizeof(PersonalID_c)) - (uintptr_t)buf_start_p;
+#else
         ((u32)buf + ANIMAL_NAME_LEN * 5 + PLAYER_NAME_LEN + sizeof(u16) * 5 + sizeof(PersonalID_c)) - (u32)buf_start_p;
+#endif
     return ALIGN_PREV(size + 4, 4);
 }
 

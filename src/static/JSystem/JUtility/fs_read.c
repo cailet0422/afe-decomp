@@ -264,7 +264,11 @@ u16 FS_ReadIODoing(SDFileInfo* pFileInfo, void* param2, u16 param3, u16 param4, 
     status = 0;
     temp_r19 = pFileInfo->pDriveInfo->unk_F6 * pFileInfo->pDriveInfo->unk_1C;
     temp_r24 = &FS_drv_ctl[pFileInfo->pDriveInfo->nChan];
+#ifdef TARGET_PC
+    someValue = (uintptr_t)param2;
+#else
     someValue = (u32)param2;
+#endif
     temp_r31 = pFileInfo->pDriveInfo;
 
     if (param5 == 0) {

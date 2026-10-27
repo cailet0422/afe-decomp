@@ -6,13 +6,25 @@ static void aNTT_to_birthday_demo(NPC_TOTAKEKE_ACTOR* totakeke) {
 }
 
 static void aNTT_ban_shutter(NPC_TOTAKEKE_ACTOR* totakeke, GAME_PLAY* play) {
+#ifdef TARGET_PC
+    if (mSM_CheckAbleChange_unable_shutter_label(play, (uintptr_t)totakeke)) {
+#else
     if (mSM_CheckAbleChange_unable_shutter_label(play, (u32)totakeke)) {
+#endif
+#ifdef TARGET_PC
+        mSM_Set_unable_shutter_label(play, (uintptr_t)totakeke);
+#else
         mSM_Set_unable_shutter_label(play, (u32)totakeke);
+#endif
     }
 }
 
 static void aNTT_release_shutter(NPC_TOTAKEKE_ACTOR* totakeke, GAME_PLAY* play) {
+#ifdef TARGET_PC
+    if (mSM_CheckOwner_unable_shutter_label(play, (uintptr_t)totakeke)) {
+#else
     if (mSM_CheckOwner_unable_shutter_label(play, (u32)totakeke)) {
+#endif
         mSM_Set_unable_shutter_label(play, 0);
     }
 }

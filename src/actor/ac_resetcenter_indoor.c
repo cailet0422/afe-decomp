@@ -48,7 +48,11 @@ static void aRI_tv_sound(void) {
     // static u8 tv_sfx[] = { 0x04, 0x05, 0x06, 0x5E }; // temp until e+ sfx is added
     static u8 sound; // used as a unique ID for sAdo_OngenPos
 
+#ifdef TARGET_PC
+    sAdo_OngenPos((uintptr_t)&sound, 0x61, &l_tv_position);
+#else
     sAdo_OngenPos((u32)&sound, 0x61, &l_tv_position);
+#endif
     // sAdo_OngenPos((u32)&sound, tv_sfx[RANDOM(ARRAY_COUNT(tv_sfx))], &l_tv_position); // Temp sfx until we get the correct one added
 }
 

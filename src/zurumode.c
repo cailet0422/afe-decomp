@@ -224,7 +224,11 @@ static void zurumode_callback(void* param) {
 
 static void zurumode_onFault(void* param) {
     if (zurumode_initialized) {
+#ifdef TARGET_PC
+        zurucheck_key_check(&zuruKeyCheck, (uintptr_t)param);
+#else
         zurucheck_key_check(&zuruKeyCheck, (u32)param);
+#endif
 
         if (zuruKeyCheck.zurumode_enabled) {
             APPNMI_ZURUMODE_SET();

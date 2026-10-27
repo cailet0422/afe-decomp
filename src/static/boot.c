@@ -288,9 +288,21 @@ void set_info_ReloadLink_module_IorO(u8* rest_p, u8* end_p) {
   size_t size = 0;
 
   if (rest_p != nullptr && end_p != nullptr) {
+#ifdef TARGET_PC
+    if ((u64)ALIGN_NEXT((uintptr_t)rest_p, 32) < (u64)ALIGN_PREV((uintptr_t)end_p, 32)) {
+#else
     if ((u64)ALIGN_NEXT((u32)rest_p, 32) < (u64)ALIGN_PREV((u32)end_p, 32)) {
+#endif
+#ifdef TARGET_PC
+      use_p = (u8*)ALIGN_NEXT((uintptr_t)rest_p, 32);
+#else
       use_p = (u8*)ALIGN_NEXT((u32)rest_p, 32);
+#endif
+#ifdef TARGET_PC
+      size = (u64)ALIGN_PREV((uintptr_t)end_p, 32) - (u64)ALIGN_NEXT((uintptr_t)rest_p, 32);
+#else
       size = (u64)ALIGN_PREV((u32)end_p, 32) - (u64)ALIGN_NEXT((u32)rest_p, 32);
+#endif
     }
   }
 
@@ -618,7 +630,11 @@ void adjustOSArena() {
   OSSetArenaHi(arenahi);
   OSReport("ARENA %08x-%08x" VT_RST "\n", arenalo, arenahi);
 
+#ifdef TARGET_PC
+  bzero(arenalo, ((uintptr_t)arenahi - (uintptr_t)arenalo));
+#else
   bzero(arenalo, ((u32)arenahi - (u32)arenalo));
+#endif
 }
 
 /**

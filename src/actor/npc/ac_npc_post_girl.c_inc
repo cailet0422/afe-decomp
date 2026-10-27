@@ -219,13 +219,25 @@ static void aPG_set_music_str(NPC_POSTGIRL_ACTOR* postgirl) {
 }
 
 static void aPG_ban_shutter(NPC_POSTGIRL_ACTOR* postgirl, GAME_PLAY* play) {
+#ifdef TARGET_PC
+    if (mSM_CheckAbleChange_unable_shutter_label(play, (uintptr_t)postgirl)) {
+#else
     if (mSM_CheckAbleChange_unable_shutter_label(play, (u32)postgirl)) {
+#endif
+#ifdef TARGET_PC
+        mSM_Set_unable_shutter_label(play, (uintptr_t)postgirl);
+#else
         mSM_Set_unable_shutter_label(play, (u32)postgirl);
+#endif
     }
 }
 
 static void aPG_release_shutter(NPC_POSTGIRL_ACTOR* postgirl, GAME_PLAY* play) {
+#ifdef TARGET_PC
+    if (mSM_CheckOwner_unable_shutter_label(play, (uintptr_t)postgirl)) {
+#else
     if (mSM_CheckOwner_unable_shutter_label(play, (u32)postgirl)) {
+#endif
         mSM_Set_unable_shutter_label(play, 0);
     }
 }

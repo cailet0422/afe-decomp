@@ -48,7 +48,11 @@ static void fTIC_mv(FTR_ACTOR* ftr_actor, ACTOR* my_room_actor, GAME* game, u8* 
         }
 
         if (ftr_actor->dynamic_work_f[0] >= 0.01f && ftr_actor->switch_bit == TRUE) {
+#ifdef TARGET_PC
+            sAdo_OngenPos((uintptr_t)ftr_actor, 0x51, &ftr_actor->position);
+#else
             sAdo_OngenPos((u32)ftr_actor, 0x51, &ftr_actor->position);
+#endif
         }
     }
 }

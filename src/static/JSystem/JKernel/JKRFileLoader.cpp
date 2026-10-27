@@ -132,7 +132,11 @@ JKRFileFinder* JKRFileLoader::findFirstFile(const char* volumeName) {
     return ret;
 }
 
+#ifdef TARGET_PC
+const char* JKRFileLoader::fetchVolumeName(char* buffer, s32 bufferSize, const char* path) {
+#else
 const char* JKRFileLoader::fetchVolumeName(char* buffer, long bufferSize, const char* path) {
+#endif
     static char rootPath[] = "/";
     if (strcmp(path, "/") == 0) {
         strcpy(buffer, rootPath);

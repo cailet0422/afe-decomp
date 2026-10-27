@@ -167,7 +167,11 @@ static void aCD1_clap(COUNTDOWN_NPC1_ACTOR* actor) {
     int idx = actor->npc_class.actor_class.npc_id - SP_NPC_EV_COUNTDOWN_1;
 
     aCD1_before_wait(actor);
+#ifdef TARGET_PC
+    sAdo_OngenPos((uintptr_t)actor, se_no[idx], &actor->npc_class.actor_class.world.position);
+#else
     sAdo_OngenPos((u32)actor, se_no[idx], &actor->npc_class.actor_class.world.position);
+#endif
 }
 
 static void aCD1_set_spd_info(COUNTDOWN_NPC1_ACTOR* actor, int action) {

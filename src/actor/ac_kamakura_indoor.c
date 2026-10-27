@@ -320,7 +320,11 @@ static void Kamakura_Indoor_Actor_move(ACTOR* actorx, GAME* game) {
     int i;
     s16 timer;
 
+#ifdef TARGET_PC
+    sAdo_OngenPos((uintptr_t)actorx, NA_SE_KOKORO_TOGURU, &k_indoor->mochi.pos);
+#else
     sAdo_OngenPos((u32)actorx, NA_SE_KOKORO_TOGURU, &k_indoor->mochi.pos);
+#endif
     if ((play->game_frame & 7) == 0) {
         xyz_t soba_yuge_pos = k_indoor->mochi.pos;
 

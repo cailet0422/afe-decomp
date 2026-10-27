@@ -20,7 +20,11 @@ static void aSumMinmin_mv(FTR_ACTOR* ftr_actor, ACTOR* my_room_actor, GAME* game
 
     if (aFTR_CAN_PLAY_SE(ftr_actor)) {
         keyframe = &ftr_actor->keyframe;
+#ifdef TARGET_PC
+        valid = sAdo_RoomIncectPos((uintptr_t)ftr_actor, 64, &ftr_actor->position);
+#else
         valid = sAdo_RoomIncectPos((u32)ftr_actor, 64, &ftr_actor->position);
+#endif
 
         if (valid != 0) {
             cKF_SkeletonInfo_R_init_standard_stop(keyframe, &cKF_ba_r_int_sum_minmin, NULL);

@@ -833,7 +833,11 @@ static void aITB_actor_move(ACTOR* actorx, GAME* game) {
     aINS_INSECT_ACTOR* ins = (aINS_INSECT_ACTOR*)actorx;
     u32 catch_label = (u32)mPlib_Get_item_net_catch_label();
 
+#ifdef TARGET_PC
+    if (catch_label == (uintptr_t)ins) {
+#else
     if (catch_label == (u32)ins) {
+#endif
         ins->alpha0 = 255;
         aITB_setupAction(ins, aITB_ACT_LET_ESCAPE, game);
     } else if (ins->insect_flags.timeup_escape_pending == TRUE && ins->insect_flags.ignore_escape_pending == FALSE) {

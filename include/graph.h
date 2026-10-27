@@ -279,9 +279,15 @@ extern void graph_dt(GRAPH* graph);
 
 #define FONT_DISP __font_gfx
 
+#ifdef TARGET_PC
+#define GRAPH_ALLOC(graph, size)                        \
+    ((void*)((graph)->polygon_opaque_thaga.tha.tail_p = \
+                 (graph)->polygon_opaque_thaga.tha.tail_p - (int)(size)))
+#else
 #define GRAPH_ALLOC(graph, size)                        \
     ((void*)((graph)->polygon_opaque_thaga.tha.tail_p = \
                  (char*)((int)(graph)->polygon_opaque_thaga.tha.tail_p - (int)(size))))
+#endif
 #define GRAPH_ALLOC_TYPE(graph, type, num) (GRAPH_ALLOC(graph, sizeof(type) * (num)))
 
 extern GRAPH graph_class;

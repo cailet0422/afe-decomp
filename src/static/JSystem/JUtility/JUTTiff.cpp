@@ -67,14 +67,22 @@ void JUTTiff::storeEntry_multidata(u8* buffer, u16 tag, void* value) {
     for (int i = 0; i < dataCount; i++) {
         if (dataType == ETYPE_SHORT) {
             u16 src = *(u16*)value;
+#ifdef TARGET_PC
+            value = (void*)((uintptr_t)value + sizeof(u16));
+#else
             value = (void*)((u32)value + sizeof(u16));
+#endif
             writeShort(m_IFDEntryAddr, src);
             m_IFDEntryAddr += sizeof(u16);
         }
         
         if (dataType == ETYPE_LONG || dataType == ETYPE_SLONG) {
             u32 src = *(u32*)value;
+#ifdef TARGET_PC
+            value = (void*)((uintptr_t)value + sizeof(u32));
+#else
             value = (void*)((u32)value + sizeof(u32));
+#endif
             writeLong(m_IFDEntryAddr, src);
             m_IFDEntryAddr += sizeof(u32);
         }

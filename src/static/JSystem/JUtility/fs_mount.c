@@ -724,7 +724,11 @@ u16 FS_ChkFDCfatal(SDDriveInfo* pDriveInfo, FSDescriptor* pFDC) {
         return 0xA01A;
     }
 
+#ifdef TARGET_PC
+    var_r30 = (u8*)((uintptr_t)var_r28 + offsetof(FSDescriptor, sectors_per_cluster));
+#else
     var_r30 = (u8*)((u32)var_r28 + offsetof(FSDescriptor, sectors_per_cluster));
+#endif
     if ((*var_r30 != 1) && (*var_r30 != 2) && (*var_r30 != 4) && (*var_r30 != 8) && (*var_r30 != 0x10) &&
         (*var_r30 != 0x20) && (*var_r30 != 0x40)) {
         pDriveInfo->unk_102 |= 1;
@@ -765,7 +769,11 @@ u16 FS_ChkFDCfatal(SDDriveInfo* pDriveInfo, FSDescriptor* pFDC) {
         return 0xA01A;
     }
 
+#ifdef TARGET_PC
+    var_r30 = (u8*)((uintptr_t)pFDC + offsetof(FSDescriptor, fs_type));
+#else
     var_r30 = (u8*)((u32)pFDC + offsetof(FSDescriptor, fs_type));
+#endif
     if (FS_strncmp((char*)var_r30, "FAT32   ", sizeof(var_r28->fs_type)) == 0) {
         pDriveInfo->unk_102 |= 1;
         return 0xA01A;

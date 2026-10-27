@@ -146,7 +146,11 @@ static int aISM_check_player_net(ACTOR* actorx) {
     if (mPlib_Check_StopNet(&net_pos) == TRUE) {
         u32 catch_label = mPlib_Get_item_net_catch_label();
 
+#ifdef TARGET_PC
+        if (catch_label == (uintptr_t)actorx) {
+#else
         if (catch_label == (u32)actorx) {
+#endif
             aISM_IS_CAUGHT(insect) = TRUE;
         } else {
             f32 dx = net_pos.x - actorx->world.position.x;
@@ -248,7 +252,11 @@ static void aISM_avoid(ACTOR* actorx, GAME* game) {
     }
 
     if (insect->type == aINS_INSECT_TYPE_BEE) {
+#ifdef TARGET_PC
+        sAdo_OngenPos((uintptr_t)actorx, NA_SE_26, &actorx->world.position);
+#else
         sAdo_OngenPos((u32)actorx, NA_SE_26, &actorx->world.position);
+#endif
     }
 }
 
@@ -277,7 +285,11 @@ static void aISM_wait(ACTOR* actorx, GAME* game) {
                     int semi_idx = insect->type - aINS_INSECT_TYPE_ROBUST_CICADA;
 
                     insect->timer = 0;
+#ifdef TARGET_PC
+                    sAdo_OngenPos((uintptr_t)actorx, semi_sound_data[semi_idx], &actorx->world.position);
+#else
                     sAdo_OngenPos((u32)actorx, semi_sound_data[semi_idx], &actorx->world.position);
+#endif
                     actorx->world.position.x = actorx->home.position.x + RANDOM_F(0.4f);
                 }
             } else {
@@ -378,7 +390,11 @@ static void aISM_actor_move(ACTOR* actorx, GAME* game) {
     aINS_INSECT_ACTOR* ins = (aINS_INSECT_ACTOR*)actorx;
     u32 catch_label = (u32)mPlib_Get_item_net_catch_label();
 
+#ifdef TARGET_PC
+    if (catch_label == (uintptr_t)ins) {
+#else
     if (catch_label == (u32)ins) {
+#endif
         aISM_setupAction(ins, aISM_ACT_LET_ESCAPE, game);
     } else if (ins->insect_flags.timeup_escape_pending == TRUE && ins->insect_flags.ignore_escape_pending == FALSE) {
         aISM_setupAction(ins, aISM_ACT_LET_ESCAPE, game);

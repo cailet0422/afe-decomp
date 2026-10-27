@@ -533,7 +533,14 @@ extern void JW_Init() {
     }
 #endif
 
+#ifdef TARGET_PC
+    SystemHeapSize = (u32)((uintptr_t)OSGetArenaHi() - (uintptr_t)OSGetArenaLo()) - 0xD0;
+#if UINTPTR_MAX > 0xFFFFFFFFu
+    SystemHeapSize -= 0x100; /* the root heap's bookkeeping is bigger with 64-bit pointers */
+#endif
+#else
     SystemHeapSize = (u32)OSGetArenaHi() - (u32)OSGetArenaLo() - 0xD0;
+#endif
     JC_JFWSystem_setMaxStdHeap(1);
     JC_JFWSystem_setSysHeapSize(SystemHeapSize);
     JC_JFWSystem_setFifoBufSize(0x10001);
@@ -724,28 +731,76 @@ long JW_AgbTargetMiniClient_InAgbArchiveFile1234_size;
 void* JW_AgbTargetMiniChild_InAgbArchiveFile1234_data_p;
 long JW_AgbTargetMiniChild_InAgbArchiveFile1234_size;
 
+#ifdef TARGET_PC
+extern uintptr_t JW_Get_AgbTargetNpcHead_InAgbArchiveFile0_data_p() {
+#else
 extern u32 JW_Get_AgbTargetNpcHead_InAgbArchiveFile0_data_p() {
+#endif
+#ifdef TARGET_PC
+    return (uintptr_t)JW_AgbTargetNpcHead_InAgbArchiveFile0_data_p;
+#else
     return (u32)JW_AgbTargetNpcHead_InAgbArchiveFile0_data_p;
+#endif
 }
 
+#ifdef TARGET_PC
+extern uintptr_t JW_Get_AgbTargetNpcBody_InAgbArchiveFile0_data_p() {
+#else
 extern u32 JW_Get_AgbTargetNpcBody_InAgbArchiveFile0_data_p() {
+#endif
+#ifdef TARGET_PC
+    return (uintptr_t)JW_AgbTargetNpcBody_InAgbArchiveFile0_data_p;
+#else
     return (u32)JW_AgbTargetNpcBody_InAgbArchiveFile0_data_p;
+#endif
 }
 
+#ifdef TARGET_PC
+extern uintptr_t JW_Get_AgbTargetNpcPal_InAgbArchiveFile0_data_p() {
+#else
 extern u32 JW_Get_AgbTargetNpcPal_InAgbArchiveFile0_data_p() {
+#endif
+#ifdef TARGET_PC
+    return (uintptr_t)JW_AgbTargetNpcPal_InAgbArchiveFile0_data_p;
+#else
     return (u32)JW_AgbTargetNpcPal_InAgbArchiveFile0_data_p;
+#endif
 }
 
+#ifdef TARGET_PC
+extern uintptr_t JW_Get_AgbTargetPlayerHead_InAgbArchiveFile0_data_p() {
+#else
 extern u32 JW_Get_AgbTargetPlayerHead_InAgbArchiveFile0_data_p() {
+#endif
+#ifdef TARGET_PC
+    return (uintptr_t)JW_AgbTargetPlayerHead_InAgbArchiveFile0_data_p;
+#else
     return (u32)JW_AgbTargetPlayerHead_InAgbArchiveFile0_data_p;
+#endif
 }
 
+#ifdef TARGET_PC
+extern uintptr_t JW_Get_AgbTargetPlayerBody_InAgbArchiveFile0_data_p() {
+#else
 extern u32 JW_Get_AgbTargetPlayerBody_InAgbArchiveFile0_data_p() {
+#endif
+#ifdef TARGET_PC
+    return (uintptr_t)JW_AgbTargetPlayerBody_InAgbArchiveFile0_data_p;
+#else
     return (u32)JW_AgbTargetPlayerBody_InAgbArchiveFile0_data_p;
+#endif
 }
 
+#ifdef TARGET_PC
+extern uintptr_t JW_Get_AgbTargetPlayerPal_InAgbArchiveFile0_data_p() {
+#else
 extern u32 JW_Get_AgbTargetPlayerPal_InAgbArchiveFile0_data_p() {
+#endif
+#ifdef TARGET_PC
+    return (uintptr_t)JW_AgbTargetPlayerPal_InAgbArchiveFile0_data_p;
+#else
     return (u32)JW_AgbTargetPlayerPal_InAgbArchiveFile0_data_p;
+#endif
 }
 
 extern u8* JW_Get_AgbTargetClient_InAgbArchiveFile1234_data_p() {
@@ -790,7 +845,11 @@ u32 JW_ArchiveExpandSize(u8* data) {
     return (data[4] << 24) | (data[5] << 16) | (data[6] << 8) | data[7];
 }
 
+#ifdef TARGET_PC
+u8* JW_FileLoad_DvdToMainRam_byName(char* name, u8** buf_p, uintptr_t buf_end) {
+#else
 u8* JW_FileLoad_DvdToMainRam_byName(char* name, u8** buf_p, u32 buf_end) {
+#endif
     u8* data = (u8*)JC__JKRDvdToMainRam_byName(name, *buf_p, EXPAND_SWITCH_DECOMPRESS);
 
     if (data == nullptr) {
@@ -799,9 +858,15 @@ u8* JW_FileLoad_DvdToMainRam_byName(char* name, u8** buf_p, u32 buf_end) {
     }
 
     *buf_p += JW_ArchiveExpandSize(data);
+#ifdef TARGET_PC
+    *buf_p = (u8*)ALIGN_NEXT((uintptr_t)*buf_p, 32);
+
+    if ((uintptr_t)*buf_p >= buf_end) {
+#else
     *buf_p = (u8*)ALIGN_NEXT((u32)*buf_p, 32);
 
     if ((u32)*buf_p >= buf_end) {
+#endif
         OSReport("\x1b[41;37m外専用ＡＧＢファイルが大きすぎます:%s\n\x1b[m", name);
         return nullptr;
     }
@@ -809,9 +874,15 @@ u8* JW_FileLoad_DvdToMainRam_byName(char* name, u8** buf_p, u32 buf_end) {
     return data;
 }
 
+#ifdef TARGET_PC
+JKRMemArchive* JW_Create_JKRMemArchive(u8** buf_p, uintptr_t buf_end) {
+    u8* buf = *buf_p;
+    uintptr_t next = ALIGN_NEXT((uintptr_t)buf + sizeof(JKRMemArchive), 32);
+#else
 JKRMemArchive* JW_Create_JKRMemArchive(u8** buf_p, u32 buf_end) {
     u8* buf = *buf_p;
     u32 next = ALIGN_NEXT((u32)buf + sizeof(JKRMemArchive), 32);
+#endif
 
     if (next >= buf_end) {
         OSReport("\x1b[41;37m外専用ＡＧＢアーカイブのインスタンスが確保できませんでした:%s %d\n\x1b[m",
@@ -858,7 +929,15 @@ extern void JW_Load_AGB_archive_outdoor(u8* buf, u32 size) {
     static char* target_file1_name[] = { "/agb_game0/mini_child0.bin", "/agb_game1/mini_child1.bin",
                                          "/agb_game2/mini_child2.bin" };
     u8* buf_p = buf;
+#ifdef TARGET_PC
+    uintptr_t buf_end = (uintptr_t)buf + size;
+#else
+#ifdef TARGET_PC
+    uintptr_t buf_end = (uintptr_t)buf + size;
+#else
     u32 buf_end = (u32)buf + size;
+#endif
+#endif
     u8* save_p;
 
     if (buf == nullptr || size == 0) {

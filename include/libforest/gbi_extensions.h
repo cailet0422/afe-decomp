@@ -11,7 +11,7 @@ extern "C" {
 
 #ifndef _GBI_STATIC_PTR
 #ifdef TARGET_PC
-#define _GBI_STATIC_PTR(s) (unsigned int)(uintptr_t)(s)
+#define _GBI_STATIC_PTR(s) (uintptr_t)(s)
 #else
 #define _GBI_STATIC_PTR(s) (unsigned int)(s)
 #endif
@@ -242,6 +242,7 @@ typedef struct {
     unsigned int c0:5;
     unsigned int a0:4;
     unsigned int cmd:8;
+    GBI_PC_W1_PAD
     unsigned int Ad1:3;
     unsigned int Ab1:3;
     unsigned int d1:3;
@@ -286,6 +287,7 @@ typedef struct {
     unsigned int Ab0:3;
     unsigned int Aa0:3;
     int cmd:8;
+    GBI_PC_W1_PAD
     unsigned int d1:4;
     unsigned int c1:4;
     unsigned int b1:4;
@@ -322,6 +324,7 @@ typedef struct {
     unsigned int lower0:16;
     unsigned int upper0:8;
     int cmd:8;
+    GBI_PC_W1_PAD
     unsigned int lower1:16;
     unsigned int upper1:16;
 } Gsetcombine_raw;
@@ -340,14 +343,19 @@ typedef struct {
     unsigned int yl:12;
     unsigned int xl:12;
     unsigned int cmd:8;
+    GBI_PC_W1_PAD
     unsigned int yh:12;
     unsigned int xh:12;
     unsigned int tile:3;
     unsigned int pad1:5;
+    GBI_PC_W1_PAD /* the rest of this w1; then the next two commands */
     unsigned int pad2:32;
+    GBI_PC_W1_PAD
     unsigned int t:16;
     unsigned int s:16;
+    GBI_PC_W1_PAD
     unsigned int pad3:32;
+    GBI_PC_W1_PAD
     unsigned int dtdy:16;
     unsigned int dsdx:16;
 } Gtexrect2;
@@ -380,6 +388,7 @@ typedef struct {
     unsigned int pad0:1;
     unsigned int dol_fmt:4;
     int cmd:8;
+    GBI_PC_W1_PAD
     unsigned int pad1:32;
 } Gsettile_dolphin;
 #else
@@ -402,6 +411,7 @@ typedef struct {
     unsigned int slen:10;
     unsigned int sl:14;
     int cmd:8;
+    GBI_PC_W1_PAD
     unsigned int tlen:10;
     unsigned int tl:14;
     unsigned int tile:3;
@@ -429,7 +439,8 @@ typedef struct {
     unsigned int siz:2;
     unsigned int fmt:3;
     int cmd:8;
-    unsigned int imgaddr:32;
+    GBI_PC_W1_PAD
+    uintptr_t imgaddr;
 } Gsetimg2;
 #else
 typedef struct {
@@ -456,7 +467,8 @@ typedef struct {
     unsigned int pad0:2;
     unsigned int type:2;
     int cmd:8;
-    unsigned int tlut_addr:32;
+    GBI_PC_W1_PAD
+    uintptr_t tlut_addr;
 } Gloadtlut_dolphin;
 #else
 typedef struct {
@@ -478,6 +490,7 @@ typedef struct {
     unsigned int pad:2;
     unsigned int xparam:8;
     unsigned int cmd:8;
+    GBI_PC_W1_PAD
     unsigned short t;
     unsigned short s;
 } Gtexture_internal;
@@ -499,7 +512,8 @@ typedef struct {
     unsigned int offset:16;
     unsigned int index:8;
     unsigned int cmd:8;
-    unsigned int data;
+    GBI_PC_W1_PAD
+    uintptr_t data; /* a segment's base address */
 } Gmoveword;
 #else
 typedef struct {
@@ -516,7 +530,8 @@ typedef struct {
     unsigned int offset:8;
     unsigned int length:8;
     unsigned int cmd:8;
-    unsigned int data;
+    GBI_PC_W1_PAD
+    uintptr_t data;
 } Gmovemem;
 #else
 typedef struct {
@@ -532,6 +547,7 @@ typedef struct {
 typedef struct Gsettexedgealpha {
     unsigned int unused0:24;
     unsigned int cmd:8;
+    GBI_PC_W1_PAD
     unsigned int tex_edge_alpha:8;
     unsigned int unused1:24;
 } Gsettexedgealpha;
@@ -551,6 +567,7 @@ typedef struct {
     unsigned int		x0frac:2;
     unsigned int		x0:10;
     int		            cmd:8;
+    GBI_PC_W1_PAD
     unsigned int		y1frac:2;
     unsigned int		y1:10;
     unsigned int		x1frac:2;
@@ -579,6 +596,7 @@ typedef struct {
     unsigned int		x0frac:2;
     unsigned int		x0:10;
     int		            cmd:8;
+    GBI_PC_W1_PAD
     unsigned int		y1frac:2;
     unsigned int		y1:10;
     unsigned int		x1frac:2;
@@ -605,7 +623,8 @@ typedef struct Gnoop {
     unsigned int param0: 16;
     unsigned int tag: 8;
     unsigned int cmd: 8;
-    unsigned int param1;
+    GBI_PC_W1_PAD
+    uintptr_t param1; /* may be a string */
 } Gnoop;
 #else
 typedef struct Gnoop {
@@ -622,7 +641,8 @@ typedef struct Gmtx {
     unsigned int pad: 8;
     unsigned int par: 8;
     unsigned int cmd: 8;
-    unsigned int addr;
+    GBI_PC_W1_PAD
+    uintptr_t addr;
 } Gmtx;
 #else
 typedef struct Gmtx {
@@ -641,7 +661,8 @@ typedef struct Gvtx {
     unsigned int n: 8;
     unsigned int pad0: 4;
     unsigned int cmd: 8;
-    unsigned int addr;
+    GBI_PC_W1_PAD
+    uintptr_t addr;
 } Gvtx;
 #else
 typedef struct Gvtx {
@@ -660,6 +681,7 @@ typedef struct Gline3D_new {
     unsigned int v1: 8;
     unsigned int v0: 8;
     unsigned int cmd: 8;
+    GBI_PC_W1_PAD
     unsigned int pad;
 } Gline3D_new;
 #else
@@ -678,6 +700,7 @@ typedef struct Gtri1 {
     unsigned int v1: 8;
     unsigned int v0: 8;
     unsigned int cmd: 8;
+    GBI_PC_W1_PAD
     unsigned int pad;
 } Gtri1;
 #else
@@ -696,6 +719,7 @@ typedef struct Gtri2 {
     unsigned int t0v1: 8;
     unsigned int t0v0: 8;
     int cmd: 8;
+    GBI_PC_W1_PAD
     unsigned int t1v2: 8;
     unsigned int t1v1: 8;
     unsigned int t1v0: 8;
@@ -722,6 +746,7 @@ typedef struct Gtrin_independ {
     unsigned int f2v2: 5;
     unsigned int count: 7;
     unsigned int cmd: 8;
+    GBI_PC_W1_PAD
     unsigned int is7bit: 1;
     unsigned int pad: 3;
     unsigned int f0v0: 5;
@@ -759,6 +784,7 @@ typedef struct Gtrin {
     unsigned int f3v0: 5;
     unsigned int f3v1: 5;
     unsigned int f3v2: 5;
+    GBI_PC_W1_PAD
     unsigned int is7bit: 1;
     unsigned int pad: 3;
     unsigned int f0v0: 5;
@@ -795,6 +821,7 @@ typedef struct Gtrin_7b {
     unsigned int f2v0: 7;
     unsigned int f2v1: 7;
     unsigned int f2v2: 7;
+    GBI_PC_W1_PAD
     unsigned int is7bit: 1;
     unsigned int f0v0: 7;
     unsigned int f0v1: 7;
@@ -826,6 +853,7 @@ typedef struct Gquad_independ {
     unsigned int unused: 5;
     unsigned int count: 7;
     unsigned int cmd: 8;
+    GBI_PC_W1_PAD
     unsigned int is7bit: 1;
     unsigned int pad: 3;
     unsigned int f0v0: 5;
@@ -863,6 +891,7 @@ typedef struct Gquad {
     unsigned int f2v1: 5;
     unsigned int f2v2: 5;
     unsigned int f2v3: 5;
+    GBI_PC_W1_PAD
     unsigned int is7bit: 1;
     unsigned int pad: 3;
     unsigned int f0v0: 5;
@@ -900,6 +929,7 @@ typedef struct Gquad_7b {
     unsigned int f1v1: 7;
     unsigned int f1v2: 7;
     unsigned int f1v3: 7;
+    GBI_PC_W1_PAD
     unsigned int is7bit: 1;
     unsigned int pad0: 3;
     unsigned int f0v0: 7;
@@ -930,6 +960,7 @@ typedef struct Gquad0 {
     unsigned int v1: 8;
     unsigned int v0: 8;
     int cmd: 8;
+    GBI_PC_W1_PAD
     unsigned int v3: 8;
     unsigned int pad: 24;
 } Gquad0;
@@ -949,6 +980,7 @@ typedef struct Gculldl {
     unsigned int vstart: 16;
     unsigned int pad0: 8;
     int cmd: 8;
+    GBI_PC_W1_PAD
     unsigned int vend: 16;
     unsigned int pad1: 16;
 } Gculldl;
@@ -967,6 +999,7 @@ typedef struct Gspecial1 {
     unsigned int param0: 16;
     int mode: 8;
     int cmd: 8;
+    GBI_PC_W1_PAD
     unsigned int param1;
 } Gspecial1;
 #else
@@ -984,6 +1017,7 @@ typedef struct {
 		u32		sft:8;
 		int		pad0:8;
 		int		cmd:8;
+		GBI_PC_W1_PAD
 		unsigned int	data:32;
 } Gsetothermode_dolphin;
 #else
@@ -1280,6 +1314,25 @@ do { \
 /* Macro for calling GC formatted display lists from N64 lists */
 #define gGXCallDisplayList(pkt, dl, nbytes) gDma1p(pkt, G_DL, dl, nbytes, G_DL_GXDL)
 #define gsGXCallDisplayList(dl, nbytes) gsDma1p(pkt, G_DL, dl, nbytes, G_DL_GXDL)
+#ifdef TARGET_PC
+
+/* w1 keeps the whole address (see gbi.h) */
+#undef gDPLoadTLUT_Dolphin
+#define gDPLoadTLUT_Dolphin(pkt, name, count, unk, addr) \
+do { \
+    Gfx* _g = (Gfx*)(pkt); \
+    _g->words.w0 = _SHIFTL(G_LOADTLUT, 24, 8) | _SHIFTL(G_TLUT_DOLPHIN, 22, 2) | _SHIFTL(name, 16, 4) | _SHIFTL(unk, 14, 2) | _SHIFTL(count, 0, 14); \
+    _g->words.w1 = (uintptr_t)addr; \
+} while (0)
+#undef gDPSetTextureImage_Dolphin
+#define gDPSetTextureImage_Dolphin(pkt, fmt, siz, h, w, img) \
+{{ \
+    Gfx* _gfx = (Gfx*)(pkt); \
+    _gfx->words.w0 = _SHIFTL(G_SETTIMG, 24, 8) | _SHIFTL(fmt, 21, 3) | _SHIFTL(siz, 19, 2) | _SHIFTL(1, 18, 1) | \
+        _SHIFTL((h/4)-1, 10, 8) | _SHIFTL((w-1), 0, 10); \
+    _gfx->words.w1 = (uintptr_t)img; \
+}}
+#endif
 
 // clang-format on
 

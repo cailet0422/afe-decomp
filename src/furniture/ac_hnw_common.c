@@ -342,7 +342,11 @@ static cKF_Animation_R_c cKF_ba_r_int_hnw_off = {
 };
 
 static void aHnwCommon_RhythmStart(FTR_ACTOR* ftr_actor, int state, s8 delay) {
+#ifdef TARGET_PC
+    sAdo_RhythmStart((uintptr_t)ftr_actor, state + 1, delay);
+#else
     sAdo_RhythmStart((u32)ftr_actor, state + 1, delay);
+#endif
     ftr_actor->dynamic_work_s[0] = 0;
     ftr_actor->dynamic_work_f[1] = 0.0f;
 }
@@ -406,13 +410,25 @@ static void aHnwCommon_mv(FTR_ACTOR* ftr_actor, ACTOR* my_room_actor, GAME* game
                 return;
             }
 
+#ifdef TARGET_PC
+            delay = sAdo_GetRhythmDelay((uintptr_t)ftr_actor);
+#else
             delay = sAdo_GetRhythmDelay((u32)ftr_actor);
+#endif
             if (delay != -1) {
                 ftr_actor->haniwa_step = delay;
             }
 
+#ifdef TARGET_PC
+            sAdo_RhythmPos((uintptr_t)ftr_actor, haniwa_idx + 1, &ftr_actor->position);
+#else
             sAdo_RhythmPos((u32)ftr_actor, haniwa_idx + 1, &ftr_actor->position);
+#endif
+#ifdef TARGET_PC
+            counter = sAdo_GetRhythmAnimCounter((uintptr_t)ftr_actor);
+#else
             counter = sAdo_GetRhythmAnimCounter((u32)ftr_actor);
+#endif
 
             if (counter >= 0.0f) {
                 if (counter < ftr_actor->dynamic_work_f[1]) {
@@ -466,7 +482,11 @@ static void aHnwCommon_mv(FTR_ACTOR* ftr_actor, ACTOR* my_room_actor, GAME* game
             }
 
             if (ftr_actor->switch_changed_flag && ftr_actor->switch_bit == FALSE) {
+#ifdef TARGET_PC
+                sAdo_RhythmStop((uintptr_t)ftr_actor);
+#else
                 sAdo_RhythmStop((u32)ftr_actor);
+#endif
                 ftr_actor->haniwa_state = aFTR_HNW_STATE_OFF;
                 cKF_SkeletonInfo_R_init(keyframe, keyframe->skeleton, &cKF_ba_r_int_hnw_off, 1.0f,
                                         cKF_ba_r_int_hnw_off.frames, 0.0f, 0.0f, 10.0f, cKF_FRAMECONTROL_STOP, NULL);
@@ -501,7 +521,11 @@ static void aHnwCommon_dw(FTR_ACTOR* ftr_actor, ACTOR* my_room_actor, GAME* game
 }
 
 static void aHnwCommon_dt(FTR_ACTOR* ftr_actor, u8* data) {
+#ifdef TARGET_PC
+    sAdo_RhythmStop((uintptr_t)ftr_actor);
+#else
     sAdo_RhythmStop((u32)ftr_actor);
+#endif
 }
 
 static void aHnwCommon_dma(mActor_name_t ftr_name, u8* data) {

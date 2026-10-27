@@ -33,7 +33,11 @@ static void eLove_mv(eEC_Effect_c* effect, GAME* game) {
     u16 name;
 
     eEC_CLIP->set_continious_env_proc(effect, 52, 102);
+#ifdef TARGET_PC
+    sAdo_OngenPos((uintptr_t)effect, 14, &effect->position);
+#else
     sAdo_OngenPos((u32)effect, 14, &effect->position);
+#endif
 
     if ((effect->timer & 7) == 0) {
         name = effect->item_name;

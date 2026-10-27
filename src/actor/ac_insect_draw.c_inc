@@ -209,7 +209,11 @@ static void aINS_actor_draw(ACTOR* actorx, GAME* game) {
 
                     alpha = insect->alpha0;
                     label = mPlib_Get_item_net_catch_label();
+#ifdef TARGET_PC
+                    if (label != (uintptr_t)insect && Camera2_CheckCullingMode() &&
+#else
                     if (label != (u32)insect && Camera2_CheckCullingMode() &&
+#endif
                         Camera2_CheckEnterCullingArea(insect->tools_actor.actor_class.world.position.x,
                                                       insect->tools_actor.actor_class.world.position.z, 60.0f)) {
                         alpha = 0;

@@ -1015,7 +1015,11 @@ static int aSMAN_process_player_push(ACTOR* actorx, GAME* game) {
 
                 aSMAN_Make_Effect_Ground(actorx, game);
                 if (actorx->speed > 1.0f) {
+#ifdef TARGET_PC
+                    sAdo_OngenPos((uintptr_t)actorx, 52, &actorx->world.position);
+#else
                     sAdo_OngenPos((u32)actorx, 52, &actorx->world.position);
+#endif
                 }
                 aSMAN_player_push_scroll_request(actorx, game);
             }

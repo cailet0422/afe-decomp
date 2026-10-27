@@ -6,11 +6,19 @@
 
 #define OS_MALLOC_MAGIC 0x7373 // ('ss') magic number for an OSMemBlock
 #define OS_MALLOC_BLOCK_OK(block) ((block) != NULL && (block)->magic == OS_MALLOC_MAGIC) // check if OSMemBlock structure is OK
+#ifdef TARGET_PC
+#define OS_MALLOC_DATA2BLOCK(data) ((OSMemBlock*)((uintptr_t)(data) - sizeof(OSMemBlock)))
+#else
 #define OS_MALLOC_DATA2BLOCK(data) ((OSMemBlock*)((u32)(data) - sizeof(OSMemBlock))) // get memblock data pointer from OSMemBlock
+#endif
 #define OS_MALLOC_BLOCK2DATA(block) ((u8*)(block) + sizeof(OSMemBlock)) // get OSMemBlock pointer from data
 
 // Gets the pointer to the next OSMemBlock immediately following this block in RAM, may or may not be a valid OSMemBlock
+#ifdef TARGET_PC
+#define OS_MALLOC_NEXTMEMBLOCK(block) ((OSMemBlock*)((uintptr_t)(block) + sizeof(OSMemBlock) + (block)->size))
+#else
 #define OS_MALLOC_NEXTMEMBLOCK(block) ((OSMemBlock*)((u32)(block) + sizeof(OSMemBlock) + (block)->size))
+#endif
 
 int __osMalloc_FreeBlockTest_Enable = FALSE;
 
@@ -53,12 +61,20 @@ static int is_block_valid(OSMemBlock* block) {
         }
 
         next = block->next;
+#ifdef TARGET_PC
+        if (next != NULL && (!OS_MALLOC_CHK_BLOCK(next) || ((uintptr_t)next > (uintptr_t)block && (uintptr_t)block + sizeof(OSMemBlock) + block->size < (uintptr_t)next) || next->prev != block)) {
+#else
         if (next != NULL && (!OS_MALLOC_CHK_BLOCK(next) || ((u32)next > (u32)block && (u32)block + sizeof(OSMemBlock) + block->size < (u32)next) || next->prev != block)) {
+#endif
             return FALSE;
         }
 
         prev = block->prev;
+#ifdef TARGET_PC
+        if (prev != NULL && (!OS_MALLOC_CHK_BLOCK(prev) || ((uintptr_t)prev < (uintptr_t)block && (uintptr_t)prev + sizeof(OSMemBlock) + prev->size > (uintptr_t)block) || prev->next != block)) {
+#else
         if (prev != NULL && (!OS_MALLOC_CHK_BLOCK(prev) || ((u32)prev < (u32)block && (u32)prev + sizeof(OSMemBlock) + prev->size > (u32)block) || prev->next != block)) {
+#endif
             return FALSE;
         }
     }
@@ -117,8 +133,16 @@ extern void __osMallocAddBlock(OSArena* arena, u8* base, s32 size) {
     OSMemBlock* last;
     
     if (base != NULL) {
+#ifdef TARGET_PC
+        block = (OSMemBlock*)ALIGN_NEXT((uintptr_t)base, 32);
+#else
         block = (OSMemBlock*)ALIGN_NEXT((u32)base, 32);
+#endif
+#ifdef TARGET_PC
+        align_size = ALIGN_PREV(size - ((uintptr_t)block - (uintptr_t)base), 32);
+#else
         align_size = ALIGN_PREV(size - ((u32)block - (u32)base), 32);
+#endif
 
         if (align_size > (int)sizeof(OSMemBlock)) {
             memset(block, 0xAB, align_size);
@@ -223,9 +247,17 @@ static void* __osMallocAlign_NoLock(OSArena* arena, u32 size, u32 align) {
     mask = align - 1;
     while (block != NULL) {
         if (block->free) {
+#ifdef TARGET_PC
+            remain = ((uintptr_t)block + sizeof(OSMemBlock)) & mask;
+#else
             remain = ((u32)block + sizeof(OSMemBlock)) & mask;
+#endif
             alignment_bytes = remain == 0 ? 0 : align - remain;
+#ifdef TARGET_PC
+            aligned_block = (OSMemBlock*)((uintptr_t)block + alignment_bytes);
+#else
             aligned_block = (OSMemBlock*)((u32)block + alignment_bytes);
+#endif
 
             if (block->size - alignment_bytes >= size) {
                 if (arena->flags & OSArena_FLAG_FREE_BLOCK_TEST) {
@@ -249,7 +281,11 @@ static void* __osMallocAlign_NoLock(OSArena* arena, u32 size, u32 align) {
                 }
 
                 if (block->size > full_size) {
+#ifdef TARGET_PC
+                    new_next = (OSMemBlock*)((uintptr_t)block + full_size);
+#else
                     new_next = (OSMemBlock*)((u32)block + full_size);
+#endif
                     next = get_block_next(block);
                     new_next->next = next;
                     new_next->prev = block;
@@ -316,7 +352,11 @@ extern void* __osMallocR(OSArena* arena, u32 size) {
             }
 
             if (block->size > full_size) {
+#ifdef TARGET_PC
+                next = (OSMemBlock*)((uintptr_t)block + block->size - size);
+#else
                 next = (OSMemBlock*)((u32)block + block->size - size);
+#endif
                 n = get_block_next(block);
                 next->next = n;
                 next->prev = block;
@@ -451,7 +491,11 @@ extern void* __osRealloc(OSArena* arena, void* ptr, u32 size) {
             next = get_block_next(orig_block);
             need_size = size - orig_block->size;
             if (next == OS_MALLOC_NEXTMEMBLOCK(orig_block) && next->free && next->size >= need_size) {
+#ifdef TARGET_PC
+                OSMemBlock* new_next = (OSMemBlock*)((uintptr_t)next + need_size);
+#else
                 OSMemBlock* new_next = (OSMemBlock*)((u32)next + need_size);
+#endif
                 next->size -= need_size;
                 temp = get_block_next(next);
                 if (temp != NULL) {
@@ -471,7 +515,11 @@ extern void* __osRealloc(OSArena* arena, void* ptr, u32 size) {
         } else if (size < orig_block->size) {
             next = get_block_next(orig_block);
             if (next != NULL && next->free) {
+#ifdef TARGET_PC
+                OSMemBlock* new_next = (OSMemBlock*)((uintptr_t)orig_block + full_size);
+#else
                 OSMemBlock* new_next = (OSMemBlock*)((u32)orig_block + full_size);
+#endif
                 *new_next = *next;
                 new_next->size += orig_block->size - size;
                 temp = get_block_next(next);
@@ -481,7 +529,11 @@ extern void* __osRealloc(OSArena* arena, void* ptr, u32 size) {
                     temp->prev = new_next;
                 }
             } else if (size + sizeof(OSMemBlock) < orig_block->size) {
+#ifdef TARGET_PC
+                new_next = (OSMemBlock*)((uintptr_t)orig_block + full_size);
+#else
                 new_next = (OSMemBlock*)((u32)orig_block + full_size);
+#endif
                 temp = get_block_next(orig_block);
                 new_next->next = temp;
                 new_next->prev = orig_block;
@@ -612,7 +664,11 @@ extern void __osDisplayArena(OSArena* arena) {
         while (block != NULL) {
             if (is_block_valid(block)) {
                 next = block->next;
+#ifdef TARGET_PC
+                OSReport("%08x-%08x%c %s %08x", (uintptr_t)block, (uintptr_t)block + sizeof(OSMemBlock) + block->size, next == NULL ? '$' : (next->prev != block ? '!' : ' '), block->free ? "空き" : "確保", block->size);
+#else
                 OSReport("%08x-%08x%c %s %08x", (u32)block, (u32)block + sizeof(OSMemBlock) + block->size, next == NULL ? '$' : (next->prev != block ? '!' : ' '), block->free ? "空き" : "確保", block->size);
+#endif
                 if (!block->free) {
                     // 空き = free, 確保 = used
                     OSReport(" [%016llu:%2d:%s:%d]", OSTicksToMicroseconds((u64)block->time * 1000), block->threadId, block->file != NULL ? block->file : "**NULL**", block->line);

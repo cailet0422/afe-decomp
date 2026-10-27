@@ -22,7 +22,11 @@ class JKRFileLoader : public JKRDisposer {
     virtual void removeResourceAll() = 0;                                                              // _24
     virtual bool removeResource(void*) = 0;                                                            // _28
     virtual bool detachResource(void*) = 0;                                                            // _2C
+#ifdef TARGET_PC
+    virtual s32 getResSize(const void*) const = 0;
+#else
     virtual long getResSize(const void*) const = 0;                                                    // _30
+#endif
     virtual u32 countFile(const char*) const = 0;                                                      // _34
     virtual JKRFileFinder* getFirstFile(const char*) const = 0;                                        // _38
 
@@ -45,7 +49,11 @@ class JKRFileLoader : public JKRDisposer {
 
     static JKRFileLoader* findVolume(const char**);
     static JKRFileFinder* findFirstFile(const char*);
+#ifdef TARGET_PC
+    static const char* fetchVolumeName(char*, s32, const char*);
+#else
     static const char* fetchVolumeName(char*, long, const char*);
+#endif
 
     static JKRFileLoader* getCurrentVolume() {
         return sCurrentVolume;

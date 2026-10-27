@@ -10,13 +10,25 @@ static void aSTM_Change_sound(NPC_STATION_MASTER_ACTOR* actor, u16 sound) {
 }
 
 static void aSTM_ban_shutter(NPC_STATION_MASTER_ACTOR* actor, GAME_PLAY* play) {
+#ifdef TARGET_PC
+    if (mSM_CheckAbleChange_unable_shutter_label(play, (uintptr_t)actor)) {
+#else
     if (mSM_CheckAbleChange_unable_shutter_label(play, (u32)actor)) {
+#endif
+#ifdef TARGET_PC
+        mSM_Set_unable_shutter_label(play, (uintptr_t)actor);
+#else
         mSM_Set_unable_shutter_label(play, (u32)actor);
+#endif
     }
 }
 
 static void aSTM_release_shutter(NPC_STATION_MASTER_ACTOR* actor, GAME_PLAY* play) {
+#ifdef TARGET_PC
+    if (mSM_CheckOwner_unable_shutter_label(play, (uintptr_t)actor)) {
+#else
     if (mSM_CheckOwner_unable_shutter_label(play, (u32)actor)) {
+#endif
         mSM_Set_unable_shutter_label(play, 0);
     }
 }

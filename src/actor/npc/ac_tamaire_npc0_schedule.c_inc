@@ -55,7 +55,11 @@ static void aTMN0_timer_next(TAMAIRE_NPC0_ACTOR* actor, GAME_PLAY* play) {
     }
 
     if (actor->npc_class.draw.animation_id == aNPC_ANIM_CLAP1) {
+#ifdef TARGET_PC
+        sAdo_OngenPos((uintptr_t)actorx, NA_SE_2F, &actorx->world.position);
+#else
         sAdo_OngenPos((u32)actorx, NA_SE_2F, &actorx->world.position);
+#endif
     }
 }
 

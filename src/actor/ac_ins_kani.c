@@ -401,7 +401,11 @@ static void aIKN_avoid(ACTOR* actorx, GAME* game) {
     int action = -1;
 
     aIKN_anime_proc(insect);
+#ifdef TARGET_PC
+    sAdo_OngenPos((uintptr_t)insect, NA_ONGEN_POS_SE_63, &insect->tools_actor.actor_class.world.position); // TODO: 0x60 is last ongen entry in AC
+#else
     sAdo_OngenPos((u32)insect, NA_ONGEN_POS_SE_63, &insect->tools_actor.actor_class.world.position); // TODO: 0x60 is last ongen entry in AC
+#endif
 
     if (actorx->bg_collision_check.result.jump_flag) {
         action = aIKN_ACT_DIVE;
@@ -482,7 +486,11 @@ static void aIKN_move(ACTOR* actorx, GAME* game) {
     aINS_INSECT_ACTOR* insect = (aINS_INSECT_ACTOR*)actorx;
 
     aIKN_anime_proc(insect);
+#ifdef TARGET_PC
+    sAdo_OngenPos((uintptr_t)insect, NA_ONGEN_POS_SE_63, &actorx->world.position);
+#else
     sAdo_OngenPos((u32)insect, NA_ONGEN_POS_SE_63, &actorx->world.position);
+#endif
 
     if ((actorx->bg_collision_check.result.jump_flag) != 0) {
         aIKN_setupAction(insect, aIKN_ACT_DIVE, game);
@@ -558,7 +566,11 @@ static void aIKN_appear_from_shell(ACTOR* actorx, GAME* game) {
     aINS_INSECT_ACTOR* insect = (aINS_INSECT_ACTOR*)actorx;
 
     aIKN_anime_proc(insect);
+#ifdef TARGET_PC
+    sAdo_OngenPos((uintptr_t)insect, NA_ONGEN_POS_SE_63, &actorx->world.position);
+#else
     sAdo_OngenPos((u32)insect, NA_ONGEN_POS_SE_63, &actorx->world.position);
+#endif
     insect->continue_timer += 15;
     if (insect->continue_timer > 100) {
         int action = aIKN_ACT_AVOID;
@@ -576,7 +588,11 @@ static void aIKN_into_shell(ACTOR* actorx, GAME* game) {
     aINS_INSECT_ACTOR* insect = (aINS_INSECT_ACTOR*)actorx;
 
     aIKN_anime_proc(insect);
+#ifdef TARGET_PC
+    sAdo_OngenPos((uintptr_t)insect, NA_ONGEN_POS_SE_63, &actorx->world.position);
+#else
     sAdo_OngenPos((u32)insect, NA_ONGEN_POS_SE_63, &actorx->world.position);
+#endif
     insect->continue_timer -= 15;
     if (insect->continue_timer < 0) {
         insect->continue_timer = 0;
@@ -588,7 +604,11 @@ static void aIKN_turn(ACTOR* actorx, GAME* game) {
     aINS_INSECT_ACTOR* insect = (aINS_INSECT_ACTOR*)actorx;
 
     aIKN_anime_proc(insect);
+#ifdef TARGET_PC
+    sAdo_OngenPos((uintptr_t)insect, NA_ONGEN_POS_SE_63, &actorx->world.position);
+#else
     sAdo_OngenPos((u32)insect, NA_ONGEN_POS_SE_63, &actorx->world.position);
+#endif
     
     if (aIKN_chase_angleY(insect, insect->s32_work0, 0x200) == TRUE) {
         insect->s32_work2 = DEG2SHORT_ANGLE2(0.0f);
@@ -660,7 +680,11 @@ static void aIKN_struggle_yasi(ACTOR* actorx, GAME* game) {
     insect->timer--;
     if (insect->timer <= 120) {
         aIKN_anime_proc(insect);
+#ifdef TARGET_PC
+        sAdo_OngenPos((uintptr_t)actorx, NA_ONGEN_POS_SE_15, &actorx->world.position);
+#else
         sAdo_OngenPos((u32)actorx, NA_ONGEN_POS_SE_15, &actorx->world.position);
+#endif
         if (insect->timer <= 0) {
             aIKN_setupAction(insect, aIKN_ACT_ROLL_YASI, game);
         }
@@ -989,7 +1013,11 @@ static void aIKN_actor_move(ACTOR* actorx, GAME* game) {
     aINS_INSECT_ACTOR* insect = (aINS_INSECT_ACTOR*)actorx;
     u32 label = mPlib_Get_item_net_catch_label();
 
+#ifdef TARGET_PC
+    if (label == (uintptr_t)insect) {
+#else
     if (label == (u32)insect) {
+#endif
         insect->alpha0 = 255;
         actorx->shape_info.rotation.y = DEG2SHORT_ANGLE2(180.0f);
         aIKN_setupAction(insect, aIKN_ACT_LET_ESCAPE, game);

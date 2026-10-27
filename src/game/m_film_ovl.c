@@ -900,7 +900,11 @@ static void mFL_move_Wait(Submenu* submenu, mSM_MenuInfo_c* menu) {
 
         switch (status) {
         case 0:
+#ifdef TARGET_PC
+            film_ovl->prbuf = (void*)ALIGN_NEXT((uintptr_t)film_ovl->sdcard_buf + 0xE3D00, 32);
+#else
             film_ovl->prbuf = (void*)ALIGN_NEXT((u32)film_ovl->sdcard_buf + 0xE3D00, 32);
+#endif
             if (mSD_TiffToRGB565(film_ovl->sdcard_buf, film_ovl->prbuf) == 0) {
                 film_ovl->next_strb_idx = 0x26;
             } else {

@@ -2398,7 +2398,11 @@ void *FS_memset(void *dest, u16 ch, size_t count) {
     var_r31 = count;
 
 
+#ifdef TARGET_PC
+    while (((uintptr_t) var_r29 & 3) && var_r31 != 0) {
+#else
     while (((u32) var_r29 & 3) && var_r31 != 0) {
+#endif
         *var_r29++ = ch;
         var_r31--;
     }
@@ -2464,12 +2468,20 @@ char *FS_strncpy(char *dest, const char *src, size_t num) {
         var_r30 = (char*)src;
         var_r28 = num;
 
+#ifdef TARGET_PC
+        if (((intptr_t) dest & 1) && ((intptr_t) var_r30 & 1)) {
+#else
         if (((s32) dest & 1) && ((s32) var_r30 & 1)) {
+#endif
             *var_r31 = *var_r30;
             var_r31++;
             var_r30++;
             var_r28--;
+#ifdef TARGET_PC
+        } else if (((intptr_t) var_r31 & 1) || ((intptr_t) var_r30 & 1)) {
+#else
         } else if (((s32) var_r31 & 1) || ((s32) var_r30 & 1)) {
+#endif
             var_r29 = 0;
 
             while (var_r29 < var_r28) {

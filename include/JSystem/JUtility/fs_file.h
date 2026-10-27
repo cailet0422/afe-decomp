@@ -163,7 +163,11 @@ typedef struct DrvCtl {
     /* 0x259DE */ char pad_unk_259DE[0x25E48 - 0x259DE];
 } DrvCtl; // size = 0x25E48
 
+#ifdef TARGET_PC
+#define PTR_UNK(pDrvCtl, index) ((u8*)((uintptr_t)pDrvCtl->unk_5F8 + index))
+#else
 #define PTR_UNK(pDrvCtl, index) ((u8*)((u32)pDrvCtl->unk_5F8 + index))
+#endif
 
 #define GET_FILE_INFO_COUNT(pDrvCtl, pDriveInfo) \
     ((u16)((pDriveInfo)->unk_04 == 1 ? ARRAY_COUNT((pDrvCtl)->unk_210) : ARRAY_COUNT((pDrvCtl)->unk_47C)))

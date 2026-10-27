@@ -68,8 +68,16 @@ static void mTRC_KishaStatusLevel(GAME_PLAY* play, f32 speed, xyz_t pos) {
     distance2 = sqrtf(SQ(x) + SQ(y) + SQ(z));
     unsigned_angle2 = (int)angle;
 
+#ifdef TARGET_PC
+    ongen = (uintptr_t)Common_GetPointer(train_coming_flag);
+#else
     ongen = (u32)Common_GetPointer(train_coming_flag);
+#endif
+#ifdef TARGET_PC
+    ongen2 = (uintptr_t)Common_GetPointer(train_exists_flag);
+#else
     ongen2 = (u32)Common_GetPointer(train_exists_flag);
+#endif
     sAdos_KishaStatusLevel(speed, ongen, distance, unsigned_angle,
                            ongen2, distance2, unsigned_angle2);
 }

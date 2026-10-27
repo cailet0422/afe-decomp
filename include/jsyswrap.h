@@ -173,12 +173,36 @@ extern u8* JW_Get_AgbTarget_EditorLoader_data_p(void);
 extern size_t JW_Get_AgbTarget_EditorLoader_size(void);
 extern u8* JW_Get_AgbTarget_EditorProg_data_p(void);
 extern size_t JW_Get_AgbTarget_EditorProg_size(void);
+#ifdef TARGET_PC
+extern uintptr_t JW_Get_AgbTargetNpcHead_InAgbArchiveFile0_data_p(void);
+#else
 extern u32 JW_Get_AgbTargetNpcHead_InAgbArchiveFile0_data_p(void);
+#endif
+#ifdef TARGET_PC
+extern uintptr_t JW_Get_AgbTargetNpcPal_InAgbArchiveFile0_data_p(void);
+#else
 extern u32 JW_Get_AgbTargetNpcPal_InAgbArchiveFile0_data_p(void);
+#endif
+#ifdef TARGET_PC
+extern uintptr_t JW_Get_AgbTargetNpcBody_InAgbArchiveFile0_data_p(void);
+#else
 extern u32 JW_Get_AgbTargetNpcBody_InAgbArchiveFile0_data_p(void);
+#endif
+#ifdef TARGET_PC
+extern uintptr_t JW_Get_AgbTargetPlayerHead_InAgbArchiveFile0_data_p(void);
+#else
 extern u32 JW_Get_AgbTargetPlayerHead_InAgbArchiveFile0_data_p(void);
+#endif
+#ifdef TARGET_PC
+extern uintptr_t JW_Get_AgbTargetPlayerBody_InAgbArchiveFile0_data_p(void);
+#else
 extern u32 JW_Get_AgbTargetPlayerBody_InAgbArchiveFile0_data_p(void);
+#endif
+#ifdef TARGET_PC
+extern uintptr_t JW_Get_AgbTargetPlayerPal_InAgbArchiveFile0_data_p(void);
+#else
 extern u32 JW_Get_AgbTargetPlayerPal_InAgbArchiveFile0_data_p(void);
+#endif
 
 #ifdef __cplusplus
 }

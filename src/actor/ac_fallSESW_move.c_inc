@@ -5,5 +5,9 @@ void aFLEW_actor_move(ACTOR* actor, GAME*) {
 
     pos.y += 40.0f;
 
+#ifdef TARGET_PC
+    sAdo_OngenPos((uintptr_t)actor, 12, &pos);
+#else
     sAdo_OngenPos((u32)actor, 12, &pos);
+#endif
 }

@@ -292,7 +292,11 @@ u16 FS_WriteIODoing(SDFileInfo* pFileInfo, void* param2, u16 param3, u16 param4,
 
     var_r28 = 0;
     temp_r24 = pFileInfo->pDriveInfo->unk_F6 * pFileInfo->pDriveInfo->unk_1C;
+#ifdef TARGET_PC
+    someValue = (uintptr_t)param2;
+#else
     someValue = (u32)param2;
+#endif
     temp_r19 = &FS_drv_ctl[pFileInfo->pDriveInfo->nChan];
     temp_r30 = pFileInfo->pDriveInfo;
 

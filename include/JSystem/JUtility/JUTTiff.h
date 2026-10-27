@@ -126,7 +126,11 @@ private:
     bool getInfo_subroutine(u8* buffer, bool full);
     u32 readEntry_1data(u8* entry) const {
         u16 type = readShort(entry + 2);
+#ifdef TARGET_PC
+        if (type == ETYPE_BYTE) return (u32)(uintptr_t)(entry + 8);
+#else
         if (type == ETYPE_BYTE) return (u32)(entry + 8);
+#endif
         if (type == ETYPE_SHORT) return readShort(entry + 8);
         if (type == ETYPE_LONG) return readLong(entry + 8);
         if (type == ETYPE_SLONG) return readLong(entry + 8);

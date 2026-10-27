@@ -978,8 +978,16 @@ static mFM_fdinfo_c* mFM_MakeField(u16 scene, u16 bg_max, u8 bg_num) {
 
     for (i = 0; i < field_info->bg_num; i++) {
         field_info->bg_display_list_p[i] = (u8*)zelda_malloc(field_info->bg_max);
+#ifdef TARGET_PC
+        field_info->bg_display_list_p[i] = (u8*)((uintptr_t)(field_info->bg_display_list_p[i]) + (16 - 1));
+#else
         field_info->bg_display_list_p[i] = (u8*)((u32)(field_info->bg_display_list_p[i]) + (16 - 1));
+#endif
+#ifdef TARGET_PC
+        field_info->bg_display_list_p[i] = (u8*)((uintptr_t)(field_info->bg_display_list_p[i]) & (~(16 - 1)));
+#else
         field_info->bg_display_list_p[i] = (u8*)((u32)(field_info->bg_display_list_p[i]) & (~(16 - 1)));
+#endif
     }
 
     mFM_set_pal_p(&field_info->field_palette);
@@ -1885,7 +1893,11 @@ extern void mFM_RenewalIslandFg(GAME* game) {
 
     if (game != NULL) {
         gamealloc_data_p = gamealloc_malloc(game_alloc_p, fg_datasize_align + 32);
+#ifdef TARGET_PC
+        fg_data_p = (mFM_fg_data_c*)ALIGN_NEXT((uintptr_t)gamealloc_data_p, 32);
+#else
         fg_data_p = (mFM_fg_data_c*)ALIGN_NEXT((u32)gamealloc_data_p, 32);
+#endif
     } else {
         fg_data_p = (mFM_fg_data_c*)zelda_malloc_align(fg_datasize_align, 32);
     }
@@ -1954,7 +1966,11 @@ extern void mFM_InitFgCombiSaveData(GAME* game) {
 
     if (game != NULL) {
         gamealloc_data_p = gamealloc_malloc(game_alloc_p, fg_datasize_align + 32);
+#ifdef TARGET_PC
+        fg_data_p = (mFM_fg_data_c*)(ALIGN_NEXT((uintptr_t)gamealloc_data_p, 32));
+#else
         fg_data_p = (mFM_fg_data_c*)(ALIGN_NEXT((u32)gamealloc_data_p, 32));
+#endif
     } else {
         fg_data_p = (mFM_fg_data_c*)zelda_malloc_align(fg_datasize_align, 32);
     }
@@ -2339,7 +2355,11 @@ extern void mFM_SetIslandNpcRoomData(GAME* game, int malloc_flag) {
         fgnpc_data_p = (mFM_fg_data_c*)zelda_malloc_align(fgnpc_size_align, 32);
     } else if (game != NULL) {
         gamealloc_data_p = gamealloc_malloc(gamealloc, fgnpc_size_align + 32);
+#ifdef TARGET_PC
+        fgnpc_data_p = (mFM_fg_data_c*)(ALIGN_NEXT((uintptr_t)gamealloc_data_p, 32));
+#else
         fgnpc_data_p = (mFM_fg_data_c*)(ALIGN_NEXT((u32)gamealloc_data_p, 32));
+#endif
     } else {
         fgnpc_data_p = (mFM_fg_data_c*)zelda_malloc_align(fgnpc_size_align, 32);
     }

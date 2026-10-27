@@ -18,7 +18,11 @@ static void fITF02_mv(FTR_ACTOR* ftr_actor, ACTOR* my_room_actor, GAME* game, u8
     keyframe->frame_control.speed = 0.5f;
 
     if (aFTR_CAN_PLAY_SE(ftr_actor)) {
+#ifdef TARGET_PC
+        sAdo_OngenPos((uintptr_t)ftr_actor, 0x5C, &ftr_actor->position);
+#else
         sAdo_OngenPos((u32)ftr_actor, 0x5C, &ftr_actor->position);
+#endif
     }
 }
 

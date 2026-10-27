@@ -3,11 +3,19 @@
 
 typedef signed char s8;
 typedef signed short s16;
+#if defined(TARGET_PC) && defined(__LP64__) /* long is 64-bit */
+typedef signed int s32;
+#else
 typedef signed long s32;
+#endif
 typedef signed long long s64;
 typedef unsigned char u8;
 typedef unsigned short u16;
+#if defined(TARGET_PC) && defined(__LP64__) /* long is 64-bit */
+typedef unsigned int u32;
+#else
 typedef unsigned long u32;
+#endif
 typedef unsigned long long u64;
 
 typedef float f32;

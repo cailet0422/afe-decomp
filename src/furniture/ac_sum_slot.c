@@ -25,7 +25,11 @@ static void aSumSlot_mv(FTR_ACTOR* ftr_actor, ACTOR* my_room_actor, GAME* game, 
             }
 
             if (aFTR_CAN_PLAY_SE(ftr_actor)) {
+#ifdef TARGET_PC
+                sAdo_OngenPos((uintptr_t)ftr_actor, 2, &ftr_actor->position);
+#else
                 sAdo_OngenPos((u32)ftr_actor, 2, &ftr_actor->position);
+#endif
             }
         } else {
             ftr_actor->dynamic_work_s[0] = FALSE;

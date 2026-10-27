@@ -188,7 +188,11 @@ static void mi_kani_move_init(MUSEUM_INSECT_PRIVATE_DATA* priv, GAME* game) {
 }
 
 static void mi_kani_move(MUSEUM_INSECT_PRIVATE_DATA* priv, GAME* game) {
+#ifdef TARGET_PC
+    sAdo_OngenPos((uintptr_t)priv, NA_ONGEN_POS_SE_63, &priv->_1C);
+#else
     sAdo_OngenPos((u32)priv, NA_ONGEN_POS_SE_63, &priv->_1C);
+#endif
     mi_kani_anime_proc(priv);
     
     if (mi_kani_chk_active_range(priv)) {

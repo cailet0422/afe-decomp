@@ -36,7 +36,11 @@ static void aHT0_merry(NPC_HARVEST_NPC0_ACTOR* actor, GAME_PLAY* play) {
             actor->actor.draw.loop_flag--;
         }
     }
+#ifdef TARGET_PC
+    sAdo_OngenPos((uintptr_t)actor, actor->_9A8, &actor->actor.actor_class.world.position);
+#else
     sAdo_OngenPos((u32)actor, actor->_9A8, &actor->actor.actor_class.world.position);
+#endif
 }
 
 static void aHT0_drink(NPC_HARVEST_NPC0_ACTOR* actor, GAME_PLAY* play) {

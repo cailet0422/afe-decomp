@@ -130,9 +130,15 @@ void ksNesDrawMakeBGIndTex(ksNesCommonWorkObj* wp, u32 mmc3) {
             }
 
             nametable_p = wp->draw_ctx.ppu_scanline_regs[row].nametable_ptrs[((scanline_ctrl1 >> 8) & 1)];
+#ifdef TARGET_PC
+            if (((intptr_t)nametable_p) >= 0) { /* the PC port draws with FixNES */
+                nibble_acc = (((uintptr_t)nametable_p) & 3) | (nibble_acc << 4);
+                tile_byte = (((uintptr_t)nametable_p) >> 8) & 0xFF;
+#else
             if (((s32)nametable_p) >= 0) {
                 nibble_acc = (((u32)nametable_p) & 3) | (nibble_acc << 4);
                 tile_byte = (((u32)nametable_p) >> 8) & 0xFF;
+#endif
             } else {
                 nibble_acc = (((nametable_p[0x3C0 + ((scanline_ctrl0 & 0xE0) >> 2) + ((scanline_ctrl1 & 0xE0) >> 5)] >> ((((scanline_ctrl1 & 0x10) >> 3) | (scanline_ctrl0 & 0x10) >> 2))) & 3) & 0x0F) | ((nibble_acc << 4));
                 tile_byte = nametable_p[((scanline_ctrl0 & 0xF8) << 2) + ((scanline_ctrl1 & 0xF8) >> 3)];
@@ -173,9 +179,15 @@ void ksNesDrawMakeBGIndTexMMC5(ksNesCommonWorkObj* wp, ksNesStateObj* sp) {
 
         for (col = 0; col < 34; col++) {
             nametable_p = wp->draw_ctx.ppu_scanline_regs[row].nametable_ptrs[((scanline_ctrl1 >> 8) & 1)];
+#ifdef TARGET_PC
+            if (((intptr_t)nametable_p) >= 0) { /* the PC port draws with FixNES */
+                nibble_acc = (((uintptr_t)nametable_p) & 3) | (nibble_acc << 4);
+                tile_byte = (((uintptr_t)nametable_p) >> 8) & 0xFF;
+#else
             if (((s32)nametable_p) >= 0) {
                 nibble_acc = (((u32)nametable_p) & 3) | (nibble_acc << 4);
                 tile_byte = (((u32)nametable_p) >> 8) & 0xFF;
+#endif
             } else {
                 nibble_acc = ((nametable_p[0x3C0 + ((scanline_ctrl0 & 0xE0) >> 2) + ((scanline_ctrl1 & 0xE0) >> 5)] >> ((((scanline_ctrl1 & 0x10) >> 3) | (scanline_ctrl0 & 0x10) >> 2))) & 3) | (nibble_acc << 4);
                 tile_byte = nametable_p[((scanline_ctrl0 & 0xF8) << 2) + ((scanline_ctrl1 & 0xF8) >> 3)];
@@ -279,9 +291,15 @@ void ksNesDrawMakeBGIndTexMMC2(ksNesCommonWorkObj* wp, u32 default_bank) {
 
         for (col = 0; col < 34; col++) {
             nametable_p = wp->draw_ctx.ppu_scanline_regs[i].nametable_ptrs[((scanline_ctrl1 >> 8) & 1)];
+#ifdef TARGET_PC
+            if (((intptr_t)nametable_p) >= 0) { /* the PC port draws with FixNES */
+                nibble_acc = (((uintptr_t)nametable_p) & 3) | (nibble_acc << 4);
+                tile_byte = (((uintptr_t)nametable_p) >> 8) & 0xFF;
+#else
             if (((s32)nametable_p) >= 0) {
                 nibble_acc = (((u32)nametable_p) & 3) | (nibble_acc << 4);
                 tile_byte = (((u32)nametable_p) >> 8) & 0xFF;
+#endif
             } else {
                 nibble_acc = (((nametable_p[0x3C0 + ((scanline_ctrl0 & 0xE0) >> 2) + ((scanline_ctrl1 & 0xE0) >> 5)] >> ((((scanline_ctrl1 & 0x10) >> 3) | (scanline_ctrl0 & 0x10) >> 2))) & 3) & 0x0F) | ((nibble_acc << 4));
                 tile_byte = nametable_p[((scanline_ctrl0 & 0xF8) << 2) + ((scanline_ctrl1 & 0xF8) >> 3)];

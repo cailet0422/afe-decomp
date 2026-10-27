@@ -40,7 +40,11 @@ extern char* mSc_secure_exchange_keep_bank(Object_Exchange_c* exchange, s16 bank
     Object_Bank_c* bank = exchange->banks + exchange->bank_idx;
 
     if (exchange->bank_idx < mSc_OBJECT_BANK_NUM) {
+#ifdef TARGET_PC
+        area = (char*)ALIGN_NEXT((uintptr_t)exchange->next_bank_ram_address + size, 32);
+#else
         area = (char*)ALIGN_NEXT((u32)exchange->next_bank_ram_address + size, 32);
+#endif
 
         if (area >= exchange->max_ram_address) {
             area = NULL;
@@ -114,7 +118,11 @@ extern void mSc_regist_initial_exchange_bank(GAME_PLAY* play) {
         size = (u32)(play->object_exchange.max_ram_address - play->object_exchange.next_bank_ram_address) / 2;
         play->object_exchange.start_address_save[0] = play->object_exchange.next_bank_ram_address;
         play->object_exchange.end_address_save[0] =
+#ifdef TARGET_PC
+            (char*)ALIGN_NEXT((uintptr_t)play->object_exchange.next_bank_ram_address + size, 32);
+#else
             (char*)ALIGN_NEXT((u32)play->object_exchange.next_bank_ram_address + size, 32);
+#endif
 
         play->object_exchange.start_address_save[1] = play->object_exchange.end_address_save[0];
         play->object_exchange.end_address_save[1] = play->object_exchange.max_ram_address;
@@ -134,14 +142,22 @@ extern void mSc_regist_initial_exchange_bank(GAME_PLAY* play) {
 
 static void mSc_dmacopy_all_exchange_bank_sub(Object_Bank_c* bank, Object_Exchange_c* exchange, int idx) {
     if (idx >= exchange->exchange_id) {
+#ifdef TARGET_PC
+        char* area = (char*)ALIGN_NEXT((uintptr_t)exchange->next_bank_ram_address + bank->size, 32);
+#else
         char* area = (char*)ALIGN_NEXT((u32)exchange->next_bank_ram_address + bank->size, 32);
+#endif
 
         if (area >= exchange->max_ram_address) {
             exchange->selected_partition = (exchange->selected_partition + 1) % 2;
             exchange->next_bank_ram_address = exchange->start_address_save[exchange->selected_partition];
             exchange->max_ram_address = exchange->end_address_save[exchange->selected_partition];
 
+#ifdef TARGET_PC
+            area = (char*)ALIGN_NEXT((uintptr_t)exchange->next_bank_ram_address + bank->size, 32);
+#else
             area = (char*)ALIGN_NEXT((u32)exchange->next_bank_ram_address + bank->size, 32);
+#endif
         }
 
         bank->dma_start = exchange->next_bank_ram_address;

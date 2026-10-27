@@ -51,15 +51,27 @@ ACTOR_PROFILE Mscore_Control_Profile = {
 static void aMSC_setupAction(MSCORE_CONTROL_ACTOR* mscore_ctrl, int act_idx);
 
 static void aMSC_InitVar(MSCORE_CONTROL_ACTOR* mscore_ctrl, GAME_PLAY* play) {
+#ifdef TARGET_PC
+    if (mSM_CheckAbleChange_unable_shutter_label(play, (uintptr_t)mscore_ctrl)) {
+#else
     if (mSM_CheckAbleChange_unable_shutter_label(play, (u32)mscore_ctrl)) {
+#endif
+#ifdef TARGET_PC
+        mSM_Set_unable_shutter_label(play, (uintptr_t)mscore_ctrl);
+#else
         mSM_Set_unable_shutter_label(play, (u32)mscore_ctrl);
+#endif
     }
 
     mGcgba_InitVar();
 }
 
 static void aMSC_EndComm(MSCORE_CONTROL_ACTOR* mscore_ctrl, GAME_PLAY* play) {
+#ifdef TARGET_PC
+    if (mSM_CheckOwner_unable_shutter_label(play, (uintptr_t)mscore_ctrl)) {
+#else
     if (mSM_CheckOwner_unable_shutter_label(play, (u32)mscore_ctrl)) {
+#endif
         mSM_Set_unable_shutter_label(play, 0);
     }
 
@@ -91,7 +103,11 @@ static void aMSC_menu_open_wait(MSCORE_CONTROL_ACTOR* mscore_ctrl, GAME_PLAY* pl
                 }
 
                 mMld_GetMelody(mscore_ctrl->melody);
+#ifdef TARGET_PC
+                mSM_open_submenu_new2(submenu, mSM_OVL_MSCORE, 0, 0, mscore_ctrl, (intptr_t)mscore_ctrl->melody);
+#else
                 mSM_open_submenu_new2(submenu, mSM_OVL_MSCORE, 0, 0, mscore_ctrl, (int)mscore_ctrl->melody);
+#endif
                 player->a_btn_pressed = FALSE;
                 player->a_btn_triggers_submenu = TRUE;
                 aMSC_setupAction(mscore_ctrl, aMSC_ACT_MENU_CLOSE_WAIT);
@@ -339,7 +355,11 @@ static void aMSC_force_menu_open_wait(MSCORE_CONTROL_ACTOR* mscore_ctrl, GAME_PL
         if (player != NULL) {
             Submenu* submenu = &play->submenu;
 
+#ifdef TARGET_PC
+            mSM_open_submenu_new2(submenu, mSM_OVL_MSCORE, 0, 0, mscore_ctrl, (intptr_t)mscore_ctrl->melody);
+#else
             mSM_open_submenu_new2(submenu, mSM_OVL_MSCORE, 0, 0, mscore_ctrl, (int)mscore_ctrl->melody);
+#endif
             player->a_btn_pressed = FALSE;
             player->a_btn_triggers_submenu = TRUE;
             aMSC_setupAction(mscore_ctrl, aMSC_ACT_MENU_CLOSE_WAIT);

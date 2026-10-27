@@ -228,9 +228,27 @@ extern void Nap_SetF32(u32 cmd, f32 param) {
     Nap_PortSet(cmd, (s32*)&param);
 }
 
+#ifdef TARGET_PC
 extern void Nap_SetS32(u32 cmd, s32 param) {
     Nap_PortSet(cmd, (s32*)&param);
 }
+
+extern void Nap_SetPtr(u32 cmd, void* param) {
+    AudioPort* port_p = &AG.audio_port_cmds[AG.thread_cmd_write_pos & 0xFF];
+
+    port_p->raw_cmd = cmd;
+    port_p->param.asVoidPtr = param;
+
+    AG.thread_cmd_write_pos++;
+    if (AG.thread_cmd_write_pos == AG.thread_cmd_read_pos) {
+        AG.thread_cmd_write_pos--;
+    }
+}
+#else
+extern void Nap_SetS32(u32 cmd, s32 param) {
+    Nap_PortSet(cmd, (s32*)&param);
+}
+#endif
 
 #ifdef TARGET_PC
 extern void Nap_SetS8(u32 cmd, s8 param) {

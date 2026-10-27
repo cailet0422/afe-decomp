@@ -14,8 +14,13 @@ extern "C" {
 #define PBS_COUNT 32
 
 #define PTR_BOOT_SECTOR_ENTRY(pDrvCtl, index) ((FSPartitionBootSector*)((u32)pDrvCtl->unk_20BA4 + index))
+#ifdef TARGET_PC
+#define PTR_ROOT_DIR_ENTRY(pDrvCtl, index) ((FSDirEntry*)((uintptr_t)pDrvCtl->unk_20BA4 + index))
+#define PTR_MBR_BASE(pDrvCtl, index) ((void*)((uintptr_t)((pDrvCtl)->unk_20BA4) + (index)))
+#else
 #define PTR_ROOT_DIR_ENTRY(pDrvCtl, index) ((FSDirEntry*)((u32)pDrvCtl->unk_20BA4 + index))
 #define PTR_MBR_BASE(pDrvCtl, index) ((void*)((u32)((pDrvCtl)->unk_20BA4) + (index)))
+#endif
 #define PTR_MBR(pMBRBase) ((FSMasterBootRecord*)pMBRBase)
 #define PTR_MBR_ENTRY(pMBRBase) ((MBRPartitionEntry*)pMBRBase)
 

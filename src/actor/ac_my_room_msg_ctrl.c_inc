@@ -168,8 +168,16 @@ static void aMR_OperateSwitchBit(FTR_ACTOR* ftr_actor);
 #endif
 
 static int aMR_lock_camera_shutter(ACTOR* actorx, GAME* game) {
+#ifdef TARGET_PC
+    if (mSM_CheckAbleChange_unable_shutter_label((GAME_PLAY*)game, (uintptr_t)actorx)) {
+#else
     if (mSM_CheckAbleChange_unable_shutter_label((GAME_PLAY*)game, (u32)actorx)) {
+#endif
+#ifdef TARGET_PC
+        mSM_Set_unable_shutter_label((GAME_PLAY*)game, (uintptr_t)actorx);
+#else
         mSM_Set_unable_shutter_label((GAME_PLAY*)game, (u32)actorx);
+#endif
         return TRUE;
     }
 
@@ -182,7 +190,11 @@ static void aMR_InitVar(ACTOR* actorx, GAME* game) {
 }
 
 static int aMR_unlock_camera_shutter(ACTOR* actorx, GAME* game) {
+#ifdef TARGET_PC
+    if (mSM_CheckOwner_unable_shutter_label((GAME_PLAY*)game, (uintptr_t)actorx)) {
+#else
     if (mSM_CheckOwner_unable_shutter_label((GAME_PLAY*)game, (u32)actorx)) {
+#endif
         mSM_Set_unable_shutter_label((GAME_PLAY*)game, 0);
         return TRUE;
     }

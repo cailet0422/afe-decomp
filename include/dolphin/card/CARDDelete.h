@@ -2,7 +2,9 @@
 #define _DOLPHIN_CARDDELETE_H_
 
 s32 CARDFastDeleteAsync(s32 chan, s32 fileNo, CARDCallback callback);
+#if !defined(TARGET_PC) || !defined(__LP64__) /* long is 64-bit: card.h declares it with s32 */
 long CARDFastDelete(long chan, long fileNo);
+#endif
 s32 CARDDeleteAsync(s32 chan, const char *fileName, CARDCallback callback);
 s32 CARDDelete(s32 chan, const char *fileName);
 

@@ -774,8 +774,13 @@ void JUTException::createFB() {
     u32 pixel_count = width * height;
     u32 size = pixel_count * 2;
 
+#ifdef TARGET_PC
+    void* begin = (void*)ALIGN_PREV((uintptr_t)end - size, 32);
+    void* object = (void*)ALIGN_PREV((uintptr_t)begin - sizeof(JUTExternalFB), 32);
+#else
     void* begin = (void*)ALIGN_PREV((u32)end - size, 32);
     void* object = (void*)ALIGN_PREV((s32)begin - sizeof(JUTExternalFB), 32);
+#endif
     new (object) JUTExternalFB(renderMode, GX_GM_1_7, begin, size);
 
     mDirectPrint->changeFrameBuffer(begin, renderMode->fbWidth, renderMode->efbHeight);

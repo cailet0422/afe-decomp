@@ -649,7 +649,11 @@ static void aMNM_actor_move(ACTOR* actorx, GAME* game) {
 
             actor->structure_class.keyframe.frame_control.speed = speed;
             cKF_SkeletonInfo_R_play(&actor->structure_class.keyframe);
+#ifdef TARGET_PC
+            sAdo_FuushaOngenPos((uintptr_t)actorx, &actorx->world.position, speed);
+#else
             sAdo_FuushaOngenPos((u32)actorx, &actorx->world.position, speed);
+#endif
             break;
         case aMNM_TYPE_WINDPOWER:
             angle = mEnv_GetWindAngleS();
@@ -669,7 +673,11 @@ static void aMNM_actor_move(ACTOR* actorx, GAME* game) {
             aMNM_setup_light(actor, game);
             break;
         case aMNM_TYPE_FOUNTAIN:
+#ifdef TARGET_PC
+            sAdo_OngenPos((uintptr_t)actorx, 0x65, &actorx->world.position);
+#else
             sAdo_OngenPos((u32)actorx, 0x65, &actorx->world.position);
+#endif
             break;
     }
 }

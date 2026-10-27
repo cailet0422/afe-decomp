@@ -127,7 +127,11 @@ void JKRAramArchive::unmountFixed() {
     mIsMounted = false;
 }
 
+#ifdef TARGET_PC
+bool JKRAramArchive::open(s32 entryNum) {
+#else
 bool JKRAramArchive::open(long entryNum) {
+#endif
     mArcInfoBlock = nullptr;
     mDirectories = nullptr;
     mFileEntries = nullptr;
@@ -392,7 +396,11 @@ u32 JKRAramArchive::fetchResource_subroutine(u32 srcAram, u32 size, JKRHeap* hea
         {
 #endif
             u8 decompBuf[64];
+#ifdef TARGET_PC
+            u8* bufptr = (u8*)ALIGN_NEXT((uintptr_t)decompBuf, 32);
+#else
             u8* bufptr = (u8*)ALIGN_NEXT((u32)decompBuf, 32);
+#endif
             JKRAramToMainRam(srcAram, bufptr, sizeof(decompBuf) / 2, EXPAND_SWITCH_DEFAULT, 0, nullptr, -1, nullptr);
 
             u32 expandSize = ALIGN_NEXT(JKRDecompExpandSize(bufptr), 32);
@@ -432,7 +440,11 @@ u32 JKRAramArchive::getExpandedResSize(const void* resource) const {
     }
 
     u8 buf[64];
+#ifdef TARGET_PC
+    u8* bufPtr = (u8*)ALIGN_NEXT((uintptr_t)buf, 32);
+#else
     u8* bufPtr = (u8*)ALIGN_NEXT((u32)buf, 32);
+#endif
 
     JKRAramToMainRam(fileEntry->mDataOffset + mBlock->getAddress(), bufPtr, sizeof(buf) / 2, EXPAND_SWITCH_DEFAULT, 0,
                      nullptr, -1, nullptr);

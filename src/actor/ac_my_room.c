@@ -1973,10 +1973,18 @@ static void aMR_SoundMelody(FTR_ACTOR* ftr_actor, ACTOR* actorx, int idx) {
     if (ftr_actor->switch_changed_flag) {
         u8* melody_data = aMR_GetMelodyData(actorx);
 
+#ifdef TARGET_PC
+        sAdo_FurnitureInst((uintptr_t)ftr_actor, idx, melody_data, &ftr_actor->position);
+#else
         sAdo_FurnitureInst((u32)ftr_actor, idx, melody_data, &ftr_actor->position);
+#endif
     }
 
+#ifdef TARGET_PC
+    sAdo_FurnitureInstPos((uintptr_t)ftr_actor, &ftr_actor->position);
+#else
     sAdo_FurnitureInstPos((u32)ftr_actor, &ftr_actor->position);
+#endif
 }
 
 static void aMR_OneMDFurnitureSwitchOn(void) {
@@ -2434,7 +2442,11 @@ static void aMR_CallSitDownOngenPosSE(const xyz_t* pos) {
         /* Check for massage chair */
         switch (ftr_actor->name) {
             case FTR_KON_MASAJI:
+#ifdef TARGET_PC
+                sAdo_OngenPos((uintptr_t)ftr_actor, 39, &ftr_actor->position);
+#else
                 sAdo_OngenPos((u32)ftr_actor, 39, &ftr_actor->position);
+#endif
                 break;
         }
     }

@@ -22,6 +22,8 @@ typedef struct CARDStat
 
 s32 CARDGetStatus(s32 chan, s32 fileNo, CARDStat *stat);
 s32 CARDSetStatusAsync(s32 chan, s32 fileNo, CARDStat *stat, CARDCallback callback);
+#if !defined(TARGET_PC) || !defined(__LP64__) /* long is 64-bit: card.h declares it with s32 */
 long CARDSetStatus(long chan, long fileNo, struct CARDStat * stat);
+#endif
 
 #endif // _DOLPHIN_CARDSTAT_H_

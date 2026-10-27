@@ -278,7 +278,11 @@ void* JUTGba::gbaThreadMain(void* arg) {
                 break;
             }
 
+#ifdef TARGET_PC
+            switch ((u32)(uintptr_t)threadVar.mCommand) {
+#else
             switch ((u32)threadVar.mCommand) {
+#endif
             case JUT_GBA_CMD_JOYBOOT:
                 sManager->gbaThread_JoyBoot(&threadVar);
                 break;

@@ -5,6 +5,9 @@
 #include "JSystem/JKernel/JKRFileLoader.h"
 #include "JSystem/JKernel/JKRHeap.h"
 #include "types.h"
+#ifdef TARGET_PC
+#include "pc_ptr32.h"
+#endif
 
 #ifdef __cplusplus
 // NOTE: Vtable offsets are off
@@ -111,7 +114,11 @@ class JKRArchive : public JKRFileLoader {
         u32 mFlag;       // _04
         u32 mDataOffset; // _08
         u32 mSize;       // _0C
+#ifdef TARGET_PC
+        PCPtr32 mData; /* read from disc: the pointer must stay 4 bytes (pc_ptr32.h) */
+#else
         void* mData;     // _10
+#endif
     };
 
     struct SDirEntry {
@@ -306,7 +313,11 @@ struct JKRCompArchive : public JKRArchive {
 
     // _00     = VTBL
     // _00-_64 = JKRArchive
+#ifdef TARGET_PC
+    uintptr_t _64; /* base of the part in memory */
+#else
     u32 _64;                 // _64
+#endif
     JKRAramBlock* mAramPart; // _68
     u32 _6C;                 // _6C
     JKRFile* mDvdFile;       // _70

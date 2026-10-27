@@ -19,7 +19,11 @@ JKRThread::JKRThread(u32 stackSize, int msgCount, int threadPrio) : mLink(this) 
 JKRThread::JKRThread(OSThread* threadRecord, int msgCount) : mLink(this) {
     mHeap = nullptr;
     mThreadRecord = threadRecord;
+#ifdef TARGET_PC
+    mStackSize = (u32)((uintptr_t)threadRecord->stackEnd - (uintptr_t)threadRecord->stackBase);
+#else
     mStackSize = (u32)threadRecord->stackEnd - (u32)threadRecord->stackBase;
+#endif
     mStackMemory = threadRecord->stackBase;
 
     setCommon_mesgQueue(JKRHeap::getSystemHeap(), msgCount);
@@ -56,7 +60,11 @@ BOOL JKRThread::setCommon_heapSpecified(JKRHeap* heap, u32 stackSize, int thread
     mStackSize = JKR_ALIGN32(stackSize);
     mStackMemory = JKRHeap::alloc(mStackSize, 32, mHeap);
     mThreadRecord = (OSThread*)JKRHeap::alloc(sizeof(OSThread), 32, mHeap);
+#ifdef TARGET_PC
+    return OSCreateThread(mThreadRecord, &JKRThread::start, this, (void*)((uintptr_t)mStackMemory + mStackSize), mStackSize,
+#else
     return OSCreateThread(mThreadRecord, &JKRThread::start, this, (void*)((u32)mStackMemory + mStackSize), mStackSize,
+#endif
                           threadPrio, OS_THREAD_ATTR_DETACH);
 }
 

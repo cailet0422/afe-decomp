@@ -100,7 +100,11 @@ s32 JKRAramStream::writeToAram(JKRAramStreamCommand* command) {
                 break;
             }
 
+#ifdef TARGET_PC
+            JKRAramPcs(0, (uintptr_t)buffer, destination, length, nullptr);
+#else
             JKRAramPcs(0, (u32)buffer, destination, length, nullptr);
+#endif
             dstSize -= length;
             writtenLength += length;
             destination += length;
@@ -124,7 +128,11 @@ JKRAramStreamCommand* JKRAramStream::write_StreamToAram_Async(JSUFileInputStream
                                                               u32 offset, u32* returnSize) {
     JKRAramStreamCommand* command = new (JKRGetSystemHeap(), -4) JKRAramStreamCommand();
     command->type = JKRAramStreamCommand::ECT_WRITE;
+#ifdef TARGET_PC
+    command->mAddress = (u32)(uintptr_t)addr;
+#else
     command->mAddress = (u32)addr;
+#endif
     command->mSize = size;
     command->mStream = stream;
     command->_2C = stream->getAvailable();
@@ -209,7 +217,11 @@ void JKRAramStream::setTransBuffer(u8* buffer, u32 bufferSize, JKRHeap* heap) {
     transHeap = nullptr;
 
     if (buffer) {
+#ifdef TARGET_PC
+        transBuffer = (u8*)ALIGN_NEXT((uintptr_t)buffer, 0x20);
+#else
         transBuffer = (u8*)ALIGN_NEXT((u32)buffer, 0x20);
+#endif
     }
 
     if (bufferSize) {

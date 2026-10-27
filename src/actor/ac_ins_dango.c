@@ -501,7 +501,11 @@ static void aIDG_fly_away(ACTOR* actorx, GAME* game) {
     }
 
     actorx->gravity = gravity;
+#ifdef TARGET_PC
+    sAdo_OngenPos((uintptr_t)insect, NA_ONGEN_POS_SE_25, &actorx->world.position);
+#else
     sAdo_OngenPos((u32)insect, NA_ONGEN_POS_SE_25, &actorx->world.position);
+#endif
 }
 
 static void aIDG_avoid_init(aINS_INSECT_ACTOR* insect, GAME* game) {
@@ -683,7 +687,11 @@ static void aIDG_actor_move(ACTOR* actor, GAME* game) {
  
     u32 label = mPlib_Get_item_net_catch_label();
 
+#ifdef TARGET_PC
+    if (label == (uintptr_t)actor) {
+#else
     if (label == (u32)actor) {
+#endif
         int action;
 
         switch (insect->type) {
