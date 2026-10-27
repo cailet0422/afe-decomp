@@ -1,5 +1,11 @@
 #include "game.h"
 
+#ifdef TARGET_PC
+#include "pc_platform.h"
+#include "pc_diag.h"
+extern int g_pc_model_viewer;
+#endif
+
 #include "m_debug.h"
 #include "zurumode.h"
 #include "libforest/gbi_extensions.h"
@@ -140,11 +146,33 @@ extern void game_main(GAME* this) {
     }
 
     game_draw_first(graph);
+#ifdef TARGET_PC
+    PC_DIAG(5, "game_main: draw_first done, calling mTM_time\n");
+#endif
     GRAPH_SET_DOING_POINT(graph, GAME_TIME);
     mTM_time();
     GRAPH_SET_DOING_POINT(graph, GAME_TIME_FINISHED);
+#ifdef TARGET_PC
+    PC_DIAG(5, "game_main: mTM_time done, calling exec=%p\n", (void*)this->exec);
+#endif
     GRAPH_SET_DOING_POINT(graph, GAME_EXEC);
+#ifdef TARGET_PC
+    {
+        static jmp_buf game_exec_jmpbuf;
+        pc_crash_set_jmpbuf(&game_exec_jmpbuf);
+        if (setjmp(game_exec_jmpbuf) != 0) {
+            /* Recovered from crash in game exec */
+            printf("[PC] CRASH in game exec! doing_point=%d specific=0x%02X addr=0x%08X data=0x%08X\n",
+                this->doing_point, this->doing_point_specific,
+                pc_crash_get_addr(), pc_crash_get_data_addr());
+        } else {
+            this->exec(this);
+        }
+        pc_crash_set_jmpbuf(NULL);
+    }
+#else
     this->exec(this);
+#endif
     GRAPH_SET_DOING_POINT(graph, GAME_EXEC_FINISHED);
     GRAPH_SET_DOING_POINT(graph, GAME_BGM);
 

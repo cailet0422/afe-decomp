@@ -14,6 +14,78 @@ static u8 dspstatus = 0;
 static s16* dsp_buf[DSPBUF_NUM];
 static u32 dac_sync_counter = 0;
 
+#ifdef TARGET_PC
+extern s16* CpubufProcess(DSPBUF_EVENTS event) {
+    u32 i;
+    u32 j;
+
+    switch (event) {
+        case DSPBUF_EVENT_INIT:
+            write_buffer = 2;
+            read_buffer = 0;
+            for (i = 0; i < DSPBUF_NUM; i++) {
+                dsp_buf[i] = (s16*)OSAlloc2(JAC_FRAMESAMPLES << 2);
+                for (j = 0; j < (JAC_FRAMESAMPLES << 1); j++) {
+                    dsp_buf[i][j] = 0;
+                }
+
+            }
+
+            dspstatus = 0;
+            break;
+        case DSPBUF_EVENT_FRAME_END: {
+            u8 write = write_buffer + 1;
+
+            if (write == DSPBUF_NUM) {
+                write = 0;
+            }
+
+            if (write == read_buffer) {
+                dspstatus = 0;
+            } else {
+                write_buffer = write;
+                if (Neos_Update(dsp_buf[write_buffer]) == TRUE) {
+                    dspstatus = 1;
+                }
+            }
+            break;
+        }
+        case DSPBUF_EVENT_MIX: {
+            u8 read = read_buffer + 1;
+            if (read == DSPBUF_NUM) {
+                read = 0;
+            }
+
+            if (read == write_buffer) {
+                static u32 underrun_count = 0;
+                if ((++underrun_count % 60) == 1)
+                    printf("[CPUBUF] underrun #%u (read==write==%d, readbuf=%d)\n", underrun_count, read, read_buffer);
+                /* PC: data is interleaved (L,R,L,R,...). Fill with last stereo pair. */
+                {
+                    s16 last_L = dsp_buf[read_buffer][(JAC_FRAMESAMPLES << 1) - 2];
+                    s16 last_R = dsp_buf[read_buffer][(JAC_FRAMESAMPLES << 1) - 1];
+                    for (i = 0; i < (JAC_FRAMESAMPLES << 1); i += 2) {
+                        dsp_buf[read_buffer][i]     = last_L;
+                        dsp_buf[read_buffer][i + 1] = last_R;
+                    }
+                }
+
+                /* On PC (synchronous), always try FRAME_END to keep the
+                 * ring advancing. On GC, AI DMA interrupts drive this
+                 * asynchronously and dspstatus gates re-entry. */
+                CpubufProcess(DSPBUF_EVENT_FRAME_END);
+            } else {
+                read_buffer = read;
+                CpubufProcess(DSPBUF_EVENT_FRAME_END);
+            }
+
+            return dsp_buf[read_buffer];
+        }
+    }
+
+    return nullptr;
+}
+#else
 extern s16* CpubufProcess(DSPBUF_EVENTS event) {
     u32 i;
     u32 j;
@@ -82,6 +154,7 @@ extern s16* CpubufProcess(DSPBUF_EVENTS event) {
 
     return nullptr;
 }
+#endif
 
 extern s16* MixCpu(s32 n_samples) {
     static s32 cur = 0;

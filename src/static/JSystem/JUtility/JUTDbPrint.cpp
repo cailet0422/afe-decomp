@@ -98,9 +98,18 @@ inline void enter_(int x, int y, int duration, const char* txt, int n) {
 void JUTReport(int x, int y, const char* fmt, ...) {
     va_list vl;
     va_start(vl, fmt);
+#ifdef TARGET_PC
+    char buf[256];
+    s32 n = vsnprintf(buf, sizeof(buf), fmt, vl);
+    if (n >= 0) {
+        enter_(x, y, 1, buf, n < 256 ? n : 255);
+    }
+    va_end(vl);
+#else
     char buf[256];
     enter_(x, y, 1, buf, vsnprintf(buf, sizeof(buf), fmt, vl));
     va_end();
+#endif
 }
 
 void JUTReport(int x, int y, int duration, const char* fmt, ...) {

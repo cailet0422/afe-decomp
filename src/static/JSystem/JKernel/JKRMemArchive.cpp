@@ -226,6 +226,9 @@ u32 JKRMemArchive::fetchResource_subroutine(u8* src, u32 srcLength, u8* dst, u32
 
         case JKRCOMPRESSION_YAY0:
         case JKRCOMPRESSION_YAZ0:
+#ifdef TARGET_PC
+        {
+#endif
             u32 expandSize = JKRDecompExpandSize(src);
             srcLength = expandSize;
             if (expandSize > dstLength)
@@ -233,6 +236,9 @@ u32 JKRMemArchive::fetchResource_subroutine(u8* src, u32 srcLength, u8* dst, u32
 
             JKRDecompress(src, dst, srcLength, 0);
             return srcLength;
+#ifdef TARGET_PC
+        }
+#endif
 
         default: {
             JPANIC(723, "??? bad sequence\n");

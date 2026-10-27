@@ -2,9 +2,11 @@
 
 #include "libultra/libultra.h"
 #include "m_flashrom.h"
+#ifdef TARGET_PC
+#include "m_card.h"
+#endif
 
 common_data_t common_data;
-
 
 extern void common_data_reinit(){
 
@@ -20,6 +22,14 @@ extern void common_data_reinit(){
     Common_Set(demo_profiles[1], mAc_PROFILE_NUM); /* cleared state */
     Common_Set(pad_connected, state);
 
+#ifdef TARGET_PC
+    /* GC re-reads the memory card here. We re-read the GCI file, same idea.
+     * Title demo trashes the in-memory save (player/animal slots), so we
+     * need a fresh copy from disk before anything touches it again. */
+    if (pc_save_loaded) {
+        pc_save_reload();
+    } else
+#endif
     mFRm_ClearSaveCheckData(Save_GetPointer(save_check));
 }
 

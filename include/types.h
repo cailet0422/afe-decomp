@@ -2,7 +2,21 @@
 #define TYPES_H
 
 #include "ver.h"
+#ifdef TARGET_PC
+/* On PC, we don't have MSL_C - use standard math */
+#include <math.h>
+#include <string.h>
+#include <malloc.h>  /* for alloca() */
+/* Metrowerks __alloca is a compiler built-in; map to standard alloca on PC */
+#define __alloca alloca
+/* Metrowerks __declspec(section "...") is not supported by GCC.
+ * GCC defines __declspec as a builtin keyword, so we must #undef it first. */
+#undef __declspec
+#define __declspec(x)
+#else
 #include "MSL_C/w_math.h"
+#endif
+
 #include <dolphin/types.h>
 #include "macros.h"
 
@@ -17,9 +31,13 @@ typedef signed long long s64;
 typedef unsigned char u8;
 typedef unsigned short u16;
 typedef unsigned long u32;
+#ifndef TARGET_PC
 #ifndef _SIZE_T_DEF
 #define _SIZE_T_DEF
 typedef unsigned long size_t;
+#endif
+#else
+#include <stddef.h>
 #endif
 typedef unsigned long long u64;
 typedef unsigned int uint;
@@ -54,7 +72,9 @@ typedef u32 unknown;
 #define NULL 0
 #endif
 #endif
+#if !defined(__cplusplus) || !defined(TARGET_PC)
 #define nullptr 0
+#endif
 
 // #ifdef __MWERKS__
 // #define AT_ADDRESS(x) : (x)
@@ -135,8 +155,10 @@ typedef u32 unknown;
 #define GPACK_RGB5A3(r, g, b, a) \
     ARGB8_to_RGB5A3((((a) & 0xFF) << 24) | (((r) & 0xFF) << 16) | (((g) & 0xFF) << 8) | ((b) & 0xFF))
 
+#if !defined(TARGET_PC)
 #pragma section RX "forcestrip"
-#ifndef __INTELLISENSE__
+#endif
+#if !defined(__INTELLISENSE__) && !defined(TARGET_PC)
 #define FORCESTRIP __declspec(section "forcestrip")
 #else
 #define FORCESTRIP
@@ -148,7 +170,7 @@ typedef u32 unknown;
 #define MATCH_FORCESTRIP
 #endif
 
-#if !defined(__INTELLISENSE__) && defined(MUST_MATCH)
+#if !defined(__INTELLISENSE__) && defined(MUST_MATCH) && !defined(TARGET_PC)
 #define ORDER_BSS_DATA static asm void order_bss()
 #define ORDER_BSS(s) lis r3, s @ha
 #define BSS_ORDER_GROUP_START FORCESTRIP ORDER_BSS_DATA {
@@ -160,7 +182,7 @@ typedef u32 unknown;
 #define BSS_ORDER_ITEM(v)
 #endif
 
-#ifndef __cplusplus
+#if !defined(__cplusplus) && !defined(TARGET_PC)
 // Some definitions rely on wchar_t being defined
 typedef unsigned short wchar_t;
 #endif

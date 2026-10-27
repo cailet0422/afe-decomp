@@ -10,12 +10,235 @@
 #include "jaudio_NES/sub_sys.h"
 #include "jaudio_NES/audioheaders.h"
 #include <dolphin/os.h>
+#ifdef TARGET_PC
+#include <dolphin/ar.h>
+#endif
 
 #define MK_BGLOAD_MSG(retData, tableType, id, loadStatus) \
     (((retData) << 24) | ((tableType) << 16) | ((id) << 8) | (loadStatus))
 #define BGLOAD_TBLTYPE(v) ((v >> 16) & 0xFF)
 #define BGLOAD_ID(v) ((v >> 8) & 0xFF)
 #define BGLOAD_LOAD_STATUS(v) ((v >> 0) & 0xFF)
+
+#ifdef TARGET_PC
+#include "pc_bswap.h"
+#define BSWAP16(x) pc_bswap16(x)
+#define BSWAP32(x) pc_bswap32(x)
+
+/* Swap a u32 in-place at a given address */
+static inline void swap32_inplace(void* p) {
+    u32* pp = (u32*)p;
+    *pp = pc_bswap32(*pp);
+}
+
+/* Swap a s16 in-place */
+static inline void swap16_inplace(void* p) {
+    u16* pp = (u16*)p;
+    *pp = pc_bswap16(*pp);
+}
+
+/**
+ * Byte-swap the bank control block's u32 pointer-offset table.
+ * The first (2 + n_instruments) u32s are offsets to perc table, sfx table,
+ * and each instrument entry.
+ */
+static void pc_swap_bank_ctrl_offsets(u8* ctrl_p, s32 n_entries) {
+    u32* p = (u32*)ctrl_p;
+    for (s32 i = 0; i < n_entries; i++) {
+        p[i] = BSWAP32(p[i]);
+    }
+}
+
+/**
+ * Byte-swap a perctable's multi-byte fields in-place.
+ * Layout: u8 decay_idx, u8 pan, u8 is_relocated, u8 pad,
+ *         wtstr tuned_sample {smzwavetable* wavetable(4), f32 tuning(4)},
+ *         envdat* envelope(4)
+ */
+static void pc_swap_perctable(perctable* pt) {
+    /* tuned_sample.wavetable pointer (offset before relocation) */
+    swap32_inplace(&pt->tuned_sample.wavetable);
+    /* tuned_sample.tuning (f32) */
+    swap32_inplace(&pt->tuned_sample.tuning);
+    /* envelope pointer (offset before relocation) */
+    swap32_inplace(&pt->envelope);
+}
+
+/**
+ * Byte-swap a voicetable's multi-byte fields in-place.
+ * Layout: u8 is_relocated, u8 normal_range_low, u8 normal_range_high,
+ *         u8 adsr_decay_idx, envdat* envelope(4),
+ *         wtstr low{ptr(4), f32(4)}, wtstr normal{ptr(4), f32(4)},
+ *         wtstr high{ptr(4), f32(4)}
+ */
+static void pc_swap_voicetable(voicetable* vt) {
+    swap32_inplace(&vt->envelope);
+    swap32_inplace(&vt->low_pitch_tuned_sample.wavetable);
+    swap32_inplace(&vt->low_pitch_tuned_sample.tuning);
+    swap32_inplace(&vt->normal_pitch_tuned_sample.wavetable);
+    swap32_inplace(&vt->normal_pitch_tuned_sample.tuning);
+    swap32_inplace(&vt->high_pitch_tuned_sample.wavetable);
+    swap32_inplace(&vt->high_pitch_tuned_sample.tuning);
+}
+
+/**
+ * Byte-swap a percvoicetable (sfx entry) — just wtstr {ptr(4), f32(4)}.
+ */
+static void pc_swap_percvoicetable(percvoicetable* pvt) {
+    swap32_inplace(&pvt->tuned_sample.wavetable);
+    swap32_inplace(&pvt->tuned_sample.tuning);
+}
+
+/**
+ * Byte-swap a smzwavetable's fields. The first u32 is a bitfield
+ * (bit31, codec, medium, bit26, is_relocated, size) that must be
+ * swapped as a whole u32 so the bits shift to LE layout.
+ */
+static void pc_swap_smzwavetable(smzwavetable* wt) {
+    swap32_inplace(wt);           /* first u32: bitfield */
+    swap32_inplace(&wt->sample);  /* sample ptr/offset */
+    swap32_inplace(&wt->loop);    /* loop ptr/offset */
+    swap32_inplace(&wt->book);    /* book ptr/offset */
+}
+
+/**
+ * Visited sets for adpcmbook/adpcmloop — prevents double-swap when
+ * multiple wavetables share the same book or loop pointer.
+ */
+#define PC_BOOK_VISITED_MAX 256
+static void* pc_book_visited[PC_BOOK_VISITED_MAX];
+static u32 pc_book_visited_count = 0;
+static void* pc_loop_visited[PC_BOOK_VISITED_MAX];
+static u32 pc_loop_visited_count = 0;
+
+/**
+ * Byte-swap adpcmloop fields.
+ */
+static void pc_swap_adpcmloop(adpcmloop* lp) {
+    for (u32 v = 0; v < pc_loop_visited_count; v++) {
+        if (pc_loop_visited[v] == lp) return;
+    }
+    if (pc_loop_visited_count < PC_BOOK_VISITED_MAX) {
+        pc_loop_visited[pc_loop_visited_count++] = lp;
+    }
+    lp->loop_start = BSWAP32(lp->loop_start);
+    lp->loop_end = BSWAP32(lp->loop_end);
+    lp->count = BSWAP32(lp->count);
+    lp->sample_end = BSWAP32(lp->sample_end);
+    if (lp->count > 0) {
+        for (s32 i = 0; i < 16; i++) {
+            lp->predictor_state[i] = BSWAP16(lp->predictor_state[i]);
+        }
+    }
+}
+
+/**
+ * Byte-swap adpcmbook fields.
+ */
+static void pc_swap_adpcmbook(adpcmbook* bk) {
+    for (u32 v = 0; v < pc_book_visited_count; v++) {
+        if (pc_book_visited[v] == bk) return;
+    }
+    if (pc_book_visited_count < PC_BOOK_VISITED_MAX) {
+        pc_book_visited[pc_book_visited_count++] = bk;
+    }
+    bk->order = BSWAP32(bk->order);
+    bk->n_predictors = BSWAP32(bk->n_predictors);
+    s32 n_entries = bk->order * bk->n_predictors * 8;
+    for (s32 i = 0; i < n_entries; i++) {
+        bk->codebook[i] = BSWAP16(bk->codebook[i]);
+    }
+}
+
+/**
+ * Byte-swap envdat array. envdat is {s16 delay, s16 value} pairs.
+ * The array is terminated by delay <= 0.
+ */
+/* Track which envelope addresses have already been byte-swapped to prevent double-swap.
+   Multiple instruments in a bank can share the same envelope pointer, so we must not
+   swap the same data twice.
+   - bank_visited: bank-embedded envelopes, reset for each bank relocation
+   - seq_visited:  sequence-script envelopes, intentionally preserved across bank relocations */
+#define PC_ENVDAT_VISITED_MAX 512
+static void* pc_envdat_bank_visited[PC_ENVDAT_VISITED_MAX];
+static u32 pc_envdat_bank_visited_count = 0;
+static void* pc_envdat_seq_visited[PC_ENVDAT_VISITED_MAX];
+static u32 pc_envdat_seq_visited_count = 0;
+
+static void pc_reset_envdat_bank_visited(void) {
+    pc_envdat_bank_visited_count = 0;
+    pc_book_visited_count = 0;
+    pc_loop_visited_count = 0;
+}
+
+static void pc_reset_envdat_seq_visited(void) {
+    pc_envdat_seq_visited_count = 0;
+}
+
+static void pc_reset_envdat_visited_all(void) {
+    pc_reset_envdat_bank_visited();
+    pc_reset_envdat_seq_visited();
+}
+
+/**
+ * Swap envdat array entries. Special delay values (from audiocommon.h):
+ *   ADSR_DISABLE  =  0  (array terminator)
+ *   ADSR_HANG     = -1  (hang forever, no entries after)
+ *   ADSR_GOTO     = -2  (jump to index in value field, no entries after)
+ *   ADSR_RESTART  = -3  (loop to start, no entries after)
+ *   ADSR_SPECIAL4 = -4  (reads value, increments idx, CONTINUES to next entry)
+ * Must continue past SPECIAL4 since it has sequential entries following it.
+ */
+static void pc_swap_envdat_entries(envdat* env) {
+    for (s32 i = 0; ; i++) {
+        env[i].delay = BSWAP16(env[i].delay);
+        env[i].value = BSWAP16(env[i].value);
+        /* ADSR_DISABLE (0) is the true array terminator */
+        if (env[i].delay == 0) break;
+        /* HANG (-1), GOTO (-2), RESTART (-3) are logical endpoints */
+        if (env[i].delay == -1 || env[i].delay == -2 || env[i].delay == -3) break;
+        /* SPECIAL4 (-4) continues to next entry — don't break */
+        if (i > 64) break; /* safety limit */
+    }
+}
+
+/* Swap envdat array from bank data (called during bank relocation) */
+void pc_swap_envdat(envdat* env) {
+    /* Check if already swapped */
+    for (u32 v = 0; v < pc_envdat_bank_visited_count; v++) {
+        if (pc_envdat_bank_visited[v] == env) return;
+    }
+    if (pc_envdat_bank_visited_count < PC_ENVDAT_VISITED_MAX) {
+        pc_envdat_bank_visited[pc_envdat_bank_visited_count++] = env;
+    }
+    pc_swap_envdat_entries(env);
+}
+
+/* Swap envdat array from sequence data (called when script sets envelope pointer) */
+void pc_swap_envdat_seq(envdat* env) {
+    /* Check if already swapped */
+    for (u32 v = 0; v < pc_envdat_seq_visited_count; v++) {
+        if (pc_envdat_seq_visited[v] == env) return;
+    }
+    if (pc_envdat_seq_visited_count < PC_ENVDAT_VISITED_MAX) {
+        pc_envdat_seq_visited[pc_envdat_seq_visited_count++] = env;
+    }
+    pc_swap_envdat_entries(env);
+}
+
+/**
+ * Byte-swap the percussion pointer-offset array within the bank data.
+ * After the perc table base offset is resolved, the perc table itself
+ * is an array of u32 pointers to individual perctable entries.
+ */
+static void pc_swap_perc_ptr_array(u32* perc_tbl, s32 n_perc) {
+    for (s32 i = 0; i < n_perc; i++) {
+        perc_tbl[i] = BSWAP32(perc_tbl[i]);
+    }
+}
+
+static u32 pc_swap_bank_init_count = 0;
+#endif /* TARGET_PC */
 
 static s32 Nas_GetSyncDummy(u8* param0, s32 param1);
 
@@ -54,6 +277,17 @@ static void __BgCopySub(Bgload* bgload, s32 reset_status);
 static void __Nas_BgDiskCopy(u8* src, u8* dst, u32 size, s32 param);
 static void __Nas_ExCopy(Bgload* bgload, s32 size);
 static void __Nas_BgCopy(Bgload* bgload, s32 size);
+
+#ifdef TARGET_PC
+u8 Nas_MapHeaderReadByte(s32 byteIndex) {
+    u16 word = AG.map_header[(u32)byteIndex >> 1];
+
+    if (byteIndex & 1) {
+        return word & 0xFF;
+    }
+    return word >> 8;
+}
+#endif
 
 void Nas_WaveDmaFrameWork(void) {
     WaveLoad* wl;
@@ -350,9 +584,15 @@ void* Nas_PreLoadBank(s32 seq_id, s32* bank_id) {
     void* ctrl;
 
     l_bank_id = 0xFF;
+#ifdef TARGET_PC
+    idx = ((u16*)AG.map_header)[seq_id];
+    for (i = Nas_MapHeaderReadByte(idx++); i > 0; i--) {
+        l_bank_id = Nas_MapHeaderReadByte(idx++);
+#else
     idx = ((u16*)AG.map_header)[seq_id];
     for (i = ((u8*)AG.map_header)[idx++]; i > 0; i--) {
         l_bank_id = ((u8*)AG.map_header)[idx++];
+#endif
         ctrl = __Load_Ctrl(l_bank_id);
     }
 
@@ -455,6 +695,28 @@ s32 Nas_PreLoadBank_BG(s32 id, s32 param_2, s32 ret_data, OSMesgQueue* ret_queue
 }
 
 // @unused
+#ifdef TARGET_PC
+u8* Nas_SeqToBank(s32 seq_id, s32* num_banks) {
+    s32 index = ((u16*)AG.map_header)[seq_id];
+    s32 i;
+
+    *num_banks = Nas_MapHeaderReadByte(index++);
+    if (*num_banks == 0) {
+        return NULL;
+    }
+    static u8 seq_to_bank_ids[0x100];
+
+    if (*num_banks > 0x100) {
+        *num_banks = 0x100;
+    }
+
+    for (i = 0; i < *num_banks; i++) {
+        seq_to_bank_ids[i] = Nas_MapHeaderReadByte(index++);
+    }
+
+    return seq_to_bank_ids;
+}
+#else
 u8* Nas_SeqToBank(s32 seq_id, s32* num_banks) {
     s32 index =  ((u16*)AG.map_header)[seq_id];
 
@@ -464,7 +726,26 @@ u8* Nas_SeqToBank(s32 seq_id, s32* num_banks) {
     }
     return &((u8*)AG.map_header)[index];
 }
+#endif
 
+#ifdef TARGET_PC
+void Nas_FlushBank(s32 seq_id) {
+    s32 bank_id;
+    s32 bank_count;
+    s32 index = ((u16*)AG.map_header)[seq_id];
+
+    bank_count = Nas_MapHeaderReadByte(index++);
+    while (bank_count > 0) {
+        bank_count--;
+        bank_id = Nas_MapHeaderReadByte(index++);
+        bank_id = __Link_BankNum(BANK_TABLE, bank_id);
+        if (EmemOnCheck(BANK_TABLE, bank_id) == NULL) {
+            __Kill_Bank(bank_id);
+            Nas_WriteIDbank(bank_id, LOAD_STATUS_NOT_LOADED);
+        }
+    }
+}
+#else
 void Nas_FlushBank(s32 seq_id) {
     s32 bank_id;
     s32 bank_count;
@@ -481,6 +762,7 @@ void Nas_FlushBank(s32 seq_id) {
         }
     }
 }
+#endif
 
 static s32 __Kill_Bank(s32 bank_id) {
     u32 i;
@@ -548,9 +830,15 @@ static s32 __Nas_StartSeq(s32 group_idx, s32 seq_id) {
 
     Nas_ReleaseGroup(group);
     bank_id = 0xFF;
+#ifdef TARGET_PC
+    idx = ((u16*)AG.map_header)[seq_id];
+    for (i = Nas_MapHeaderReadByte(idx++); i > 0; i--) {
+        bank_id = Nas_MapHeaderReadByte(idx++);
+#else
     idx =  ((u16*)AG.map_header)[seq_id];
     for (i = ((u8*)AG.map_header)[idx++]; i > 0; i--) {
         bank_id = ((u8*)AG.map_header)[idx++];
+#endif
         __Load_Ctrl(bank_id);
     }
 
@@ -828,9 +1116,24 @@ static void Nas_BankOfsToAddr_Inner(s32 bank_id, u8* ctrl_p, WaveMedia* wave_med
     n_sfx_inst = AG.voice_info[bank_id].num_sfx;
     // u32* data_p = (u32*)ctrl_p;
 
+#ifdef TARGET_PC
+    /* Byte-swap the u32 offset table at the start of the bank ctrl block.
+     * Entries: [0]=perc_tbl_ofs, [1]=sfx_tbl_ofs, [2..2+n_voice-1]=inst_ofs */
+    {
+        s32 n_ctrl_entries = 2 + (n_voice_inst > 126 ? 126 : n_voice_inst);
+        pc_swap_bank_ctrl_offsets(ctrl_p, n_ctrl_entries);
+        pc_swap_bank_init_count++;
+    }
+#endif
+
     ofs = *BANK_ENTRY(ctrl_p, 0);
     if (ofs != 0 && n_perc_inst != 0) {
         *BANK_ENTRY(ctrl_p, 0) = OFS2RAM(ctrl_p, ofs);
+
+#ifdef TARGET_PC
+        /* Swap the percussion pointer array (u32 offsets to each perctable) */
+        pc_swap_perc_ptr_array((u32*)*BANK_ENTRY(ctrl_p, 0), n_perc_inst);
+#endif
 
         for (i = 0; i < n_perc_inst; i++) {
             inst_ofs = (u32)((perctable**)*BANK_ENTRY(ctrl_p, 0))[i];
@@ -848,9 +1151,15 @@ static void Nas_BankOfsToAddr_Inner(s32 bank_id, u8* ctrl_p, WaveMedia* wave_med
                 continue;
             }
 
+#ifdef TARGET_PC
+            pc_swap_perctable(percvt);
+#endif
             __WaveTouch(&percvt->tuned_sample, (u32)ctrl_p, wave_media);
             inst_ofs = (u32)percvt->envelope;
             percvt->envelope = (envdat*)OFS2RAM(ctrl_p, inst_ofs);
+#ifdef TARGET_PC
+            pc_swap_envdat(percvt->envelope);
+#endif
             percvt->is_relocated = TRUE;
         }
     }
@@ -859,6 +1168,14 @@ static void Nas_BankOfsToAddr_Inner(s32 bank_id, u8* ctrl_p, WaveMedia* wave_med
     ofs = *BANK_ENTRY(ctrl_p, 1);
     if (ofs != 0 && n_sfx_inst != 0) {
         *BANK_ENTRY(ctrl_p, 1) = OFS2RAM(ctrl_p, ofs);
+
+#ifdef TARGET_PC
+        /* Swap all sfx entries (percvoicetable = wtstr = {ptr, f32}) */
+        for (i = 0; i < n_sfx_inst; i++) {
+            percvoicetable* sfx_entry = ((percvoicetable*)*BANK_ENTRY(ctrl_p, 1)) + i;
+            pc_swap_percvoicetable(sfx_entry);
+        }
+#endif
 
         for (i = 0; i < n_sfx_inst; i++) {
             inst_ofs = (u32)(((percvoicetable*)*BANK_ENTRY(ctrl_p, 1)) + i);
@@ -886,6 +1203,9 @@ static void Nas_BankOfsToAddr_Inner(s32 bank_id, u8* ctrl_p, WaveMedia* wave_med
 
             // instrument may appear multiple times in the list
             if (!inst->is_relocated) {
+#ifdef TARGET_PC
+                pc_swap_voicetable(inst);
+#endif
                 // Optional low pitch sample
                 if (inst->normal_range_low != 0) {
                     __WaveTouch(&inst->low_pitch_tuned_sample, (u32)ctrl_p, wave_media);
@@ -901,6 +1221,9 @@ static void Nas_BankOfsToAddr_Inner(s32 bank_id, u8* ctrl_p, WaveMedia* wave_med
 
                 inst_ofs = (u32)inst->envelope;
                 inst->envelope = (envdat*)OFS2RAM(ctrl_p, inst_ofs);
+#ifdef TARGET_PC
+                pc_swap_envdat(inst->envelope);
+#endif
 
                 inst->is_relocated = TRUE;
             }
@@ -993,6 +1316,37 @@ extern void Nas_FastDiskCopy(u8* SrcAddr, u8* DestAdd, size_t Length, s32 medium
 
 static s32 Nas_StartDma(OSIoMesg* ioMsg, s32 priority, s32 direction, u32 device_addr, void* dram_addr, u32 size,
                         OSMesgQueue* mq, s32 medium, s8* dma_type) {
+#ifdef TARGET_PC
+    /* On PC, ARAM is a flat memory buffer. Do the copy synchronously
+     * and send the completion message immediately. The GC path goes through
+     * Z_osEPiStartDma → DVDT_AddTaskHigh (queued) which deadlocks because
+     * the task queue is drained outside the current call path. */
+    extern u32 GetNeosRomTop(void);
+
+    if (AG.reset_timer > 16) {
+        return -1;
+    }
+
+    if (medium != MEDIUM_CART && medium != MEDIUM_DISK_DRIVE) {
+        return 0;
+    }
+
+    if ((size & 0x1F) != 0) {
+        size = ALIGN_NEXT(size, 32);
+    }
+
+    /* device_addr is an ARAM offset (relative to audiorom start).
+     * GetNeosRomTop() gives the base ARAM address for audiorom data. */
+    u32 aram_offset = device_addr + GetNeosRomTop();
+    ARStartDMA(1 /* ARAM→MRAM */, (u32)dram_addr, aram_offset, size);
+
+    /* Send completion message so callers that do Z_osRecvMesg(BLOCK) unblock */
+    if (mq != NULL) {
+        Z_osSendMesg(mq, NULL, OS_MESG_NOBLOCK);
+    }
+
+    return 0;
+#else
     OSPiHandle* handle;
 
     osInvalDCache2(dram_addr, size);
@@ -1022,6 +1376,7 @@ static s32 Nas_StartDma(OSIoMesg* ioMsg, s32 priority, s32 direction, u32 device
     ioMsg->size = size;
     (*NA_DMA_PROC)(handle, ioMsg, direction);
     return 0;
+#endif
 }
 
 // @unused void? __OfsToLbaOfs(s32 ofs?, s32* lba_ofs?);
@@ -1222,6 +1577,11 @@ void Nas_InitAudio(u64* heap_p, s32 heap_size) {
     AG.current_frame_dma_count = 0;
     AG.num_waveloads = 0;
 
+#ifdef TARGET_PC
+    /* Fresh process-wide swap tracking state at audio boot. */
+    pc_reset_envdat_visited_all();
+#endif
+
     AG.audio_heap_p = heap_p;
     AG.audio_heap_size = heap_size;
     OSReport("AUDIOHEAP SET ADDR %xh (SIZE %xh) \n", (u32)heap_p, heap_size);
@@ -1293,6 +1653,9 @@ s32 VoiceLoad(s32 bank_id, u32 inst_id, s8* done_p) {
     lpscache* cache;
 
     if (wavetable == NULL) {
+#ifdef TARGET_PC
+        printf("[VoiceLoad] FAIL: wavetable NULL bank=%d inst=%u\n", bank_id, inst_id);
+#endif
         *done_p = 0;
         return -1;
     }
@@ -1301,6 +1664,11 @@ s32 VoiceLoad(s32 bank_id, u32 inst_id, s8* done_p) {
         *done_p = 2;
         return 0;
     }
+
+#ifdef TARGET_PC
+    printf("[VoiceLoad] NEED DMA: bank=%d inst=%u medium=%d size=%u\n",
+        bank_id, inst_id, wavetable->medium, wavetable->size);
+#endif
 
     cache = &AG.lps_cache[AG.slow_load_pos];
     if (cache->status == 3) {
@@ -1313,6 +1681,10 @@ s32 VoiceLoad(s32 bank_id, u32 inst_id, s8* done_p) {
         (u8*)Nas_Alloc_Single(wavetable->size, bank_id, wavetable->sample, wavetable->medium, CACHE_TEMPORARY);
 
     if (cache->current_ram_addr == NULL) {
+#ifdef TARGET_PC
+        printf("[VoiceLoad] ALLOC FAIL: bank=%d inst=%u size=%u medium=%d\n",
+            bank_id, inst_id, wavetable->size, wavetable->medium);
+#endif
         if (wavetable->medium == MEDIUM_DISK || wavetable->codec == CODEC_S16_INMEMORY) {
             *done_p = 0;
         } else {
@@ -1697,6 +2069,81 @@ static void __WaveTouch(wtstr* wavetouch_str, u32 ram_addr, WaveMedia* wave_medi
     smzwavetable* wavetable;
     void* reloc;
 
+#ifdef TARGET_PC
+    /* The wavetable pointer in wtstr was already byte-swapped in
+     * pc_swap_perctable/pc_swap_voicetable/pc_swap_percvoicetable.
+     * It's still a BE offset that was byte-swapped to LE — now a valid
+     * LE u32 offset value. Check if it needs relocation. On PC, all
+     * pointers are < OS_BASE_CACHED (0x80000000), so use a simpler check:
+     * if the offset is small enough to be a valid offset, relocate it. */
+    {
+        u32 wt_ofs = (u32)wavetouch_str->wavetable;
+        if (wt_ofs != 0 && wt_ofs < 0x10000000) {
+            /* Not yet relocated — relocate now */
+            reloc = (void*)(wt_ofs + ram_addr);
+            wavetouch_str->wavetable = (smzwavetable*)reloc;
+            wavetable = wavetouch_str->wavetable;
+
+            /* Check if this wavetable was already byte-swapped and relocated
+             * by a previous entry (e.g. another percussion sharing the same wavetable).
+             * We need to read the raw u32 and check the is_relocated bit.
+             * In BE (original data): bit layout = bit31(1)|codec(3)|medium(2)|bit26(1)|is_relocated(1)|size(24)
+             * is_relocated is bit 25 of the BE u32.
+             * After pc_swap_smzwavetable: the u32 is byte-swapped to LE, and the
+             * struct bitfield layout on LE puts is_relocated at the correct C-level position.
+             * Before swap: we need to check the raw BE byte. Bit 25 of a BE u32
+             * is bit 1 of byte[0]. As raw LE u32, that's bit 25 of BSWAP32(raw). */
+            {
+                u32 raw_first_u32 = *(u32*)wavetable;
+                u32 be_first_u32 = BSWAP32(raw_first_u32);
+                BOOL already_relocated_be = (be_first_u32 >> 25) & 1;
+                /* Also check the LE-swapped is_relocated field in case it was already swapped */
+                BOOL already_relocated_le = wavetable->is_relocated;
+                if (already_relocated_be || already_relocated_le) {
+                    /* Already processed — just update the pointer, skip swap/reloc */
+                    goto wavetouch_done;
+                }
+            }
+
+            /* Swap smzwavetable fields (bitfield u32, sample, loop, book) */
+            pc_swap_smzwavetable(wavetable);
+
+            if (wavetable->size != 0) {
+                reloc = (void*)((u32)wavetable->loop + ram_addr);
+                wavetable->loop = (adpcmloop*)reloc;
+                pc_swap_adpcmloop(wavetable->loop);
+
+                reloc = (void*)((u32)wavetable->book + ram_addr);
+                wavetable->book = (adpcmbook*)reloc;
+                pc_swap_adpcmbook(wavetable->book);
+
+                switch (wavetable->medium) {
+                    case MEDIUM_RAM:
+                        reloc = (void*)((u32)wavetable->sample + (u32)wave_media->wave0_p);
+                        wavetable->sample = (u8*)reloc;
+                        wavetable->medium = wave_media->wave0_media;
+                        break;
+                    case MEDIUM_DISK:
+                        reloc = (void*)((u32)wavetable->sample + (u32)wave_media->wave1_p);
+                        wavetable->sample = (u8*)reloc;
+                        wavetable->medium = wave_media->wave1_media;
+                        break;
+                    case MEDIUM_CART:
+                    case MEDIUM_DISK_DRIVE:
+                        break;
+                }
+
+                wavetable->is_relocated = TRUE;
+                if (wavetable->bit26 && wavetable->medium != MEDIUM_RAM &&
+                    AG.num_used_samples < ARRAY_COUNT(AG.used_samples)) {
+                    AG.used_samples[AG.num_used_samples++] = wavetable;
+                }
+            }
+        }
+    wavetouch_done:
+        (void)0; /* label needs a statement */
+    }
+#else /* !TARGET_PC */
     if ((u32)wavetouch_str->wavetable <= OS_BASE_CACHED) {
         // wave is not relocated
         reloc = (void*)((u32)wavetouch_str->wavetable + ram_addr);
@@ -1733,6 +2180,7 @@ static void __WaveTouch(wtstr* wavetouch_str, u32 ram_addr, WaveMedia* wave_medi
             }
         }
     }
+#endif /* TARGET_PC */
 }
 
 s32 Nas_BankOfsToAddr(s32 bank_id, u8* ctrl_p, WaveMedia* wave_media, s32 async) {
@@ -1746,11 +2194,16 @@ s32 Nas_BankOfsToAddr(s32 bank_id, u8* ctrl_p, WaveMedia* wave_media, s32 async)
     static ALHeap awheap;
     s32 i;
     s8 medium = 0;
-    
+
     // u8 __stack_pad[12];
     // s32* i_p = &i; // this feels wrong but w/e
 
-    
+#ifdef TARGET_PC
+    /* Only bank relocation data is guaranteed fresh here.
+     * Sequence envelopes may still be live and already swapped. */
+    pc_reset_envdat_bank_visited();
+#endif
+
     if (AG.num_requested_samples != 0) {
         preloading = TRUE;
     } else {
@@ -2118,7 +2571,6 @@ void MK_FrameWork(void) {
     if (Z_osRecvMesg(&MK_QUEUE, (OSMesg*)&ret, OS_MESG_NOBLOCK) != -1) {
         idx = ret >> 24;
         rmes = MK_RMES[idx];
-
         if (rmes != NULL) {
             *rmes = 0;
         }

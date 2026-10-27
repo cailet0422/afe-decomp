@@ -27,13 +27,22 @@
 #include "sys_ucode.h"
 #include "zurumode.h"
 #include "m_sdcard.h"
+#ifdef TARGET_PC
+#include "pc_platform.h"
+#include "pc_pause_menu.h"
+extern int g_pc_running;
+#endif
 
 GRAPH graph_class;
 
 static int skip_frame; // TODO: this is actually declared in graph_main
 static int frame; // TODO: this is actually declared in graph_task_set00
 
+#ifdef TARGET_PC
+#define CONSTRUCT_THA_GA(tha_ga, name, name2) (THA_GA_ct((tha_ga), sys_dynamic.name, name2 ## _SIZE * sizeof(Gfx)))
+#else
 #define CONSTRUCT_THA_GA(tha_ga, name, name2) (THA_GA_ct((tha_ga), sys_dynamic.##name, ##name2##_SIZE * sizeof(Gfx)))
+#endif
 
 static void graph_setup_double_buffer(GRAPH* this) {
     bzero(&sys_dynamic, sizeof(dynamic_t));
@@ -244,6 +253,9 @@ static void graph_main(GRAPH* this, GAME* game) {
     game->disable_display = FALSE;
     GRAPH_SET_DOING_POINT(this, GAME_MAIN);
     game_main(game);
+#ifdef TARGET_PC
+    pc_pause_menu_draw(game);
+#endif
     GRAPH_SET_DOING_POINT(this, GAME_MAIN_FINISHED);
     if (ResetStatus < IRQ_RESET_DELAY) {
         if (game->disable_display == FALSE) {
@@ -289,7 +301,11 @@ extern void graph_proc(void* arg) {
         emu64_refresh();
         GRAPH_SET_DOING_POINT(__graph, GAME_CT_FINISHED);
 
-        while (game_is_doing(game)) {
+        while (game_is_doing(game)
+#ifdef TARGET_PC
+               && g_pc_running
+#endif
+        ) {
             if (!dvderr_draw()) {
                 graph_main(__graph, game);
             } else if (OSGetResetSwitchState()) {
@@ -299,6 +315,11 @@ extern void graph_proc(void* arg) {
             }
         }
 
+#ifdef TARGET_PC
+        if (!g_pc_running) {
+            break;
+        }
+#endif
         dlftbl = game_get_next_game_dlftbl(game);
         dlf_no = game_get_next_game_dlf_no(game);
         GRAPH_SET_DOING_POINT(__graph, GAME_18);

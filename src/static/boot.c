@@ -306,6 +306,15 @@ void reset_info_ReloadLink_module_IorO() {
 void ReloadLink_module_IorO(int outSideType) {
   OSModuleHeader* module;
 
+#ifdef TARGET_PC
+  /* The indoor/outdoor modules are statically linked on PC, so there is
+   * nothing to swap. The GBA outdoor archive lives in the memory left over
+   * after the module and is not supported yet. */
+  (void)module;
+  (void)outSideType;
+  return;
+#endif
+
   if (moduleI != nullptr && moduleO != nullptr) {
     OSReport("室内外データを同時にロードしてしまっている"); /* Indoor and outdoor data are loaded at the same time */
     return;
@@ -793,9 +802,17 @@ int main(int argc, const char** argv) {
 
   LoadStringTable("/static.str");
 
+#ifdef TARGET_PC
+  /* Code and data of all REL modules are statically linked on PC; non-null
+   * sentinels keep the reload checks below from trying to load them. */
+  moduleD = (OSModuleHeader*)1;
+  moduleA = (OSModuleHeader*)1;
+  buff_p_for_moduleI_or_moduleO = (u8*)1;
+#else
   LoadLink_moduleIorO();
   moduleD = LoadLink("/forestd.rel.szs", nullptr, 0, TRUE, FALSE, nullptr, nullptr);
   moduleA = LoadLink("/foresta.rel.szs", nullptr, 0, TRUE, FALSE, nullptr, nullptr);
+#endif
   JW_Load_AGB_archive_special();
   JW_Load_picture_copy_archive();
   JW_Init2();
@@ -823,6 +840,14 @@ int main(int argc, const char** argv) {
 
   JC_JKRExpHeap_changeGroupID(JC_JFWSystem_getSystemHeap(), 5);
 
+#ifdef TARGET_PC
+  {
+    /* Byte-swap raw big-endian ROM data that the game reads as structs. */
+    extern void pc_boot_fixup_data(void);
+    pc_boot_fixup_data();
+  }
+#endif
+
   while (HotStartEntry != nullptr) {
     OSReport("ホットスタート(%08x)\n", HotStartEntry);
     HotStartEntry = (*(void* (*)())HotStartEntry)();
@@ -830,6 +855,12 @@ int main(int argc, const char** argv) {
 
   JW_Unload_picture_copy_archive();
   JW_Unload_AGB_archive_special();
+#ifdef TARGET_PC
+  moduleA = nullptr;
+  moduleD = nullptr;
+  moduleI = nullptr;
+  moduleO = nullptr;
+#else
   UnLink(moduleA, FALSE, TRUE);
   moduleA = nullptr;
   UnLink(moduleD, FALSE, TRUE);
@@ -838,6 +869,7 @@ int main(int argc, const char** argv) {
   moduleI = nullptr;
   UnLink(moduleO, FALSE, TRUE);
   moduleO = nullptr;
+#endif
   buff_p_for_moduleI_or_moduleO = nullptr;
   buff_size_for_moduleI_or_moduleO = 0;
   reset_info_ReloadLink_module_IorO();

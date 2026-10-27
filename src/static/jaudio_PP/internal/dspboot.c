@@ -1,5 +1,26 @@
 #include "jaudio_NES/dspboot.h"
 #include "jaudio_NES/dspproc.h"
+
+#ifdef TARGET_PC
+/* PC: No DSP hardware — DspBoot is skipped from StartAudioThread.
+ * Provide empty stubs for symbols that may be referenced. */
+u16 jdsp[1] = { 0 };
+
+void DspBoot(void) {
+    /* No DSP microcode to load on PC — rspsim does everything in software */
+}
+
+s32 __DSPCheckMXICBoot2(DSPTaskInfo2* task) {
+    (void)task;
+    return 1; /* success */
+}
+
+void DSPInit2(DSPTaskInfo2* task) {
+    (void)task;
+}
+
+#else /* !TARGET_PC — original GC code */
+
 #include "dolphin/dsp.h"
 #include "dolphin/os.h"
 #include "dolphin/hw_regs.h"
@@ -379,3 +400,5 @@ extern void DSPInit2 (DSPTaskInfo2* task){
         OSPanic("mxic.c", 357,"DSPInit(): MXIC Boot failed.");
     }
 }
+
+#endif /* TARGET_PC */

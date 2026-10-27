@@ -439,6 +439,17 @@ extern int cKF_SkeletonInfo_R_play(cKF_SkeletonInfo_R_c* keyframe) {
     s16* jointValuePtr;
     cKF_Animation_R_c* animation;
 
+#ifdef TARGET_PC
+    /* Validate keyframe data to prevent crash from corrupted animation state.
+       Note: data_table and key_table can legitimately be NULL for static poses
+       (all flags zero, all values from fixed_table). Only reject truly invalid state. */
+    if (keyframe == NULL || keyframe->skeleton == NULL || keyframe->animation == NULL ||
+        keyframe->current_joint == NULL || keyframe->skeleton->num_joints > 200 ||
+        keyframe->animation->flag_table == NULL || keyframe->animation->fixed_table == NULL) {
+        return cKF_STATE_STOPPED;
+    }
+#endif
+
     if (F32_IS_ZERO(keyframe->morph_counter)) {
         jointValuePtr = &keyframe->current_joint->x;
     } else {

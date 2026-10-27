@@ -1,4 +1,55 @@
 #include "jaudio_NES/dspproc.h"
+
+#ifdef TARGET_PC
+/*==========================================================================
+ * PC: No hardware DSP — rspsim.c does all audio processing in software.
+ * These functions become no-ops or simple state tracking.
+ *==========================================================================*/
+static u16 DSP_MIXERLEVEL = 0x4000;
+
+extern s32 DSPSendCommands(u32* commands, u32 count) {
+    /* No hardware DSP on PC */
+    (void)commands; (void)count;
+    return 0;
+}
+
+extern u32 DSPReleaseHalt(void) {
+    /* No hardware DSP — rspsim processes synchronously */
+    return 0x88881357;
+}
+
+extern void DSPWaitFinish(void) {
+    /* No hardware DSP — already done synchronously */
+}
+
+extern void DsetupTable(u32 arg0, u32 arg1, u32 arg2, u32 arg3, u32 arg4) {
+    /* Channel table setup — no-op on PC, rspsim uses DSPchannel_ structs directly */
+    (void)arg0; (void)arg1; (void)arg2; (void)arg3; (void)arg4;
+}
+
+extern void DsyncFrame(u32 subframes, u32 dspbuf_start, u32 dspbuf_end) {
+    /* On GC this sends commands to DSP to process subframes.
+     * On PC, rspsim is called directly from UpdateDSP path.
+     * Store buffer pointers for rspsim if needed. */
+    (void)subframes; (void)dspbuf_start; (void)dspbuf_end;
+}
+
+extern void DwaitFrame(void) {
+    /* No-op on PC */
+}
+
+extern void DiplSec(u32 arg0) {
+    /* IPL security — not needed on PC */
+    (void)arg0;
+}
+
+extern void DagbSec(u32 arg0) {
+    /* AGB security — not needed on PC */
+    (void)arg0;
+}
+
+#else /* !TARGET_PC — original GC code */
+
 #include "dolphin/dsp.h"
 
 static u16 DSP_MIXERLEVEL = 0x4000;
@@ -59,7 +110,7 @@ extern void DsyncFrame(u32 subframes, u32 dspbuf_start, u32 dspbuf_end){
     commands[2] = dspbuf_end;
 
     DSPSendCommands(commands, ARRAY_COUNT(commands));
-    DSPWaitFinish();    
+    DSPWaitFinish();
 }
 
 extern void DwaitFrame(){
@@ -67,7 +118,7 @@ extern void DwaitFrame(){
 
     commands[0] = 0x80000000;
     DSPSendCommands(commands, ARRAY_COUNT(commands));
-    DSPWaitFinish();    
+    DSPWaitFinish();
 }
 
 extern void DiplSec(u32 arg0){
@@ -76,7 +127,7 @@ extern void DiplSec(u32 arg0){
     commands[0] = 0x8B000008;
     commands[1] = arg0;
     DSPSendCommands(commands, ARRAY_COUNT(commands));
-    DSPWaitFinish();    
+    DSPWaitFinish();
 }
 
 extern void DagbSec(u32 arg0){
@@ -85,8 +136,8 @@ extern void DagbSec(u32 arg0){
     commands[0] = 0x8C000008;
     commands[1] = arg0;
     DSPSendCommands(commands, ARRAY_COUNT(commands));
-    DSPWaitFinish();    
+    DSPWaitFinish();
 }
 
-
+#endif /* TARGET_PC */
 

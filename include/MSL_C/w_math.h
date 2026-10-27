@@ -2,6 +2,12 @@
 #define W_MATH_H
 
 #include "ver.h"
+
+#ifdef TARGET_PC
+/* On PC, system math.h provides all needed functions */
+#include <math.h>
+#else
+
 #include "MSL_C/MSL_Common/float.h"
 
 #if !defined(BUGFIXES) && !defined(FIX_SQRT_LINKAGE)
@@ -128,4 +134,6 @@ extern double sqrt(double x);
 // }
 // #endif
 
-#endif
+#endif /* !TARGET_PC */
+
+#endif /* W_MATH_H */

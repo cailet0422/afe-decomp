@@ -17,6 +17,9 @@
 #include "dolphin/os.h"
 #include "libforest/osreport.h"
 #include "m_land.h"
+#ifdef TARGET_PC
+#include <stdlib.h>
+#endif
 
 // TODO: actually add all the stacks and headers
 
@@ -59,9 +62,20 @@ extern void mainproc(void* val) {
     JC_JKRAramHeap_dump(JC_JKRAram_getAramHeap());
     osSetThreadPri(NULL, 0);
 
+#ifdef TARGET_PC
+    /* On PC the graph thread is not started (single-threaded), so run the
+     * game loop directly instead of yielding to it. */
+    graph_proc(val);
+    {
+        extern void pc_platform_shutdown(void);
+        pc_platform_shutdown();
+        exit(0);
+    }
+#else
     do {
         osYieldThread();
     } while (TRUE);
+#endif
 }
 
 u32 entry(void) {

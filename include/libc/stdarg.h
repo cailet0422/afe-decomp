@@ -1,6 +1,9 @@
 #ifndef _STDARG_H_
 #define _STDARG_H_
 
+#ifdef TARGET_PC
+#include_next <stdarg.h>
+#else
 #ifdef __MWERKS__
 #if defined(__cplusplus) && VERSION == VER_GAEJ01_00
 namespace std {
@@ -50,4 +53,5 @@ typedef __builtin_va_list va_list;
 #define va_arg(v, l) __builtin_va_arg(v, l)
 #endif
 
+#endif /* TARGET_PC */
 #endif

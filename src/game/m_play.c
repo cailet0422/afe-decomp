@@ -39,6 +39,10 @@
 #include "m_skin_matrix.h"
 #include "padmgr.h"
 #include "GBA2/gba2.h"
+#ifdef TARGET_PC
+#include "pc_diag.h"
+#include "pc_platform.h"
+#endif
 
 #define Game_play_HYRAL_SIZE 0x3E800 // 256,000 bytes
 #define Game_play_IS_PAUSED(play) (ZURUMODE2_ENABLED() ? (!Pause_proc(&(play)->pause, &(play)->game.pads[PAD1])) : FALSE)
@@ -553,6 +557,13 @@ static void Game_play_move(GAME* game) {
     GAME_PLAY* play = (GAME_PLAY*)game;
     int pause;
 
+#ifdef TARGET_PC
+    {
+        extern int g_pc_paused;
+        if (g_pc_paused) return;
+    }
+#endif
+
     game->doing_point = 0;
     game->doing_point_specific = 0x8D;
     game->doing_point = 1;
@@ -619,7 +630,7 @@ static void setupFog(GAME_PLAY* play, GRAPH* graph) {
     SET_POLY_OPA_DISP(game_play_set_fog(play, NOW_POLY_OPA_DISP));
     SET_POLY_XLU_DISP(game_play_set_fog(play, NOW_POLY_XLU_DISP));
 
-    #ifdef BUGFIXES
+    #if defined(BUGFIXES) || defined(TARGET_PC)
     // Apply fog to blocks
     SET_BG_OPA_DISP(game_play_set_fog(play, NOW_BG_OPA_DISP));
     SET_BG_XLU_DISP(game_play_set_fog(play, NOW_BG_XLU_DISP));
@@ -704,7 +715,11 @@ static int makeBumpTexture(GAME_PLAY* play, GRAPH* graph1, GRAPH* graph2) {
     Gfx* fb_disp;
     Gfx* old_fb;
     Gfx* poly;
-    
+
+#ifdef TARGET_PC
+    PC_DIAG(3, "makeBumpTexture: enter fb_mode=%d fb_wipe_mode=%d submenu.mode=%d\n",
+            play->fb_mode, play->fb_wipe_mode, play->submenu.mode);
+#endif
     OPEN_DISP(graph1);
 
     if ((GETREG(HREG, 80) != 10) || (GETREG(HREG, 92) != 0)) {
@@ -712,6 +727,13 @@ static int makeBumpTexture(GAME_PLAY* play, GRAPH* graph1, GRAPH* graph2) {
         polydisp = gfxopen(newdisp);
 
         gSPDisplayList(NEXT_OVERLAY_DISP, polydisp);
+
+#ifdef TARGET_PC
+        /* Tell GXSetProjection to skip widescreen aspect correction for
+         * transitions (wipes, fades) so they fill the entire screen.
+         * See pc_platform.h for how the marker/flag mechanism works. */
+        gDPNoOpTag(polydisp++, PC_NOOP_WIDESCREEN_STRETCH);
+#endif
 
         if (play->fb_wipe_mode == WIPE_MODE_MOVE) {
             View view;
@@ -755,6 +777,11 @@ static int makeBumpTexture(GAME_PLAY* play, GRAPH* graph1, GRAPH* graph2) {
     if (play->submenu.mode == mSM_MODE_PRERENDER_DONE) {
         poly = NOW_POLY_OPA_DISP;
 
+#ifdef TARGET_PC
+        /* The prerendered background is a fullscreen textured rect that goes
+         * through ortho projection - enable stretch so it fills widescreen. */
+        gDPNoOpTag(poly++, PC_NOOP_WIDESCREEN_STRETCH);
+#endif
         rect_disp = gfx_rect_moji(poly++);
         gDPSetOtherMode(rect_disp++,
                         G_AD_PATTERN | G_CD_MAGICSQ | G_CK_NONE | G_TC_CONV | G_TF_POINT | G_TT_NONE | G_TL_TILE |
@@ -764,13 +791,23 @@ static int makeBumpTexture(GAME_PLAY* play, GRAPH* graph1, GRAPH* graph2) {
         gDPSetTile_Dolphin(rect_disp++, G_DOLPHIN_TLUT_DEFAULT_MODE, 0, 0, 0, 0, 0, 0);
         gSPTextureRectangle(rect_disp++, 0, 0, ((2*SCREEN_WIDTH) - 1) << 2, ((2*SCREEN_HEIGHT) - 1) << 2, G_TX_RENDERTILE, 0, 0, (256) << G_TEXTURE_IMAGE_FRAC,
                             (256) << G_TEXTURE_IMAGE_FRAC);
+#ifdef TARGET_PC
+        /* Disable stretch so the inventory overlay UI gets 4:3 correction. */
+        gDPNoOpTag(rect_disp++, PC_NOOP_WIDESCREEN_STRETCH_OFF);
+#endif
 
         SET_POLY_OPA_DISP(rect_disp);
         return 1;
     }
 
     if ((GETREG(HREG, 80) != 10) || (GETREG(HREG, 85) != 0)) {
+#ifdef TARGET_PC
+        PC_DIAG(3, "makeBumpTexture: before Actor_info_draw_actor\n");
+#endif
         Actor_info_draw_actor(play, &play->actor_info);
+#ifdef TARGET_PC
+        PC_DIAG(3, "makeBumpTexture: Actor draw done, Camera2...\n");
+#endif
         Camera2_draw(play);
         mMsg_Draw((GAME*)play);
     }
@@ -810,7 +847,7 @@ static void Game_play_draw(GAME_PLAY* play) {
 
     // @BUG - when removing display list segment function present in N64, the devs went slightly too far
     // and removed setting the background fill color while in the main field area.
-#ifdef BUGFIXES
+#if defined(BUGFIXES) || defined(TARGET_PC)
     if (Common_Get(field_type) == mFI_FIELDTYPE2_FG && mEv_CheckTitleDemo() != mEv_TITLEDEMO_STAFFROLL) {
         fill_r = play->kankyo.base_light.background_color[0];
         fill_g = play->kankyo.base_light.background_color[1];
@@ -819,13 +856,28 @@ static void Game_play_draw(GAME_PLAY* play) {
 #endif
 
     DisplayList_initialize(graph, fill_r, fill_g, fill_b, &play->game);
+#ifdef TARGET_PC
+    PC_DIAG(3, "Game_play_draw: DL_init done\n");
+#endif
 
     if ((GETREG(HREG, 80) != 10) || (GETREG(HREG, 82) != 0)) {
         setupFog(play, graph);
+#ifdef TARGET_PC
+        PC_DIAG(3, "Game_play_draw: fog done\n");
+#endif
         setupViewer(play);
+#ifdef TARGET_PC
+        PC_DIAG(3, "Game_play_draw: viewer done\n");
+#endif
         setupViewMatrix(play, graph, graph);
+#ifdef TARGET_PC
+        PC_DIAG(3, "Game_play_draw: viewMtx done\n");
+#endif
 
         if ((makeBumpTexture(play, graph, graph) == 1) && ((GETREG(HREG, 80) != 10) || (GETREG(HREG, 89) != 0))) {
+#ifdef TARGET_PC
+            PC_DIAG(3, "Game_play_draw: bump done, drawing\n");
+#endif
             watch_my_step_draw(play);
             banti_draw(play);
             mSM_submenu_draw(&play->submenu, (GAME*)play);
@@ -848,6 +900,9 @@ static void Game_play_draw(GAME_PLAY* play) {
 extern void play_main(GAME* game) {
     GAME_PLAY* play = (GAME_PLAY*)game;
 
+#ifdef TARGET_PC
+    PC_DIAG(5, "play_main: enter scene=%d frame=%d\n", play->scene_id, play->game_frame);
+#endif
     game->doing_point = 0;
     game->doing_point_specific = 0x6E;
     fqrand();

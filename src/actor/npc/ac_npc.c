@@ -15,6 +15,9 @@
 #include "ac_ball.h"
 #include "m_actor_shadow.h"
 #include "m_font.h"
+#ifdef TARGET_PC
+#include "pc_bswap.h"
+#endif
 
 extern aNPC_draw_data_c npc_draw_data_tbl[];
 

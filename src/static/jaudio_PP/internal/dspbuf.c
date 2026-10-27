@@ -17,6 +17,60 @@ static u8 dspstatus = 0;
 static s16* dsp_buf[DSPBUF_NUM];
 static u32 dac_sync_counter = 0;
 
+#ifdef TARGET_PC
+extern s16* DspbufProcess(DSPBUF_EVENTS event) {
+    u32 i;
+    u32 j;
+
+    switch (event) {
+        case DSPBUF_EVENT_INIT:
+            write_buffer = 2;
+            read_buffer = 0;
+            for (i = 0; i < DSPBUF_NUM; i++) {
+                dsp_buf[i] = (s16*)OSAlloc2(JAC_FRAMESAMPLES << 2);
+                for (j = 0; j < (JAC_FRAMESAMPLES << 1); j++) {
+                    dsp_buf[i][j] = 0;
+                }
+
+            }
+
+            dspstatus = 0;
+            break;
+        case DSPBUF_EVENT_FRAME_END: {
+            DspExtraTaskCheck();
+            u8 write = write_buffer + 1;
+
+            if (write == DSPBUF_NUM) {
+                write = 0;
+            }
+
+            if (write == read_buffer) {
+                dspstatus = 0;
+            } else {
+                write_buffer = write;
+                DspSyncCountClear(JAC_SUBFRAMES);
+                Probe_Start(7, "DSP-MAIN");
+                DsyncFrame(JAC_SUBFRAMES, (u32)dsp_buf[write_buffer], (u32)&dsp_buf[write_buffer][JAC_FRAMESAMPLES]);
+                dspstatus = 1;
+                UpdateDSP();
+            }
+            break;
+        }
+        case DSPBUF_EVENT_MIX: {
+            /* DSP hardware doesn't run on PC — just return a zeroed buffer.
+             * The original code fills with the last sample when buffers haven't
+             * advanced, creating a per-frame DC offset that causes audible pops
+             * when mixed with the CPU pipeline output. */
+            for (i = 0; i < (JAC_FRAMESAMPLES << 1); i++) {
+                dsp_buf[read_buffer][i] = 0;
+            }
+            return dsp_buf[read_buffer];
+        }
+    }
+
+    return nullptr;
+}
+#else
 extern s16* DspbufProcess(DSPBUF_EVENTS event) {
     u32 i;
     u32 j;
@@ -89,6 +143,7 @@ extern s16* DspbufProcess(DSPBUF_EVENTS event) {
 
     return nullptr;
 }
+#endif
 
 extern void UpdateDSP(void) {
     dac_sync_counter++;

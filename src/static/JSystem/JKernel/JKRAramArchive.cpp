@@ -11,6 +11,12 @@
 #include "JSystem/JSystem.h"
 #include "JSystem/JUtility/JUTAssertion.h"
 
+#ifdef TARGET_PC
+#include "pc_bswap.h"
+#define bswap32 pc_bswap32
+#define bswap16 pc_bswap16
+#endif
+
 JKRAramArchive::JKRAramArchive() : JKRArchive() {
 }
 
@@ -141,6 +147,22 @@ bool JKRAramArchive::open(long entryNum) {
         JKRDvdToMainRam(entryNum, (u8*)mem, EXPAND_SWITCH_DECOMPRESS, 32, nullptr, JKRDvdRipper::ALLOC_DIR_TOP, 0,
                         &mCompression, nullptr);
         DCInvalidateRange(mem, 32);
+
+#ifdef TARGET_PC
+        /* Byte-swap SArcHeader from big-endian to little-endian */
+        mem->signature = bswap32(mem->signature);
+        mem->file_length = bswap32(mem->file_length);
+        mem->header_length = bswap32(mem->header_length);
+        mem->file_data_offset = bswap32(mem->file_data_offset);
+        mem->file_data_length = bswap32(mem->file_data_length);
+        mem->_14 = bswap32(mem->_14);
+        mem->_18 = bswap32(mem->_18);
+        mem->_1C = bswap32(mem->_1C);
+        OSReport("[PC] RARC header: sig=%08x len=%u hdrlen=%u dataoff=%u datalen=%u\n",
+                 mem->signature, mem->file_length, mem->header_length,
+                 mem->file_data_offset, mem->file_data_length);
+#endif
+
         int alignment = mMountDirection == MOUNT_DIRECTION_HEAD ? 32 : -32;
         u32 alignedSize = ALIGN_NEXT(mem->file_data_offset, 32);
         mArcInfoBlock = (SArcDataInfo*)JKRAllocFromHeap(mHeap, alignedSize, alignment);
@@ -150,6 +172,19 @@ bool JKRAramArchive::open(long entryNum) {
             JKRDvdToMainRam(entryNum, (u8*)mArcInfoBlock, EXPAND_SWITCH_DECOMPRESS, alignedSize, nullptr,
                             JKRDvdRipper::ALLOC_DIR_TOP, 32, nullptr, nullptr);
             DCInvalidateRange(mArcInfoBlock, alignedSize);
+
+#ifdef TARGET_PC
+            /* Byte-swap SArcDataInfo from big-endian */
+            mArcInfoBlock->num_nodes = bswap32(mArcInfoBlock->num_nodes);
+            mArcInfoBlock->node_offset = bswap32(mArcInfoBlock->node_offset);
+            mArcInfoBlock->num_file_entries = bswap32(mArcInfoBlock->num_file_entries);
+            mArcInfoBlock->file_entry_offset = bswap32(mArcInfoBlock->file_entry_offset);
+            mArcInfoBlock->string_table_length = bswap32(mArcInfoBlock->string_table_length);
+            mArcInfoBlock->string_table_offset = bswap32(mArcInfoBlock->string_table_offset);
+            mArcInfoBlock->nextFreeFileID = bswap16(mArcInfoBlock->nextFreeFileID);
+            OSReport("[PC] RARC info: nodes=%u files=%u\n",
+                     mArcInfoBlock->num_nodes, mArcInfoBlock->num_file_entries);
+#endif
 
             mDirectories = (SDIDirEntry*)((u8*)mArcInfoBlock + mArcInfoBlock->node_offset);
             mFileEntries = (SDIFileEntry*)((u8*)mArcInfoBlock + mArcInfoBlock->file_entry_offset);
@@ -177,6 +212,26 @@ bool JKRAramArchive::open(long entryNum) {
                 memset(mExpandSizes, 0, mArcInfoBlock->num_file_entries << 2);
             }
 
+#ifdef TARGET_PC
+            /* Byte-swap directory entries */
+            for (u32 i = 0; i < mArcInfoBlock->num_nodes; i++) {
+                mDirectories[i].mType = bswap32(mDirectories[i].mType);
+                mDirectories[i].mOffset = bswap32(mDirectories[i].mOffset);
+                mDirectories[i]._08 = bswap16(mDirectories[i]._08);
+                mDirectories[i].mNum = bswap16(mDirectories[i].mNum);
+                mDirectories[i].mFirstIdx = bswap32(mDirectories[i].mFirstIdx);
+            }
+            /* Byte-swap file entries */
+            for (u32 i = 0; i < mArcInfoBlock->num_file_entries; i++) {
+                mFileEntries[i].mFileID = bswap16(mFileEntries[i].mFileID);
+                mFileEntries[i].mHash = bswap16(mFileEntries[i].mHash);
+                mFileEntries[i].mFlag = bswap32(mFileEntries[i].mFlag);
+                mFileEntries[i].mDataOffset = bswap32(mFileEntries[i].mDataOffset);
+                mFileEntries[i].mSize = bswap32(mFileEntries[i].mSize);
+                /* mData is a host pointer, don't swap */
+            }
+#endif
+
             u32 aramSize = ALIGN_NEXT(mem->file_data_length, 32);
             mBlock = JKRAllocFromAram(aramSize,
                                       mMountDirection == MOUNT_DIRECTION_HEAD ? JKRAramHeap::Head : JKRAramHeap::Tail);
@@ -189,6 +244,10 @@ bool JKRAramArchive::open(long entryNum) {
                 }
                 mMountMode = 0;
             } else {
+#ifdef TARGET_PC
+                OSReport("[PC] RARC: loading %u bytes of file data to ARAM at %u\n",
+                         aramSize, mBlock->getAddress());
+#endif
                 JKRDvdToAram(entryNum, mBlock->getAddress(), EXPAND_SWITCH_DECOMPRESS,
                              mem->header_length + mem->file_data_offset, 0, nullptr);
             }
@@ -329,6 +388,9 @@ u32 JKRAramArchive::fetchResource_subroutine(u32 srcAram, u32 size, JKRHeap* hea
             return size;
         case JKRCOMPRESSION_YAY0:
         case JKRCOMPRESSION_YAZ0:
+#ifdef TARGET_PC
+        {
+#endif
             u8 decompBuf[64];
             u8* bufptr = (u8*)ALIGN_NEXT((u32)decompBuf, 32);
             JKRAramToMainRam(srcAram, bufptr, sizeof(decompBuf) / 2, EXPAND_SWITCH_DEFAULT, 0, nullptr, -1, nullptr);
@@ -340,6 +402,9 @@ u32 JKRAramArchive::fetchResource_subroutine(u32 srcAram, u32 size, JKRHeap* hea
             JKRAramToMainRam(srcAram, buffer, alignedSize, EXPAND_SWITCH_DECOMPRESS, expandSize, heap, -1, &resSize);
             *pBuf = buffer;
             return resSize;
+#ifdef TARGET_PC
+        }
+#endif
         default:
             JPANIC(713, "??? bad sequence\n");
             return 0;

@@ -133,6 +133,19 @@ extern void graph_dt(GRAPH* graph);
 #define NEXT_BG_XLU_DISP NEXT_DISP(&__graph->bg_translucent_thaga)
 #define NEXT_NEW2_DISP NEXT_DISP(&__graph->new2_thaga)
 
+#ifdef TARGET_PC
+/* Metrowerks allows cast-to-lvalue; GCC does not. head_p is already Gfx*. */
+#define NOW_POLY_OPA_DISP NOW_DISP(&__graph->polygon_opaque_thaga)
+#define NOW_POLY_XLU_DISP NOW_DISP(&__graph->polygon_translucent_thaga)
+#define NOW_OVERLAY_DISP NOW_DISP(&__graph->overlay_thaga)
+#define NOW_WORK_DISP NOW_DISP(&__graph->work_thaga)
+#define NOW_FONT_DISP NOW_DISP(&__graph->font_thaga)
+#define NOW_SHADOW_DISP NOW_DISP(&__graph->shadow_thaga)
+#define NOW_LIGHT_DISP NOW_DISP(&__graph->light_thaga)
+#define NOW_BG_OPA_DISP NOW_DISP(&__graph->bg_opaque_thaga)
+#define NOW_BG_XLU_DISP NOW_DISP(&__graph->bg_translucent_thaga)
+#define NOW_NEW2_DISP NOW_DISP(&__graph->new2_thaga)
+#else
 #define NOW_POLY_OPA_DISP (Gfx*)NOW_DISP(&__graph->polygon_opaque_thaga)
 #define NOW_POLY_XLU_DISP (Gfx*)NOW_DISP(&__graph->polygon_translucent_thaga)
 #define NOW_OVERLAY_DISP (Gfx*)NOW_DISP(&__graph->overlay_thaga)
@@ -143,6 +156,7 @@ extern void graph_dt(GRAPH* graph);
 #define NOW_BG_OPA_DISP (Gfx*)NOW_DISP(&__graph->bg_opaque_thaga)
 #define NOW_BG_XLU_DISP (Gfx*)NOW_DISP(&__graph->bg_translucent_thaga)
 #define NOW_NEW2_DISP (Gfx*)NOW_DISP(&__graph->new2_thaga)
+#endif
 
 #define SET_POLY_OPA_DISP(p) SET_DISP(&__graph->polygon_opaque_thaga, p)
 #define SET_POLY_XLU_DISP(p) SET_DISP(&__graph->polygon_translucent_thaga, p)

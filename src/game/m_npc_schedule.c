@@ -274,6 +274,12 @@ extern mNPS_schedule_c* mNPS_get_schedule_area(AnmPersonalID_c* anm_id) {
 }
 
 static void mNPS_set_schedule_area(AnmPersonalID_c* anm_id) {
+#ifdef TARGET_PC
+    /* Guard against invalid looks (e.g. mNpc_LOOKS_UNSET on free animal slots) */
+    if (anm_id->looks >= mNpc_LOOKS_NUM) {
+        return;
+    }
+#endif
     mNPS_schedule_c* schedule = mNPS_get_schedule_area(NULL); /* try to get an unused schedule */
 
     if (schedule != NULL) {
@@ -288,6 +294,12 @@ extern void mNPS_set_island_schedule_area(AnmPersonalID_c* anm_id) {
         return;
     }
 
+#ifdef TARGET_PC
+    /* Guard against invalid looks (e.g. mNpc_LOOKS_UNSET on free animal slots) */
+    if (anm_id->looks >= mNpc_LOOKS_NUM) {
+        return;
+    }
+#endif
     Common_Set(npc_schedule[ANIMAL_NUM_MAX].id, anm_id);
     Common_Set(npc_schedule[ANIMAL_NUM_MAX].data_table, mNPS_schedule[anm_id->looks]);
     Common_Set(npc_schedule[ANIMAL_NUM_MAX].forced_timer, 0);

@@ -18,6 +18,9 @@ void usleep(u32 us) {
     csleep(OSMicrosecondsToTicks((u64)us));
 }
 
+#ifndef TARGET_PC
+/* On PC, msleep is provided by pc_os.c using SDL_Delay */
 void msleep(u32 ms) {
     csleep(OSMillisecondsToTicks((u64)ms));
 }
+#endif

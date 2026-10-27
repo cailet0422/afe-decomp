@@ -54,7 +54,9 @@ extern void Jac_Init(void) {
     for (int i = 0; i < 3; i++) {
         dac[i] = (s16*)OSAlloc2(DAC_SIZE * 2);
         Jac_bzero(dac[i], DAC_SIZE * 2);
+#ifndef TARGET_PC
         DCStoreRange(dac[i], DAC_SIZE * 2);
+#endif
     }
 
     AIInit(nullptr);
@@ -231,7 +233,16 @@ extern void Jac_VframeWork(void) {
     JAC_VFRAME_COUNTER++;
 
     s16* mixedTrack = MixDsp(DAC_SIZE / 2);
+#ifdef TARGET_PC
+    /* On PC, rspsim's INTERLEAVE command already produces interleaved stereo
+     * in tmp_buf/dsp_buf. The original Jac_imixcopy assumes split-channel
+     * layout (first half = R, second half = L) which is the GC DSP hardware
+     * output format. Using it on already-interleaved data scrambles channels,
+     * causing R ≈ 2×L gain asymmetry and audible pops. */
+    Jac_bcopy(mixedTrack, dac[dacp], DAC_SIZE * 2);
+#else
     Jac_imixcopy(&mixedTrack[JAC_FRAMESAMPLES], &mixedTrack[0], dac[dacp], DAC_SIZE / 2);
+#endif
 
     if (ext_mixcallback != nullptr) {
         switch (ext_mixmode) {
@@ -250,9 +261,11 @@ extern void Jac_VframeWork(void) {
         }
     }
 
+#ifndef TARGET_PC
     BOOL enable = OSDisableInterrupts();
     DCStoreRange(dac[dacp], DAC_SIZE * 2);
     OSRestoreInterrupts(enable);
+#endif
 
     last_rsp_madep = dac[dacp];
     dacp++;

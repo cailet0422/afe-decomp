@@ -14,6 +14,12 @@
 #include "dolphin/PPCArch.h"
 #include "PowerPC_EABI_Support/msl/MSL_C/PPC_EABI/cmath_gcn.h" // for std::sqrtf
 
+#ifdef TARGET_PC
+#include "pc_platform.h"
+
+static jmp_buf pc_dl_crash_jmpbuf;
+#endif
+
 class aflags_c {
 public:
 #ifdef AFLAGS_DEBUG
@@ -499,6 +505,10 @@ extern void emu64_texture_cache_data_entry_set(void* begin, void* end) {
 }
 
 static texture_cache_t* texture_cache_select(void* addr) {
+#ifdef TARGET_PC
+    /* On PC, always use the main data cache (no GC .data/.bss section distinction) */
+    return &texture_cache_data;
+#else
     int i;
 
     if (aflags[AFLAGS_SKIP_TEXTURE_CONV] >= 1 || (addr >= _f_rodata && addr <= _e_data)) {
@@ -512,6 +522,7 @@ static texture_cache_t* texture_cache_select(void* addr) {
     }
 
     return &texture_cache_bss;
+#endif
 }
 
 static int texture_cache_is_overflow(texture_cache_t* cache) {
@@ -952,6 +963,112 @@ extern void get_dol_wd_ht(unsigned int siz, unsigned int in_wd, unsigned int in_
     *ht = in_ht + h & ~h;
 }
 
+#ifdef TARGET_PC
+void emu64::texconv_tile(u8* addr, u8* converted_addr, unsigned int wd, unsigned int fmt, unsigned int siz,
+    unsigned int start_wd, unsigned int start_ht, unsigned int end_wd, unsigned int end_ht,
+    unsigned int line_siz) {
+    unsigned int blk_ht;
+    unsigned int blk_wd;
+    unsigned int blk_y;
+    unsigned int blk_x;
+    unsigned int y;
+    unsigned int y_ofs;
+
+    get_blk_wd_ht(siz, &blk_wd, &blk_ht);
+
+    for (blk_y = start_ht; blk_y < end_ht; blk_y += blk_ht) {
+        for (blk_x = start_wd; blk_x < end_wd; blk_x += blk_wd) {
+            for (y = 0; y < blk_ht; y++) {
+                y_ofs = blk_y + y;
+
+                if (siz == G_IM_SIZ_16b) {
+                    if (fmt == G_IM_FMT_RGBA) {
+                        unsigned int x_ofs = (blk_x + y_ofs * wd) * sizeof(u16);
+                        unsigned int ofs = this->tmem_swap(x_ofs, line_siz);
+                        u8* src = (u8*)(addr + ofs);
+
+                        /* Source N64 RGBA5551 data is BE; read as BE u16.
+                         * Write output as BE too so decode_RGB5A3 (which reads
+                         * bytes as BE) handles it consistently with ROM data. */
+                        {
+                            u16 v0 = rgba5551_to_rgb5a3((src[0] << 8) | src[1]);
+                            u16 v1 = rgba5551_to_rgb5a3((src[2] << 8) | src[3]);
+                            converted_addr[0] = (u8)(v0 >> 8); converted_addr[1] = (u8)v0;
+                            converted_addr[2] = (u8)(v1 >> 8); converted_addr[3] = (u8)v1;
+                        }
+
+                        ofs = this->tmem_swap(x_ofs + 4, line_siz);
+                        src = (u8*)(addr + ofs);
+                        {
+                            u16 v0 = rgba5551_to_rgb5a3((src[0] << 8) | src[1]);
+                            u16 v1 = rgba5551_to_rgb5a3((src[2] << 8) | src[3]);
+                            converted_addr[4] = (u8)(v0 >> 8); converted_addr[5] = (u8)v0;
+                            converted_addr[6] = (u8)(v1 >> 8); converted_addr[7] = (u8)v1;
+                        }
+                    } else if (fmt == G_IM_FMT_IA) {
+                        unsigned int x_ofs = (blk_x + y_ofs * wd) * sizeof(u16);
+                        unsigned int ofs = this->tmem_swap(x_ofs, line_siz);
+                        u8* src = addr + ofs;
+
+                        converted_addr[0] = src[1];
+                        converted_addr[1] = src[0];
+                        converted_addr[2] = src[3];
+                        converted_addr[3] = src[2];
+
+                        x_ofs += 4;
+                        ofs = this->tmem_swap(x_ofs, line_siz);
+                        src = addr + ofs;
+
+                        converted_addr[4] = src[1];
+                        converted_addr[5] = src[0];
+                        converted_addr[6] = src[3];
+                        converted_addr[7] = src[2];
+                    }
+
+                    converted_addr += 8;
+                } else if (siz == G_IM_SIZ_8b) {
+                    if (fmt == G_IM_FMT_IA) {
+                        unsigned int x_ofs = blk_x + y_ofs * wd;
+                        unsigned int ofs = this->tmem_swap(x_ofs, line_siz);
+                        u32* dst = (u32*)converted_addr;
+                        u32* src = (u32*)(addr + ofs);
+                        u32 part0 = (src[0] << 4) & 0xF0F0F0F0;
+                        u32 part1 = (src[0] >> 4) & 0x0F0F0F0F;
+
+                        dst[0] = part0 + part1;
+
+                        ofs = this->tmem_swap(x_ofs + 4, line_siz);
+                        src = (u32*)(addr + ofs);
+                        u32 part12 = (src[0] >> 4) & 0x0F0F0F0F;
+                        u32 part02 = (src[0] << 4) & 0xF0F0F0F0;
+                        dst[1] = part02 + part12;
+                    } else {
+                        unsigned int x_ofs = blk_x + y_ofs * wd;
+                        unsigned int ofs = this->tmem_swap(x_ofs, line_siz);
+
+                        *(u32*)(converted_addr + 0) = *(u32*)(addr + ofs);
+                        ofs = this->tmem_swap(x_ofs + 4, line_siz);
+                        *(u32*)(converted_addr + 4) = *(u32*)(addr + ofs);
+                    }
+
+                    converted_addr += 8;
+                } else if (siz == G_IM_SIZ_4b) {
+                    unsigned int x_ofs = (blk_x + y_ofs * wd) / 2;
+                    unsigned int ofs = this->tmem_swap(x_ofs, line_siz);
+
+                    *(u32*)(converted_addr + 0) = *(u32*)(addr + ofs);
+                    converted_addr += 4;
+                } else {
+                    // G_IM_SIZ_32b is not supported.
+                    this->Printf0("G_IM_SIZ_32bはサポートしてません");
+                }
+            }
+        }
+    }
+
+    this->texconv_cnt++;
+}
+#else
 void emu64::texconv_tile(u8* addr, u8* converted_addr, unsigned int wd, unsigned int fmt, unsigned int siz,
     unsigned int start_wd, unsigned int start_ht, unsigned int end_wd, unsigned int end_ht,
     unsigned int line_siz) {
@@ -1045,6 +1162,7 @@ void emu64::texconv_tile(u8* addr, u8* converted_addr, unsigned int wd, unsigned
 
     this->texconv_cnt++;
 }
+#endif
 
 unsigned int emu64::tmem_swap(unsigned int ofs, unsigned int blk_siz) {
     u16 block = ofs / blk_siz;
@@ -1167,6 +1285,8 @@ int emu64::replace_combine_to_tev(Gfx* g) {
     int Ac;
     int Ad;
 
+    /* TARGET_PC: TEXEL1 substitution disabled — combine_manual() handles multi-texture cases
+       (spotlight, fog, inventory oval) with per-stage texture binding instead. */
     if ((setcombine->a0 == G_CCMUX_TEXEL1 || setcombine->b0 == G_CCMUX_TEXEL1 || setcombine->c0 == G_CCMUX_TEXEL1 ||
          setcombine->d0 == G_CCMUX_TEXEL1 || setcombine->c0 == G_CCMUX_TEXEL1_ALPHA) ||
         (setcombine->Aa0 == G_ACMUX_TEXEL1 || setcombine->Ab0 == G_ACMUX_TEXEL1 || setcombine->Ac0 == G_ACMUX_TEXEL1 ||
@@ -1318,6 +1438,10 @@ int emu64::combine_auto() {
 
     int two_cycle = (this->othermode_high & G_CYC_2CYCLE) != 0;
 
+    /* TEXEL1 combines have dedicated multi-texture handlers in combine_manual().
+       Reject them here so they fall through to combine_manual's switch cases.
+       (PC used to substitute TEXEL1→TEXEL0 here, but that destroyed the alpha
+       mask information needed for inventory oval, spotlight, etc.) */
     if ((setcombine->a0 == G_CCMUX_TEXEL1 || setcombine->b0 == G_CCMUX_TEXEL1 || setcombine->c0 == G_CCMUX_TEXEL1 ||
          setcombine->d0 == G_CCMUX_TEXEL1 || setcombine->c0 == G_CCMUX_TEXEL1_ALPHA ||
          setcombine->Aa0 == G_ACMUX_TEXEL1 || setcombine->Ab0 == G_ACMUX_TEXEL1 || setcombine->Ac0 == G_ACMUX_TEXEL1 ||
@@ -1457,6 +1581,141 @@ int emu64::combine_auto() {
     return 0;
 }
 
+#ifdef TARGET_PC
+int emu64::combine_tev() {
+    
+    if ((u8)this->combine_gfx.setcombine.cmd == G_SETCOMBINE_TEV) {
+        int two_cycle = (this->othermode_high & G_CYC_2CYCLE) >> G_MDSFT_CYCLETYPE;
+        Gsetcombine_tev combine_tev = *((Gsetcombine_tev*)&this->combine_gfx);
+
+        if (aflags[AFLAGS_FORCE_TEV_COMBINE_MODE] != 0) {
+            if (aflags[AFLAGS_FORCE_TEV_COMBINE_MODE] == 1) {
+                static int c = TEV_SHADE;
+                static int c1 = TEV_SHADE;
+                static int a = TEV_ALPHA_SHADE;
+                static int a1 = TEV_ALPHA_SHADE;
+
+                if (combine_tev.a0 == c) {
+                    combine_tev.a0 = c1;
+                }
+
+                if (combine_tev.b0 == c) {
+                    combine_tev.b0 = c1;
+                }
+
+                if (combine_tev.c0 == c) {
+                    combine_tev.c0 = c1;
+                }
+
+                if (combine_tev.d0 == c) {
+                    combine_tev.d0 = c1;
+                }
+
+                if (combine_tev.a1 == c) {
+                    combine_tev.a1 = c1;
+                }
+
+                if (combine_tev.b1 == c) {
+                    combine_tev.b1 = c1;
+                }
+
+                if (combine_tev.c1 == c) {
+                    combine_tev.c1 = c1;
+                }
+
+                if (combine_tev.d1 == c) {
+                    combine_tev.d1 = c1;
+                }
+
+                if (combine_tev.Aa0 == a) {
+                    combine_tev.Aa0 = a1;
+                }
+
+                if (combine_tev.Ab0 == a) {
+                    combine_tev.Ab0 = a1;
+                }
+
+                if (combine_tev.Ac0 == a) {
+                    combine_tev.Ac0 = a1;
+                }
+
+                if (combine_tev.Ad0 == a) {
+                    combine_tev.Ad0 = a1;
+                }
+
+                if (combine_tev.Aa1 == a) {
+                    combine_tev.Aa1 = a1;
+                }
+
+                if (combine_tev.Ab1 == a) {
+                    combine_tev.Ab1 = a1;
+                }
+
+                if (combine_tev.Ac1 == a) {
+                    combine_tev.Ac1 = a1;
+                }
+
+                if (combine_tev.Ad1 == a) {
+                    combine_tev.Ad1 = a1;
+                }
+            }
+
+            if (aflags[AFLAGS_FORCE_TEV_COMBINE_MODE] == 2) {
+                combine_tev.d1 = TEV_HALF;
+                combine_tev.Ad1 = TEV_ALPHA_ONE;
+            }
+        }
+
+        GXSetTevOrder(GX_TEVSTAGE0, GX_TEXCOORD0, GX_TEXMAP0, GX_COLOR0A0);
+        GXSetTevColorOp(GX_TEVSTAGE0, GX_TEV_ADD, GX_TB_ZERO, GX_CS_SCALE_1, GX_TRUE, GX_TEVPREV);
+        GXSetTevAlphaOp(GX_TEVSTAGE0, GX_TEV_ADD, GX_TB_ZERO, GX_CS_SCALE_1, GX_TRUE, GX_TEVPREV);
+
+        GXSetTevColorIn(GX_TEVSTAGE0, (GXTevColorArg)combine_tev.a0, (GXTevColorArg)combine_tev.b0,
+                        (GXTevColorArg)combine_tev.c0, (GXTevColorArg)combine_tev.d0);
+        GXSetTevAlphaIn(GX_TEVSTAGE0, (GXTevAlphaArg)combine_tev.Aa0, (GXTevAlphaArg)combine_tev.Ab0,
+                        (GXTevAlphaArg)combine_tev.Ac0, (GXTevAlphaArg)combine_tev.Ad0);
+
+        if (two_cycle && ((((Gsetcombine_raw*)&combine_tev)->lower1) != 0xFFF0 || ((((Gsetcombine_raw*)&combine_tev)->lower0) & 0xFFF) != 0x0FF8)) {
+            GXSetNumTexGens(2);
+            GXSetNumTevStages(2);
+
+            GXSetTevOrder(GX_TEVSTAGE1, GX_TEXCOORD1, GX_TEXMAP1, GX_COLOR0A0);
+            GXSetTevColorOp(GX_TEVSTAGE1, GX_TEV_ADD, GX_TB_ZERO, GX_CS_SCALE_1, GX_TRUE, GX_TEVPREV);
+            GXSetTevAlphaOp(GX_TEVSTAGE1, GX_TEV_ADD, GX_TB_ZERO, GX_CS_SCALE_1, GX_TRUE, GX_TEVPREV);
+            GXSetTevColorIn(GX_TEVSTAGE1, (GXTevColorArg)combine_tev.a1, (GXTevColorArg)combine_tev.b1,
+                            (GXTevColorArg)combine_tev.c1, (GXTevColorArg)combine_tev.d1);
+            GXSetTevAlphaIn(GX_TEVSTAGE1, (GXTevAlphaArg)combine_tev.Aa1, (GXTevAlphaArg)combine_tev.Ab1,
+                            (GXTevAlphaArg)combine_tev.Ac1, (GXTevAlphaArg)combine_tev.Ad1);
+
+            GXSetTevOrder(GX_TEVSTAGE2, GX_TEXCOORD_NULL, GX_TEXMAP_NULL, GX_COLOR_NULL);
+            GXSetTevColorOp(GX_TEVSTAGE2, GX_TEV_ADD, GX_TB_ZERO, GX_CS_SCALE_1, GX_TRUE, GX_TEVPREV);
+            GXSetTevAlphaOp(GX_TEVSTAGE2, GX_TEV_ADD, GX_TB_ZERO, GX_CS_SCALE_1, GX_TRUE, GX_TEVPREV);
+            GXSetTevColorIn(GX_TEVSTAGE2, GX_CC_ZERO, GX_CC_ZERO, GX_CC_ZERO, GX_CC_ONE);
+            GXSetTevAlphaIn(GX_TEVSTAGE2, GX_CA_ZERO, GX_CA_ZERO, GX_CA_ZERO, GX_CA_KONST);
+        } else {
+            GXSetNumTexGens(1);
+            GXSetNumTevStages(1);
+
+            GXSetTevOrder(GX_TEVSTAGE1, GX_TEXCOORD_NULL, GX_TEXMAP_NULL, GX_COLOR_NULL);
+            GXSetTevColorOp(GX_TEVSTAGE1, GX_TEV_ADD, GX_TB_ZERO, GX_CS_SCALE_1, GX_TRUE, GX_TEVPREV);
+            GXSetTevAlphaOp(GX_TEVSTAGE1, GX_TEV_ADD, GX_TB_ZERO, GX_CS_SCALE_1, GX_TRUE, GX_TEVPREV);
+            GXSetTevColorIn(GX_TEVSTAGE1, GX_CC_ZERO, GX_CC_ZERO, GX_CC_ZERO, GX_CC_ONE);
+            GXSetTevAlphaIn(GX_TEVSTAGE1, GX_CA_ZERO, GX_CA_ZERO, GX_CA_ZERO, GX_CA_KONST);
+
+            GXSetTevOrder(GX_TEVSTAGE2, GX_TEXCOORD_NULL, GX_TEXMAP_NULL, GX_COLOR_NULL);
+            GXSetTevColorOp(GX_TEVSTAGE2, GX_TEV_ADD, GX_TB_ZERO, GX_CS_SCALE_1, GX_TRUE, GX_TEVPREV);
+            GXSetTevAlphaOp(GX_TEVSTAGE2, GX_TEV_ADD, GX_TB_ZERO, GX_CS_SCALE_1, GX_TRUE, GX_TEVPREV);
+            GXSetTevColorIn(GX_TEVSTAGE2, GX_CC_ZERO, GX_CC_ZERO, GX_CC_ZERO, GX_CC_ONE);
+            GXSetTevAlphaIn(GX_TEVSTAGE2, GX_CA_ZERO, GX_CA_ZERO, GX_CA_ZERO, GX_CA_KONST);
+        }
+
+        if (aflags[ALFAGS_TEV_ALPHA_KONST] != 0 || aflags[AFLAGS_WIREFRAME] != 0) {
+            GXSetTevAlphaIn(GX_TEVSTAGE1, GX_CA_ZERO, GX_CA_ZERO, GX_CA_ZERO, GX_CA_KONST);
+        }
+    }
+    return 0;
+}
+#else
 int emu64::combine_tev() {
     
     if ((u8)this->combine_gfx.setcombine.cmd == G_SETCOMBINE_TEV) {
@@ -1589,6 +1848,7 @@ int emu64::combine_tev() {
         }
     }
 }
+#endif
 
 #define NUM_COMBINER_HIGHLOW_ERRS 10
 
@@ -1603,6 +1863,478 @@ int emu64::combine_tev() {
                GCCc1w1(G_CCMUX_##b1, G_ACMUX_##Aa1, G_ACMUX_##Ac1, G_CCMUX_##d1, G_ACMUX_##Ab1, G_ACMUX_##Ad1)))
 #define COMBINE_CONSTEXPR(mode0, mode1) (gsDPSetCombineLERPInline(mode0, mode1))
 
+#ifdef TARGET_PC
+void emu64::combine_manual() {
+    static u64 highlow_errs[NUM_COMBINER_HIGHLOW_ERRS];
+    static u32 last_highlow;
+    u8 orig_combine_cmd = ((Gsetcombine_new*)&this->combine_gfx)->cmd;
+    Gsetcombine_new combine_mode_cmd_fixed = *(Gsetcombine_new*)&this->combine_gfx;
+
+    /* replace_combine_to_tev() marks TEXEL1 paths as G_SETCOMBINE_NOTEV.
+       Manual combine cases are keyed with G_SETCOMBINE opcode, so normalize
+       the command byte before matching the mode payload. */
+    if (combine_mode_cmd_fixed.cmd == G_SETCOMBINE_NOTEV) {
+        combine_mode_cmd_fixed.cmd = G_SETCOMBINE;
+    }
+
+    u64 combine_mode = *(u64*)&combine_mode_cmd_fixed;
+    /* On LE, the struct's two 32-bit words are in opposite order from the
+       gsDPSetCombineLERPInline macro (which uses BE word order: w0<<32|w1).
+       Swap words so the switch cases match. */
+    combine_mode = (combine_mode >> 32) | (combine_mode << 32);
+    switch (combine_mode) {
+        case gsDPSetCombineLERPInline(TEXEL0, 0, SHADE, TEXEL0, 0, 0, 0, TEXEL0, SHADE, ENVIRONMENT, PRIMITIVE,
+                                      COMBINED, 0, 0, 0, COMBINED): {
+            GXSetNumTevStages(3);
+            GXSetTevColorIn(GX_TEVSTAGE0, GX_CC_ZERO, GX_CC_RASC, GX_CC_TEXC, GX_CC_TEXC);
+            GXSetTevColorIn(GX_TEVSTAGE1, GX_CC_ZERO, GX_CC_RASC, GX_CC_C1, GX_CC_CPREV);
+            GXSetTevColorIn(GX_TEVSTAGE2, GX_CC_ZERO, GX_CC_C2, GX_CC_C1, GX_CC_CPREV);
+            GXSetTevAlphaIn(GX_TEVSTAGE0, GX_CA_TEXA, GX_CA_ZERO, GX_CA_ZERO, GX_CA_ZERO);
+            GXSetTevAlphaIn(GX_TEVSTAGE1, GX_CA_ZERO, GX_CA_ZERO, GX_CA_ZERO, GX_CA_APREV);
+            GXSetTevAlphaIn(GX_TEVSTAGE2, GX_CA_ZERO, GX_CA_ZERO, GX_CA_ZERO, GX_CA_APREV);
+            GXSetTevOrder(GX_TEVSTAGE0, GX_TEXCOORD0, GX_TEXMAP0, GX_COLOR0A0);
+            GXSetTevOrder(GX_TEVSTAGE1, GX_TEXCOORD_NULL, GX_TEXMAP_NULL, GX_COLOR0A0);
+            GXSetTevOrder(GX_TEVSTAGE2, GX_TEXCOORD_NULL, GX_TEXMAP_NULL, GX_COLOR0A0);
+            GXSetTevColorOp(GX_TEVSTAGE2, GX_TEV_SUB, GX_TB_ZERO, GX_CS_SCALE_1, 1, GX_TEVPREV);
+            break;
+        }
+        case gsDPSetCombineLERPInline(NOISE, TEXEL0, PRIMITIVE, ENVIRONMENT, TEXEL0, 0, PRIMITIVE, 0, COMBINED, 0,
+                                      SHADE, 0, 0, 0, 0, COMBINED): {
+            GXSetNumTevStages(3);
+            GXSetTevColorIn(GX_TEVSTAGE0, GX_CC_TEXC, GX_CC_ZERO, GX_CC_ZERO, GX_CC_HALF);
+            GXSetTevColorIn(GX_TEVSTAGE1, GX_CC_ZERO, GX_CC_CPREV, GX_CC_C1, GX_CC_C2);
+            GXSetTevColorIn(GX_TEVSTAGE2, GX_CC_ZERO, GX_CC_CPREV, GX_CC_RASC, GX_CC_ZERO);
+            GXSetTevAlphaIn(GX_TEVSTAGE0, GX_CA_ZERO, GX_CA_TEXA, GX_CA_A1, GX_CA_ZERO);
+            GXSetTevAlphaIn(GX_TEVSTAGE1, GX_CA_ZERO, GX_CA_ZERO, GX_CA_ZERO, GX_CA_APREV);
+            GXSetTevAlphaIn(GX_TEVSTAGE2, GX_CA_ZERO, GX_CA_ZERO, GX_CA_ZERO, GX_CA_APREV);
+            GXSetTevOrder(GX_TEVSTAGE0, GX_TEXCOORD0, GX_TEXMAP0, GX_COLOR0A0);
+            GXSetTevOrder(GX_TEVSTAGE1, GX_TEXCOORD_NULL, GX_TEXMAP_NULL, GX_COLOR0A0);
+            GXSetTevOrder(GX_TEVSTAGE2, GX_TEXCOORD_NULL, GX_TEXMAP_NULL, GX_COLOR0A0);
+            GXSetTevColorOp(GX_TEVSTAGE0, GX_TEV_SUB, GX_TB_ZERO, GX_CS_SCALE_1, 1, GX_TEVPREV);
+            break;
+        }
+        case gsDPSetCombineLERPInline(PRIMITIVE, ENVIRONMENT, TEXEL0, ENVIRONMENT, TEXEL0, TEXEL1, PRIMITIVE, 0, 0, 0,
+                                      0, COMBINED, 0, 0, 0, COMBINED): {
+            GXSetNumTevStages(2);
+            GXSetTevColorIn(GX_TEVSTAGE0, GX_CC_C2, GX_CC_C1, GX_CC_TEXC, GX_CC_ZERO);
+            GXSetTevColorIn(GX_TEVSTAGE1, GX_CC_ZERO, GX_CC_ZERO, GX_CC_ZERO, GX_CC_CPREV);
+            GXSetTevAlphaIn(GX_TEVSTAGE0, GX_CA_ZERO, GX_CA_TEXA, GX_CA_A1, GX_CA_ZERO);
+            GXSetTevAlphaIn(GX_TEVSTAGE1, GX_CA_ZERO, GX_CA_TEXA, GX_CA_A1, GX_CA_APREV);
+            GXSetTevOrder(GX_TEVSTAGE0, GX_TEXCOORD0, GX_TEXMAP0, GX_COLOR0A0);
+            GXSetTevOrder(GX_TEVSTAGE1, GX_TEXCOORD1, GX_TEXMAP1, GX_COLOR0A0);
+            GXSetTevAlphaOp(GX_TEVSTAGE1, GX_TEV_SUB, GX_TB_ZERO, GX_CS_SCALE_1, 1, GX_TEVPREV);
+            break;
+        }
+        case gsDPSetCombineLERPInline(TEXEL1, TEXEL0, PRIMITIVE_ALPHA, TEXEL0, SHADE, 0, PRIM_LOD_FRAC, 0, COMBINED, 0,
+                                      SHADE, 0, 0, 0, 0, COMBINED): {
+            GXSetNumTevStages(3);
+            GXSetTevColorIn(GX_TEVSTAGE0, GX_CC_TEXC, GX_CC_ZERO, GX_CC_ZERO, GX_CC_ZERO);
+            GXSetTevColorIn(GX_TEVSTAGE1, GX_CC_CPREV, GX_CC_TEXC, GX_CC_A1, GX_CC_ZERO);
+            GXSetTevColorIn(GX_TEVSTAGE2, GX_CC_ZERO, GX_CC_CPREV, GX_CC_RASC, GX_CC_ZERO);
+            GXSetTevAlphaIn(GX_TEVSTAGE0, GX_CA_ZERO, GX_CA_RASA, GX_CA_A0, GX_CA_ZERO);
+            GXSetTevAlphaIn(GX_TEVSTAGE1, GX_CA_ZERO, GX_CA_ZERO, GX_CA_ZERO, GX_CA_APREV);
+            GXSetTevAlphaIn(GX_TEVSTAGE2, GX_CA_ZERO, GX_CA_ZERO, GX_CA_ZERO, GX_CA_APREV);
+            GXSetTevOrder(GX_TEVSTAGE0, GX_TEXCOORD0, GX_TEXMAP0, GX_COLOR0A0);
+            GXSetTevOrder(GX_TEVSTAGE1, GX_TEXCOORD1, GX_TEXMAP1, GX_COLOR0A0);
+            GXSetTevOrder(GX_TEVSTAGE2, GX_TEXCOORD_NULL, GX_TEXMAP_NULL, GX_COLOR0A0);
+            break;
+        }
+        case gsDPSetCombineLERPInline(TEXEL1, TEXEL0, PRIM_LOD_FRAC, TEXEL0, TEXEL1, 0, TEXEL0, 0, PRIMITIVE,
+                                      ENVIRONMENT, COMBINED, ENVIRONMENT, 0, 0, 0, COMBINED): {
+            GXSetNumTevStages(3);
+            GXSetTevColorIn(GX_TEVSTAGE0, GX_CC_TEXC, GX_CC_ZERO, GX_CC_ZERO, GX_CC_ZERO);
+            GXSetTevColorIn(GX_TEVSTAGE1, GX_CC_CPREV, GX_CC_TEXC, GX_CC_A0, GX_CC_ZERO);
+            GXSetTevColorIn(GX_TEVSTAGE2, GX_CC_C2, GX_CC_C1, GX_CC_CPREV, GX_CC_ZERO);
+            GXSetTevAlphaIn(GX_TEVSTAGE0, GX_CA_TEXA, GX_CA_ZERO, GX_CA_ZERO, GX_CA_ZERO);
+            GXSetTevAlphaIn(GX_TEVSTAGE1, GX_CA_ZERO, GX_CA_APREV, GX_CA_TEXA, GX_CA_ZERO);
+            GXSetTevAlphaIn(GX_TEVSTAGE2, GX_CA_ZERO, GX_CA_ZERO, GX_CA_ZERO, GX_CA_APREV);
+            GXSetTevOrder(GX_TEVSTAGE0, GX_TEXCOORD0, GX_TEXMAP0, GX_COLOR0A0);
+            GXSetTevOrder(GX_TEVSTAGE1, GX_TEXCOORD1, GX_TEXMAP1, GX_COLOR0A0);
+            GXSetTevOrder(GX_TEVSTAGE2, GX_TEXCOORD_NULL, GX_TEXMAP_NULL, GX_COLOR0A0);
+            break;
+        }
+        case gsDPSetCombineLERPInline(TEXEL0, 0, TEXEL1, 0, TEXEL0, 0, TEXEL1, 0, PRIMITIVE, ENVIRONMENT, COMBINED,
+                                      ENVIRONMENT, COMBINED, 0, PRIMITIVE, 0): {
+            GXSetNumTevStages(3);
+            GXSetTevColorIn(GX_TEVSTAGE0, GX_CC_TEXC, GX_CC_ZERO, GX_CC_ZERO, GX_CC_ZERO);
+            GXSetTevColorIn(GX_TEVSTAGE1, GX_CC_ZERO, GX_CC_CPREV, GX_CC_TEXC, GX_CC_ZERO);
+            GXSetTevColorIn(GX_TEVSTAGE2, GX_CC_C2, GX_CC_C1, GX_CC_CPREV, GX_CC_ZERO);
+            GXSetTevAlphaIn(GX_TEVSTAGE0, GX_CA_TEXA, GX_CA_ZERO, GX_CA_ZERO, GX_CA_ZERO);
+            GXSetTevAlphaIn(GX_TEVSTAGE1, GX_CA_ZERO, GX_CA_APREV, GX_CA_TEXA, GX_CA_ZERO);
+            GXSetTevAlphaIn(GX_TEVSTAGE2, GX_CA_ZERO, GX_CA_APREV, GX_CA_A1, GX_CA_ZERO);
+            GXSetTevOrder(GX_TEVSTAGE0, GX_TEXCOORD0, GX_TEXMAP0, GX_COLOR0A0);
+            GXSetTevOrder(GX_TEVSTAGE1, GX_TEXCOORD1, GX_TEXMAP1, GX_COLOR0A0);
+            GXSetTevOrder(GX_TEVSTAGE2, GX_TEXCOORD_NULL, GX_TEXMAP_NULL, GX_COLOR0A0);
+            break;
+        }
+        case gsDPSetCombineLERPInline(TEXEL1, TEXEL0, PRIM_LOD_FRAC, TEXEL0, TEXEL1, TEXEL0, PRIM_LOD_FRAC, TEXEL0,
+                                      PRIMITIVE, ENVIRONMENT, COMBINED, ENVIRONMENT, COMBINED, 0, PRIMITIVE, 0): {
+            GXSetNumTevStages(3);
+            GXSetTevColorIn(GX_TEVSTAGE0, GX_CC_TEXC, GX_CC_ZERO, GX_CC_ZERO, GX_CC_ZERO);
+            GXSetTevColorIn(GX_TEVSTAGE1, GX_CC_CPREV, GX_CC_TEXC, GX_CC_A0, GX_CC_ZERO);
+            GXSetTevColorIn(GX_TEVSTAGE2, GX_CC_C2, GX_CC_C1, GX_CC_CPREV, GX_CC_ZERO);
+            GXSetTevAlphaIn(GX_TEVSTAGE0, GX_CA_TEXA, GX_CA_ZERO, GX_CA_ZERO, GX_CA_ZERO);
+            GXSetTevAlphaIn(GX_TEVSTAGE1, GX_CA_APREV, GX_CA_TEXA, GX_CA_A0, GX_CA_ZERO);
+            GXSetTevAlphaIn(GX_TEVSTAGE2, GX_CA_ZERO, GX_CA_APREV, GX_CA_A1, GX_CA_ZERO);
+            GXSetTevOrder(GX_TEVSTAGE0, GX_TEXCOORD0, GX_TEXMAP0, GX_COLOR0A0);
+            GXSetTevOrder(GX_TEVSTAGE1, GX_TEXCOORD1, GX_TEXMAP1, GX_COLOR0A0);
+            GXSetTevOrder(GX_TEVSTAGE2, GX_TEXCOORD_NULL, GX_TEXMAP_NULL, GX_COLOR0A0);
+            break;
+        }
+        case gsDPSetCombineLERPInline(TEXEL1, TEXEL0, PRIM_LOD_FRAC, TEXEL0, TEXEL1, TEXEL0, ENVIRONMENT, TEXEL0,
+                                      PRIMITIVE, ENVIRONMENT, COMBINED, ENVIRONMENT, COMBINED, 0, PRIMITIVE, 0): {
+            GXSetNumTevStages(3);
+            GXSetTevColorIn(GX_TEVSTAGE0, GX_CC_TEXC, GX_CC_ZERO, GX_CC_ZERO, GX_CC_ZERO);
+            GXSetTevColorIn(GX_TEVSTAGE1, GX_CC_CPREV, GX_CC_TEXC, GX_CC_A0, GX_CC_ZERO);
+            GXSetTevColorIn(GX_TEVSTAGE2, GX_CC_C2, GX_CC_C1, GX_CC_CPREV, GX_CC_ZERO);
+            GXSetTevAlphaIn(GX_TEVSTAGE0, GX_CA_TEXA, GX_CA_ZERO, GX_CA_ZERO, GX_CA_ZERO);
+            GXSetTevAlphaIn(GX_TEVSTAGE1, GX_CA_APREV, GX_CA_TEXA, GX_CA_A2, GX_CA_ZERO);
+            GXSetTevAlphaIn(GX_TEVSTAGE2, GX_CA_ZERO, GX_CA_APREV, GX_CA_A1, GX_CA_ZERO);
+            GXSetTevOrder(GX_TEVSTAGE0, GX_TEXCOORD0, GX_TEXMAP0, GX_COLOR0A0);
+            GXSetTevOrder(GX_TEVSTAGE1, GX_TEXCOORD1, GX_TEXMAP1, GX_COLOR0A0);
+            GXSetTevOrder(GX_TEVSTAGE2, GX_TEXCOORD_NULL, GX_TEXMAP_NULL, GX_COLOR0A0);
+            break;
+        }
+        case gsDPSetCombineLERPInline(TEXEL0, 0, TEXEL1_ALPHA, 0, TEXEL0, 0, TEXEL1, 0, PRIMITIVE, ENVIRONMENT,
+                                      COMBINED, ENVIRONMENT, COMBINED, 0, PRIMITIVE, 0): {
+            GXSetNumTevStages(3);
+            GXSetTevColorIn(GX_TEVSTAGE0, GX_CC_ZERO, GX_CC_ZERO, GX_CC_ZERO, GX_CC_TEXC);
+            GXSetTevColorIn(GX_TEVSTAGE1, GX_CC_ZERO, GX_CC_CPREV, GX_CC_TEXA, GX_CC_ZERO);
+            GXSetTevColorIn(GX_TEVSTAGE2, GX_CC_C2, GX_CC_C1, GX_CC_CPREV, GX_CC_ZERO);
+            GXSetTevAlphaIn(GX_TEVSTAGE0, GX_CA_ZERO, GX_CA_ZERO, GX_CA_ZERO, GX_CA_TEXA);
+            GXSetTevAlphaIn(GX_TEVSTAGE1, GX_CA_ZERO, GX_CA_APREV, GX_CA_TEXA, GX_CA_ZERO);
+            GXSetTevAlphaIn(GX_TEVSTAGE2, GX_CA_ZERO, GX_CA_APREV, GX_CA_A1, GX_CA_ZERO);
+            GXSetTevOrder(GX_TEVSTAGE0, GX_TEXCOORD0, GX_TEXMAP0, GX_COLOR0A0);
+            GXSetTevOrder(GX_TEVSTAGE1, GX_TEXCOORD1, GX_TEXMAP1, GX_COLOR0A0);
+            GXSetTevOrder(GX_TEVSTAGE2, GX_TEXCOORD_NULL, GX_TEXMAP_NULL, GX_COLOR0A0);
+            break;
+        }
+        case gsDPSetCombineLERPInline(0, 0, 0, PRIMITIVE, TEXEL1, TEXEL0, PRIM_LOD_FRAC, TEXEL0, 0, 0, 0, COMBINED,
+                                      COMBINED, 0, PRIMITIVE, 0): {
+            GXSetNumTevStages(3);
+            GXSetTevColorIn(GX_TEVSTAGE0, GX_CC_ZERO, GX_CC_ZERO, GX_CC_ZERO, GX_CC_C1);
+            GXSetTevColorIn(GX_TEVSTAGE1, GX_CC_ZERO, GX_CC_ZERO, GX_CC_ZERO, GX_CC_CPREV);
+            GXSetTevColorIn(GX_TEVSTAGE2, GX_CC_ZERO, GX_CC_ZERO, GX_CC_ZERO, GX_CC_CPREV);
+            GXSetTevAlphaIn(GX_TEVSTAGE0, GX_CA_ZERO, GX_CA_ZERO, GX_CA_ZERO, GX_CA_TEXA);
+            GXSetTevAlphaIn(GX_TEVSTAGE1, GX_CA_APREV, GX_CA_TEXA, GX_CA_A0, GX_CA_ZERO);
+            GXSetTevAlphaIn(GX_TEVSTAGE2, GX_CA_ZERO, GX_CA_APREV, GX_CA_A1, GX_CA_ZERO);
+            GXSetTevOrder(GX_TEVSTAGE0, GX_TEXCOORD0, GX_TEXMAP0, GX_COLOR0A0);
+            GXSetTevOrder(GX_TEVSTAGE1, GX_TEXCOORD1, GX_TEXMAP1, GX_COLOR0A0);
+            GXSetTevOrder(GX_TEVSTAGE2, GX_TEXCOORD_NULL, GX_TEXMAP_NULL, GX_COLOR0A0);
+            break;
+        }
+        case gsDPSetCombineLERPInline(PRIMITIVE, ENVIRONMENT, TEXEL0, ENVIRONMENT, TEXEL1, TEXEL0, PRIM_LOD_FRAC,
+                                      TEXEL0, COMBINED, 0, SHADE, 0, COMBINED, 0, PRIMITIVE, 0): {
+            GXSetNumTevStages(3);
+            GXSetTevColorIn(GX_TEVSTAGE0, GX_CC_TEXC, GX_CC_C1, GX_CC_C2, GX_CC_ZERO);
+            GXSetTevColorIn(GX_TEVSTAGE1, GX_CC_ZERO, GX_CC_CPREV, GX_CC_RASC, GX_CC_ZERO);
+            GXSetTevColorIn(GX_TEVSTAGE2, GX_CC_ZERO, GX_CC_ZERO, GX_CC_ZERO, GX_CC_CPREV);
+            GXSetTevAlphaIn(GX_TEVSTAGE0, GX_CA_ZERO, GX_CA_ZERO, GX_CA_ZERO, GX_CA_TEXA);
+            GXSetTevAlphaIn(GX_TEVSTAGE1, GX_CA_APREV, GX_CA_TEXA, GX_CA_A0, GX_CA_ZERO);
+            GXSetTevAlphaIn(GX_TEVSTAGE2, GX_CA_ZERO, GX_CA_APREV, GX_CA_A1, GX_CA_ZERO);
+            GXSetTevOrder(GX_TEVSTAGE0, GX_TEXCOORD0, GX_TEXMAP0, GX_COLOR0A0);
+            GXSetTevOrder(GX_TEVSTAGE1, GX_TEXCOORD1, GX_TEXMAP1, GX_COLOR0A0);
+            GXSetTevOrder(GX_TEVSTAGE2, GX_TEXCOORD_NULL, GX_TEXMAP_NULL, GX_COLOR0A0);
+            break;
+        }
+        case gsDPSetCombineLERPInline(0, 0, 0, PRIMITIVE, TEXEL1, TEXEL0, PRIM_LOD_FRAC, TEXEL0, SHADE, 0, COMBINED, 0,
+                                      COMBINED, 0, PRIMITIVE, 0): {
+            GXSetNumTevStages(3);
+            GXSetTevColorIn(GX_TEVSTAGE0, GX_CC_ZERO, GX_CC_RASC, GX_CC_C1, GX_CC_ZERO);
+            GXSetTevColorIn(GX_TEVSTAGE1, GX_CC_ZERO, GX_CC_ZERO, GX_CC_ZERO, GX_CC_CPREV);
+            GXSetTevColorIn(GX_TEVSTAGE2, GX_CC_ZERO, GX_CC_ZERO, GX_CC_ZERO, GX_CC_CPREV);
+            GXSetTevAlphaIn(GX_TEVSTAGE0, GX_CA_ZERO, GX_CA_ZERO, GX_CA_ZERO, GX_CA_TEXA);
+            GXSetTevAlphaIn(GX_TEVSTAGE1, GX_CA_APREV, GX_CA_TEXA, GX_CA_A0, GX_CA_ZERO);
+            GXSetTevAlphaIn(GX_TEVSTAGE2, GX_CA_ZERO, GX_CA_APREV, GX_CA_A1, GX_CA_ZERO);
+            GXSetTevOrder(GX_TEVSTAGE0, GX_TEXCOORD0, GX_TEXMAP0, GX_COLOR0A0);
+            GXSetTevOrder(GX_TEVSTAGE1, GX_TEXCOORD1, GX_TEXMAP1, GX_COLOR0A0);
+            GXSetTevOrder(GX_TEVSTAGE2, GX_TEXCOORD_NULL, GX_TEXMAP_NULL, GX_COLOR0A0);
+            break;
+        }
+        case gsDPSetCombineLERPInline(TEXEL1, 0, TEXEL0, TEXEL0, TEXEL1, 0, TEXEL0, 0, PRIMITIVE, 0, SHADE, COMBINED, 0,
+                                      0, 0, COMBINED): {
+            GXSetNumTevStages(3);
+            GXSetTevColorIn(GX_TEVSTAGE0, GX_CC_ZERO, GX_CC_ZERO, GX_CC_ZERO, GX_CC_TEXC);
+            GXSetTevColorIn(GX_TEVSTAGE1, GX_CC_ZERO, GX_CC_CPREV, GX_CC_TEXC, GX_CC_CPREV);
+            GXSetTevColorIn(GX_TEVSTAGE2, GX_CC_ZERO, GX_CC_RASC, GX_CC_C1, GX_CC_CPREV);
+            GXSetTevAlphaIn(GX_TEVSTAGE0, GX_CA_ZERO, GX_CA_ZERO, GX_CA_ZERO, GX_CA_TEXA);
+            GXSetTevAlphaIn(GX_TEVSTAGE1, GX_CA_ZERO, GX_CA_APREV, GX_CA_TEXA, GX_CA_ZERO);
+            GXSetTevAlphaIn(GX_TEVSTAGE2, GX_CA_ZERO, GX_CA_ZERO, GX_CA_ZERO, GX_CA_APREV);
+            GXSetTevOrder(GX_TEVSTAGE0, GX_TEXCOORD0, GX_TEXMAP0, GX_COLOR0A0);
+            GXSetTevOrder(GX_TEVSTAGE1, GX_TEXCOORD1, GX_TEXMAP1, GX_COLOR0A0);
+            GXSetTevOrder(GX_TEVSTAGE2, GX_TEXCOORD_NULL, GX_TEXMAP_NULL, GX_COLOR0A0);
+            break;
+        }
+        case gsDPSetCombineLERPInline(TEXEL1, TEXEL0, PRIM_LOD_FRAC, TEXEL0, TEXEL1, 0, TEXEL0, 0, PRIMITIVE,
+                                      ENVIRONMENT, COMBINED, ENVIRONMENT, COMBINED, 0, PRIMITIVE, 0): {
+            GXSetNumTevStages(3);
+            GXSetTevColorIn(GX_TEVSTAGE0, GX_CC_TEXC, GX_CC_ZERO, GX_CC_ZERO, GX_CC_ZERO);
+            GXSetTevColorIn(GX_TEVSTAGE1, GX_CC_CPREV, GX_CC_TEXC, GX_CC_A0, GX_CC_ZERO);
+            GXSetTevColorIn(GX_TEVSTAGE2, GX_CC_C2, GX_CC_C1, GX_CC_CPREV, GX_CC_ZERO);
+            GXSetTevAlphaIn(GX_TEVSTAGE0, GX_CA_ZERO, GX_CA_TEXA, GX_CA_A1, GX_CA_ZERO);
+            GXSetTevAlphaIn(GX_TEVSTAGE1, GX_CA_ZERO, GX_CA_TEXA, GX_CA_APREV, GX_CA_ZERO);
+            GXSetTevAlphaIn(GX_TEVSTAGE2, GX_CA_ZERO, GX_CA_ZERO, GX_CA_ZERO, GX_CA_APREV);
+            GXSetTevOrder(GX_TEVSTAGE0, GX_TEXCOORD0, GX_TEXMAP0, GX_COLOR0A0);
+            GXSetTevOrder(GX_TEVSTAGE1, GX_TEXCOORD1, GX_TEXMAP1, GX_COLOR0A0);
+            GXSetTevOrder(GX_TEVSTAGE2, GX_TEXCOORD_NULL, GX_TEXMAP_NULL, GX_COLOR0A0);
+            break;
+        }
+        case gsDPSetCombineLERPInline(TEXEL0, 0, TEXEL1_ALPHA, 0, TEXEL0, 0, TEXEL1, 0, PRIMITIVE, 0, SHADE, COMBINED,
+                                      COMBINED, 0, PRIM_LOD_FRAC, PRIMITIVE): {
+            GXSetNumTevStages(3);
+            GXSetTevColorIn(GX_TEVSTAGE0, GX_CC_ZERO, GX_CC_ZERO, GX_CC_ZERO, GX_CC_TEXC);
+            GXSetTevColorIn(GX_TEVSTAGE1, GX_CC_ZERO, GX_CC_CPREV, GX_CC_TEXA, GX_CC_ZERO);
+            GXSetTevColorIn(GX_TEVSTAGE2, GX_CC_ZERO, GX_CC_C1, GX_CC_RASC, GX_CC_CPREV);
+            GXSetTevAlphaIn(GX_TEVSTAGE0, GX_CA_ZERO, GX_CA_ZERO, GX_CA_ZERO, GX_CA_TEXA);
+            GXSetTevAlphaIn(GX_TEVSTAGE1, GX_CA_ZERO, GX_CA_APREV, GX_CA_TEXA, GX_CA_ZERO);
+            GXSetTevAlphaIn(GX_TEVSTAGE2, GX_CA_ZERO, GX_CA_APREV, GX_CA_A0, GX_CA_A1);
+            GXSetTevOrder(GX_TEVSTAGE0, GX_TEXCOORD0, GX_TEXMAP0, GX_COLOR0A0);
+            GXSetTevOrder(GX_TEVSTAGE1, GX_TEXCOORD1, GX_TEXMAP1, GX_COLOR0A0);
+            GXSetTevOrder(GX_TEVSTAGE2, GX_TEXCOORD_NULL, GX_TEXMAP_NULL, GX_COLOR0A0);
+            break;
+        }
+        case gsDPSetCombineLERPInline(TEXEL0, 0, TEXEL1_ALPHA, 0, TEXEL0, 0, TEXEL1, 0, PRIMITIVE, 0, SHADE, COMBINED,
+                                      COMBINED, 0, PRIM_LOD_FRAC, 0): {
+            GXSetNumTevStages(3);
+            GXSetTevColorIn(GX_TEVSTAGE0, GX_CC_ZERO, GX_CC_ZERO, GX_CC_ZERO, GX_CC_TEXC);
+            GXSetTevColorIn(GX_TEVSTAGE1, GX_CC_ZERO, GX_CC_CPREV, GX_CC_TEXA, GX_CC_ZERO);
+            GXSetTevColorIn(GX_TEVSTAGE2, GX_CC_ZERO, GX_CC_C1, GX_CC_RASC, GX_CC_CPREV);
+            GXSetTevAlphaIn(GX_TEVSTAGE0, GX_CA_ZERO, GX_CA_ZERO, GX_CA_ZERO, GX_CA_TEXA);
+            GXSetTevAlphaIn(GX_TEVSTAGE1, GX_CA_ZERO, GX_CA_APREV, GX_CA_TEXA, GX_CA_ZERO);
+            GXSetTevAlphaIn(GX_TEVSTAGE2, GX_CA_ZERO, GX_CA_APREV, GX_CA_A0, GX_CA_ZERO);
+            GXSetTevOrder(GX_TEVSTAGE0, GX_TEXCOORD0, GX_TEXMAP0, GX_COLOR0A0);
+            GXSetTevOrder(GX_TEVSTAGE1, GX_TEXCOORD1, GX_TEXMAP1, GX_COLOR0A0);
+            GXSetTevOrder(GX_TEVSTAGE2, GX_TEXCOORD_NULL, GX_TEXMAP_NULL, GX_COLOR0A0);
+            break;
+        }
+        case gsDPSetCombineLERPInline(TEXEL1, TEXEL0, PRIM_LOD_FRAC, TEXEL0, 0, 0, 0, TEXEL0, COMBINED, 0, SHADE, 0, 0,
+                                      0, 0, COMBINED): {
+            GXSetNumTevStages(3);
+            GXSetTevColorIn(GX_TEVSTAGE0, GX_CC_ZERO, GX_CC_ZERO, GX_CC_ZERO, GX_CC_TEXC);
+            GXSetTevColorIn(GX_TEVSTAGE1, GX_CC_CPREV, GX_CC_TEXC, GX_CC_A0, GX_CC_ZERO);
+            GXSetTevColorIn(GX_TEVSTAGE2, GX_CC_ZERO, GX_CC_CPREV, GX_CC_RASC, GX_CC_ZERO);
+            GXSetTevAlphaIn(GX_TEVSTAGE0, GX_CA_ZERO, GX_CA_ZERO, GX_CA_ZERO, GX_CA_TEXA);
+            GXSetTevAlphaIn(GX_TEVSTAGE1, GX_CA_ZERO, GX_CA_ZERO, GX_CA_ZERO, GX_CA_APREV);
+            GXSetTevAlphaIn(GX_TEVSTAGE2, GX_CA_ZERO, GX_CA_ZERO, GX_CA_ZERO, GX_CA_APREV);
+            GXSetTevOrder(GX_TEVSTAGE0, GX_TEXCOORD0, GX_TEXMAP0, GX_COLOR0A0);
+            GXSetTevOrder(GX_TEVSTAGE1, GX_TEXCOORD1, GX_TEXMAP1, GX_COLOR0A0);
+            GXSetTevOrder(GX_TEVSTAGE2, GX_TEXCOORD_NULL, GX_TEXMAP_NULL, GX_COLOR0A0);
+            break;
+        }
+        case gsDPSetCombineLERPInline(1, 0, TEXEL0, TEXEL0, 0, 0, 0, TEXEL0, COMBINED, 0, SHADE, TEXEL1, 0, 0, 0,
+                                      COMBINED): {
+            GXSetNumTevStages(2);
+            GXSetTevColorIn(GX_TEVSTAGE0, GX_CC_ZERO, GX_CC_TEXC, GX_CC_RASC, GX_CC_TEXC);
+            GXSetTevColorIn(GX_TEVSTAGE1, GX_CC_ZERO, GX_CC_TEXC, GX_CC_RASC, GX_CC_CPREV);
+            GXSetTevAlphaIn(GX_TEVSTAGE0, GX_CA_TEXA, GX_CA_ZERO, GX_CA_ZERO, GX_CA_ZERO);
+            GXSetTevAlphaIn(GX_TEVSTAGE1, GX_CA_ZERO, GX_CA_ZERO, GX_CA_ZERO, GX_CA_APREV);
+            GXSetTevOrder(GX_TEVSTAGE0, GX_TEXCOORD0, GX_TEXMAP0, GX_COLOR0A0);
+            GXSetTevOrder(GX_TEVSTAGE1, GX_TEXCOORD0, GX_TEXMAP0, GX_COLOR0A0);
+            break;
+        }
+        case gsDPSetCombineLERPInline(PRIMITIVE, 0, PRIM_LOD_FRAC, ENVIRONMENT, 0, 0, 0, TEXEL0, TEXEL1, 0, COMBINED, 0,
+                                      0, 0, 0, COMBINED): {
+            GXSetNumTevStages(2);
+            GXSetTevColorIn(GX_TEVSTAGE0, GX_CC_ZERO, GX_CC_C1, GX_CC_A0, GX_CC_C2);
+            GXSetTevColorIn(GX_TEVSTAGE1, GX_CC_ZERO, GX_CC_CPREV, GX_CC_TEXC, GX_CC_CPREV);
+            GXSetTevAlphaIn(GX_TEVSTAGE0, GX_CA_ZERO, GX_CA_ZERO, GX_CA_ZERO, GX_CA_ZERO);
+            GXSetTevAlphaIn(GX_TEVSTAGE1, GX_CA_TEXA, GX_CA_ZERO, GX_CA_ZERO, GX_CA_ZERO);
+            GXSetTevOrder(GX_TEVSTAGE0, GX_TEXCOORD0, GX_TEXMAP0, GX_COLOR0A0);
+            GXSetTevOrder(GX_TEVSTAGE1, GX_TEXCOORD0, GX_TEXMAP0, GX_COLOR0A0);
+            break;
+        }
+        case gsDPSetCombineLERPInline(PRIMITIVE, SHADE, PRIM_LOD_FRAC, SHADE, 0, 0, 0, TEXEL0, TEXEL1, 0, COMBINED, 0,
+                                      0, 0, 0, COMBINED): {
+            GXSetNumTevStages(2);
+            GXSetTevColorIn(GX_TEVSTAGE0, GX_CC_RASC, GX_CC_C1, GX_CC_A0, GX_CC_ZERO);
+            GXSetTevColorIn(GX_TEVSTAGE1, GX_CC_ZERO, GX_CC_CPREV, GX_CC_TEXC, GX_CC_ZERO);
+            GXSetTevAlphaIn(GX_TEVSTAGE0, GX_CA_ZERO, GX_CA_ZERO, GX_CA_ZERO, GX_CA_ZERO);
+            GXSetTevAlphaIn(GX_TEVSTAGE1, GX_CA_ZERO, GX_CA_ZERO, GX_CA_ZERO, GX_CA_TEXA);
+            GXSetTevOrder(GX_TEVSTAGE0, GX_TEXCOORD_NULL, GX_TEXMAP_NULL, GX_COLOR0A0);
+            GXSetTevOrder(GX_TEVSTAGE1, GX_TEXCOORD0, GX_TEXMAP0, GX_COLOR0A0);
+            break;
+        }
+        case gsDPSetCombineLERPInline(0, 0, 0, PRIMITIVE, TEXEL0, 0, TEXEL1, 0, 0, 0, 0, COMBINED, COMBINED, 0,
+                                      PRIM_LOD_FRAC, 0): {
+            GXSetNumTevStages(2);
+            GXSetTevColorIn(GX_TEVSTAGE0, GX_CC_C1, GX_CC_ZERO, GX_CC_ZERO, GX_CC_ZERO);
+            GXSetTevColorIn(GX_TEVSTAGE1, GX_CC_ZERO, GX_CC_ZERO, GX_CC_ZERO, GX_CC_CPREV);
+            GXSetTevAlphaIn(GX_TEVSTAGE0, GX_CA_ZERO, GX_CA_TEXA, GX_CA_A0, GX_CA_ZERO);
+            GXSetTevAlphaIn(GX_TEVSTAGE1, GX_CA_ZERO, GX_CA_APREV, GX_CA_TEXA, GX_CA_ZERO);
+            GXSetTevOrder(GX_TEVSTAGE0, GX_TEXCOORD0, GX_TEXMAP0, GX_COLOR0A0);
+            GXSetTevOrder(GX_TEVSTAGE1, GX_TEXCOORD1, GX_TEXMAP1, GX_COLOR0A0);
+            break;
+        }
+        case gsDPSetCombineLERPInline(PRIMITIVE, TEXEL1, TEXEL0, TEXEL1, TEXEL0, 0, TEXEL1, 0, 0, 0, 0, COMBINED, 0, 0,
+                                      0, COMBINED): {
+            GXSetNumTevStages(2);
+            GXSetTevColorIn(GX_TEVSTAGE0, GX_CC_TEXC, GX_CC_ZERO, GX_CC_ZERO, GX_CC_ZERO);
+            GXSetTevColorIn(GX_TEVSTAGE1, GX_CC_TEXC, GX_CC_C1, GX_CC_CPREV, GX_CC_ZERO);
+            GXSetTevAlphaIn(GX_TEVSTAGE0, GX_CA_TEXA, GX_CA_ZERO, GX_CA_ZERO, GX_CA_ZERO);
+            GXSetTevAlphaIn(GX_TEVSTAGE1, GX_CA_ZERO, GX_CA_APREV, GX_CA_TEXA, GX_CA_ZERO);
+            GXSetTevOrder(GX_TEVSTAGE0, GX_TEXCOORD0, GX_TEXMAP0, GX_COLOR0A0);
+            GXSetTevOrder(GX_TEVSTAGE1, GX_TEXCOORD1, GX_TEXMAP1, GX_COLOR0A0);
+            break;
+        }
+        case gsDPSetCombineLERPInline(PRIMITIVE, 0, SHADE, ENVIRONMENT, TEXEL0, 0, TEXEL1, 0, TEXEL0, 0, PRIM_LOD_FRAC,
+                                      COMBINED, 0, 0, 0, COMBINED): {
+            GXSetNumTevStages(2);
+            GXSetTevColorIn(GX_TEVSTAGE0, GX_CC_ZERO, GX_CC_RASC, GX_CC_C1, GX_CC_C2);
+            GXSetTevColorIn(GX_TEVSTAGE1, GX_CC_ZERO, GX_CC_TEXC, GX_CC_A0, GX_CC_CPREV);
+            GXSetTevAlphaIn(GX_TEVSTAGE0, GX_CA_ZERO, GX_CA_ZERO, GX_CA_ZERO, GX_CA_TEXA);
+            GXSetTevAlphaIn(GX_TEVSTAGE1, GX_CA_ZERO, GX_CA_APREV, GX_CA_TEXA, GX_CA_ZERO);
+            GXSetTevOrder(GX_TEVSTAGE0, GX_TEXCOORD0, GX_TEXMAP0, GX_COLOR0A0);
+            GXSetTevOrder(GX_TEVSTAGE1, GX_TEXCOORD1, GX_TEXMAP1, GX_COLOR0A0);
+            break;
+        }
+        case gsDPSetCombineLERPInline(PRIMITIVE, 0, SHADE, ENVIRONMENT, TEXEL0, 0, TEXEL1, TEXEL1, TEXEL1, 0,
+                                      PRIM_LOD_FRAC, COMBINED, 0, 0, 0, COMBINED): {
+            GXSetNumTevStages(2);
+            GXSetTevColorIn(GX_TEVSTAGE0, GX_CC_ZERO, GX_CC_TEXC, GX_CC_A0, GX_CC_C2);
+            GXSetTevColorIn(GX_TEVSTAGE1, GX_CC_ZERO, GX_CC_RASC, GX_CC_C1, GX_CC_CPREV);
+            GXSetTevAlphaIn(GX_TEVSTAGE0, GX_CA_ZERO, GX_CA_ZERO, GX_CA_ZERO, GX_CA_TEXA);
+            GXSetTevAlphaIn(GX_TEVSTAGE1, GX_CA_ZERO, GX_CA_APREV, GX_CA_TEXA, GX_CA_TEXA);
+            GXSetTevOrder(GX_TEVSTAGE0, GX_TEXCOORD0, GX_TEXMAP0, GX_COLOR0A0);
+            GXSetTevOrder(GX_TEVSTAGE1, GX_TEXCOORD1, GX_TEXMAP1, GX_COLOR0A0);
+            break;
+        }
+        case gsDPSetCombineLERPInline(1, 0, PRIMITIVE, TEXEL0, TEXEL0, 0, TEXEL1, 0, COMBINED, 0, SHADE, TEXEL1, 0, 0,
+                                      0, COMBINED): {
+            GXSetNumTevStages(2);
+            GXSetTevColorIn(GX_TEVSTAGE0, GX_CC_ZERO, GX_CC_TEXC, GX_CC_RASC, GX_CC_TEXC);
+            GXSetTevColorIn(GX_TEVSTAGE1, GX_CC_ZERO, GX_CC_RASC, GX_CC_C1, GX_CC_CPREV);
+            GXSetTevAlphaIn(GX_TEVSTAGE0, GX_CA_ZERO, GX_CA_ZERO, GX_CA_ZERO, GX_CA_TEXA);
+            GXSetTevAlphaIn(GX_TEVSTAGE1, GX_CA_ZERO, GX_CA_APREV, GX_CA_TEXA, GX_CA_ZERO);
+            GXSetTevOrder(GX_TEVSTAGE0, GX_TEXCOORD0, GX_TEXMAP0, GX_COLOR0A0);
+            GXSetTevOrder(GX_TEVSTAGE1, GX_TEXCOORD1, GX_TEXMAP1, GX_COLOR0A0);
+            break;
+        }
+        case gsDPSetCombineLERPInline(TEXEL0, 0, ENV_ALPHA, 0, TEXEL0, 0, TEXEL1, 0, PRIMITIVE, 0, PRIMITIVE_ALPHA,
+                                      COMBINED, COMBINED, 0, PRIM_LOD_FRAC, 0): {
+            GXSetNumTevStages(2);
+            GXSetTevColorIn(GX_TEVSTAGE0, GX_CC_ZERO, GX_CC_TEXC, GX_CC_A2, GX_CC_ZERO);
+            GXSetTevColorIn(GX_TEVSTAGE1, GX_CC_ZERO, GX_CC_C1, GX_CC_A1, GX_CC_CPREV);
+            GXSetTevAlphaIn(GX_TEVSTAGE0, GX_CA_ZERO, GX_CA_TEXA, GX_CA_A0, GX_CA_ZERO);
+            GXSetTevAlphaIn(GX_TEVSTAGE1, GX_CA_ZERO, GX_CA_APREV, GX_CA_TEXA, GX_CA_ZERO);
+            GXSetTevOrder(GX_TEVSTAGE0, GX_TEXCOORD0, GX_TEXMAP0, GX_COLOR0A0);
+            GXSetTevOrder(GX_TEVSTAGE1, GX_TEXCOORD1, GX_TEXMAP1, GX_COLOR0A0);
+            break;
+        }
+        case gsDPSetCombineLERPInline(1, 0, PRIMITIVE, TEXEL0, TEXEL1, 0, TEXEL0, 0, COMBINED, 0, SHADE, TEXEL0,
+                                      COMBINED, 0, PRIM_LOD_FRAC, 0): {
+            GXSetNumTevStages(2);
+            GXSetTevColorIn(GX_TEVSTAGE0, GX_CC_TEXC, GX_CC_ZERO, GX_CC_ZERO, GX_CC_C1);
+            GXSetTevColorIn(GX_TEVSTAGE1, GX_CC_ZERO, GX_CC_CPREV, GX_CC_RASC, GX_CC_TEXC);
+            GXSetTevAlphaIn(GX_TEVSTAGE0, GX_CA_ZERO, GX_CA_TEXA, GX_CA_A0, GX_CA_ZERO);
+            GXSetTevAlphaIn(GX_TEVSTAGE1, GX_CA_ZERO, GX_CA_APREV, GX_CA_TEXA, GX_CA_ZERO);
+            GXSetTevOrder(GX_TEVSTAGE0, GX_TEXCOORD0, GX_TEXMAP0, GX_COLOR0A0);
+            GXSetTevOrder(GX_TEVSTAGE1, GX_TEXCOORD1, GX_TEXMAP1, GX_COLOR0A0);
+            break;
+        }
+        case gsDPSetCombineLERPInline(PRIMITIVE, ENVIRONMENT, TEXEL0, ENVIRONMENT, TEXEL0, 0, TEXEL1, TEXEL1, 0, 0, 0,
+                                      COMBINED, COMBINED, 0, PRIM_LOD_FRAC, 0): {
+            /* Scene 19 spotlight: PRIM/ENV blend by TEX0, alpha = TEX1*(1+TEX0)
+             * Stage 0: color = PRIM*TEX0 + ENV*(1-TEX0), alpha = tex0.a
+             * Stage 1: color = passthrough, alpha = tex1.a * (1 + prev) */
+            GXSetNumTevStages(2);
+            GXSetTevColorIn(GX_TEVSTAGE0, GX_CC_C2, GX_CC_C1, GX_CC_TEXC, GX_CC_ZERO);
+            GXSetTevColorIn(GX_TEVSTAGE1, GX_CC_ZERO, GX_CC_ZERO, GX_CC_ZERO, GX_CC_CPREV);
+            GXSetTevAlphaIn(GX_TEVSTAGE0, GX_CA_ZERO, GX_CA_ZERO, GX_CA_ZERO, GX_CA_TEXA);
+            GXSetTevAlphaIn(GX_TEVSTAGE1, GX_CA_ZERO, GX_CA_APREV, GX_CA_TEXA, GX_CA_TEXA);
+            GXSetCullMode(GX_CULL_NONE);
+            GXSetTevOrder(GX_TEVSTAGE0, GX_TEXCOORD0, GX_TEXMAP0, GX_COLOR0A0);
+            GXSetTevOrder(GX_TEVSTAGE1, GX_TEXCOORD1, GX_TEXMAP1, GX_COLOR0A0);
+            break;
+        }
+        case gsDPSetCombineLERPInline(0, 0, 0, TEXEL0, 0, 0, 0, TEXEL1, 0, 0, 0, COMBINED, 0, 0, 0, COMBINED): {
+            GXSetNumTevStages(2);
+            GXSetTevColorIn(GX_TEVSTAGE0, GX_CC_ZERO, GX_CC_ZERO, GX_CC_ZERO, GX_CC_TEXC);
+            GXSetTevColorIn(GX_TEVSTAGE1, GX_CC_ZERO, GX_CC_ZERO, GX_CC_ZERO, GX_CC_CPREV);
+            GXSetTevAlphaIn(GX_TEVSTAGE0, GX_CA_ZERO, GX_CA_ZERO, GX_CA_ZERO, GX_CA_ZERO);
+            GXSetTevAlphaIn(GX_TEVSTAGE1, GX_CA_ZERO, GX_CA_ZERO, GX_CA_ZERO, GX_CA_TEXA);
+            GXSetTevOrder(GX_TEVSTAGE0, GX_TEXCOORD0, GX_TEXMAP0, GX_COLOR0A0);
+            GXSetTevOrder(GX_TEVSTAGE1, GX_TEXCOORD1, GX_TEXMAP1, GX_COLOR0A0);
+            break;
+        }
+        case gsDPSetCombineLERPInline(1, 0, PRIMITIVE, TEXEL0, TEXEL1, 0, PRIMITIVE, 0, COMBINED, 0, SHADE, TEXEL1, 0,
+                                      0, 0, COMBINED): {
+            GXSetNumTevStages(2);
+            GXSetTevColorIn(GX_TEVSTAGE0, GX_CC_ZERO, GX_CC_TEXC, GX_CC_RASC, GX_CC_TEXC);
+            GXSetTevColorIn(GX_TEVSTAGE1, GX_CC_ZERO, GX_CC_C1, GX_CC_RASC, GX_CC_CPREV);
+            GXSetTevAlphaIn(GX_TEVSTAGE0, GX_CA_ZERO, GX_CA_ZERO, GX_CA_ZERO, GX_CA_A1);
+            GXSetTevAlphaIn(GX_TEVSTAGE1, GX_CA_ZERO, GX_CA_APREV, GX_CA_TEXA, GX_CA_ZERO);
+            GXSetTevOrder(GX_TEVSTAGE0, GX_TEXCOORD0, GX_TEXMAP0, GX_COLOR0A0);
+            GXSetTevOrder(GX_TEVSTAGE1, GX_TEXCOORD1, GX_TEXMAP1, GX_COLOR0A0);
+            break;
+        }
+        case gsDPSetCombineLERPInline(0, 0, 0, PRIMITIVE, TEXEL0, 0, TEXEL1, 0, 0, 0, 0, COMBINED, COMBINED, 0,
+                                      PRIMITIVE, 0): {
+            GXSetNumTevStages(2);
+            GXSetTevColorIn(GX_TEVSTAGE0, GX_CC_ZERO, GX_CC_ZERO, GX_CC_ZERO, GX_CC_C1);
+            GXSetTevColorIn(GX_TEVSTAGE1, GX_CC_ZERO, GX_CC_ZERO, GX_CC_ZERO, GX_CC_CPREV);
+            GXSetTevAlphaIn(GX_TEVSTAGE0, GX_CA_ZERO, GX_CA_TEXA, GX_CA_A1, GX_CA_ZERO);
+            GXSetTevAlphaIn(GX_TEVSTAGE1, GX_CA_ZERO, GX_CA_TEXA, GX_CA_APREV, GX_CA_ZERO);
+            GXSetTevOrder(GX_TEVSTAGE0, GX_TEXCOORD0, GX_TEXMAP0, GX_COLOR0A0);
+            GXSetTevOrder(GX_TEVSTAGE1, GX_TEXCOORD1, GX_TEXMAP1, GX_COLOR0A0);
+            break;
+        }
+        case gsDPSetCombineLERPInline(0, 0, 0, PRIMITIVE, 1, 0, TEXEL0, TEXEL1, 0, 0, 0, COMBINED, COMBINED, 0,
+                                      PRIMITIVE, 0): {
+            GXSetNumTevStages(2);
+            GXSetTevColorIn(GX_TEVSTAGE0, GX_CC_C1, GX_CC_ZERO, GX_CC_ZERO, GX_CC_ZERO);
+            GXSetTevColorIn(GX_TEVSTAGE1, GX_CC_ZERO, GX_CC_ZERO, GX_CC_ZERO, GX_CC_CPREV);
+            GXSetTevAlphaIn(GX_TEVSTAGE0, GX_CA_ZERO, GX_CA_TEXA, GX_CA_A1, GX_CA_ZERO);
+            GXSetTevAlphaIn(GX_TEVSTAGE1, GX_CA_ZERO, GX_CA_TEXA, GX_CA_A1, GX_CA_APREV);
+            GXSetTevOrder(GX_TEVSTAGE0, GX_TEXCOORD0, GX_TEXMAP0, GX_COLOR0A0);
+            GXSetTevOrder(GX_TEVSTAGE1, GX_TEXCOORD1, GX_TEXMAP1, GX_COLOR0A0);
+            break;
+        }
+        case gsDPSetCombineLERPInline(PRIMITIVE, ENVIRONMENT, TEXEL0, ENVIRONMENT, 1, 0, TEXEL0, TEXEL1, COMBINED, 0,
+                                      SHADE, TEXEL0, COMBINED, 0, PRIM_LOD_FRAC, PRIMITIVE): {
+            GXSetNumTevStages(2);
+            GXSetTevColorIn(GX_TEVSTAGE0, GX_CC_C2, GX_CC_C1, GX_CC_TEXC, GX_CC_ZERO);
+            GXSetTevColorIn(GX_TEVSTAGE1, GX_CC_ZERO, GX_CC_RASC, GX_CC_CPREV, GX_CC_TEXC);
+            GXSetTevAlphaIn(GX_TEVSTAGE0, GX_CA_ZERO, GX_CA_TEXA, GX_CA_A0, GX_CA_A1);
+            GXSetTevAlphaIn(GX_TEVSTAGE1, GX_CA_ZERO, GX_CA_TEXA, GX_CA_A0, GX_CA_APREV);
+            GXSetTevOrder(GX_TEVSTAGE0, GX_TEXCOORD0, GX_TEXMAP0, GX_COLOR0A0);
+            GXSetTevOrder(GX_TEVSTAGE1, GX_TEXCOORD1, GX_TEXMAP1, GX_COLOR0A0);
+            break;
+        }
+        default: {
+            if (aflags[AFLAGS_COMBINE_AUTO] != 0 || this->combine_auto() != 0) {
+                if (aflags[AFLAGS_SKIP_COMBINE_TEV] == 2) {
+                    last_highlow = 0;
+                }
+
+                if (last_highlow < NUM_COMBINER_HIGHLOW_ERRS) {
+                    int i;
+                    for (i = 0; i < (int)last_highlow; i++) {
+                        if (combine_mode == highlow_errs[i]) {
+                            goto default_continue;
+                        }
+                    }
+
+                    highlow_errs[i] = combine_mode;
+                    last_highlow++;
+                    this->err_count++;
+                    /* ### Unsupported combine mode ###\ncase 0x%16llx: // */
+                    this->Printf0(VT_COL(YELLOW, BLACK) "### 未対応のコンバインモードです ###\ncase 0x%16llx: // ",
+                                    combine_mode);
+                    this->print_combine(combine_mode);
+                    this->Printf0(VT_RST "\n");
+                }
+            default_continue:
+                /* Default case */
+                GXSetNumTevStages(1);
+                GXSetTevColorIn(GX_TEVSTAGE0, GX_CC_ZERO, GX_CC_ZERO, GX_CC_ZERO, GX_CC_ONE);
+                GXSetTevAlphaIn(GX_TEVSTAGE0, GX_CA_ZERO, GX_CA_ZERO, GX_CA_ZERO, GX_CA_KONST);
+                GXSetTevOrder(GX_TEVSTAGE0, GX_TEXCOORD_NULL, GX_TEXMAP_NULL, GX_COLOR0A0);
+            }
+            break;
+        }
+    }
+}
+#else
 void emu64::combine_manual() {
     static u64 highlow_errs[NUM_COMBINER_HIGHLOW_ERRS];
     static u32 last_highlow;
@@ -2056,6 +2788,7 @@ void emu64::combine_manual() {
         }
     }
 }
+#endif
 
 inline u8* emu64::texconv_block_new(u8* addr, unsigned int wd, unsigned int ht, unsigned int fmt, unsigned int size,
     unsigned int line_siz) {
@@ -2086,6 +2819,8 @@ void emu64::combine() {
 
         int manual = TRUE;
 
+        /* Try combine_auto first. It will reject TEXEL1 combines (return -1)
+           so they fall through to combine_manual's dedicated handlers. */
         if (aflags[AFLAGS_COMBINE_AUTO] && this->combine_auto() == 0) {
             manual = FALSE;
         }
@@ -2403,6 +3138,27 @@ void emu64::blend_mode() {
     }
 }
 
+#ifdef TARGET_PC
+void emu64::alpha_compare() {
+    u32 gequal =
+        ((this->othermode_low & (AA_EN | CVG_X_ALPHA | ALPHA_CVG_SEL)) == (AA_EN | CVG_X_ALPHA | ALPHA_CVG_SEL) &&
+         (this->othermode_low & (CVG_DST_SAVE | ZMODE_XLU)) == 0);
+
+    u32 ac_threshold = (this->othermode_low & G_AC_DITHER) == G_AC_THRESHOLD;
+    u8 tex_edge_alpha = this->tex_edge_alpha;
+    if (aflags[AFLAGS_OVERRIDE_TEXEDGEALPHA] != 0) {
+        tex_edge_alpha = (u8)aflags[AFLAGS_OVERRIDE_TEXEDGEALPHA];
+    }
+
+    GXCompare comp1 = gequal ? GX_GEQUAL : GX_ALWAYS;
+    GXCompare comp0 = ac_threshold ? GX_GEQUAL : GX_ALWAYS;
+    /* On LE, EmuColor.raw is shift-packed (R<<24|G<<16|B<<8|A) but the
+       union's rgba struct has byte-swapped fields. Extract alpha via mask. */
+    u8 blend_alpha = this->blend_color.raw & 0xFF;
+    GXSetAlphaCompare(comp0, blend_alpha, GX_AOP_AND, comp1, tex_edge_alpha);
+    GXSetZCompLoc(ac_threshold == 0 && !gequal);
+}
+#else
 void emu64::alpha_compare() {
     u32 gequal =
         ((this->othermode_low & (AA_EN | CVG_X_ALPHA | ALPHA_CVG_SEL)) == (AA_EN | CVG_X_ALPHA | ALPHA_CVG_SEL) &&
@@ -2419,6 +3175,7 @@ void emu64::alpha_compare() {
     GXSetAlphaCompare(comp0, this->blend_color.rgba.a, GX_AOP_AND, comp1, tex_edge_alpha);
     GXSetZCompLoc(ac_threshold == 0 && !gequal);
 }
+#endif
 
 void emu64::zmode() {
     static u8 compare_enable = GX_FALSE;
@@ -2490,9 +3247,29 @@ void emu64::zmode() {
 void emu64::cullmode() {
     GXCullMode cullmode;
     if (aflags[AFLAGS_SET_CULLMODE] == 0) {
+        /* Default mapping:
+           - GC path keeps historical inverted mapping.
+           - PC path uses direct mapping to match OpenGL front/back winding. */
+#ifdef TARGET_PC
+        switch (this->geometry_mode & G_CULL_BOTH) {
+            case G_CULL_BACK:
+                cullmode = GX_CULL_BACK;
+                break;
+            case G_CULL_FRONT:
+                cullmode = GX_CULL_FRONT;
+                break;
+            case G_CULL_BOTH:
+                cullmode = GX_CULL_ALL;
+                break;
+            default:
+                cullmode = GX_CULL_NONE;
+                break;
+        }
+#else
         /* Cull modes seem to be inverted between N64 and GC */
         cullmode = (GXCullMode)(((this->geometry_mode >> 8) & (G_CULL_FRONT >> 8)) |
                                 ((this->geometry_mode >> 10) & (G_CULL_BACK >> 10)));
+#endif
     } else if (aflags[AFLAGS_SET_CULLMODE] == 1) { /* Inverse mapping mode */
         switch (this->geometry_mode & G_CULL_BOTH) {
             case G_CULL_FRONT:
@@ -2868,7 +3645,14 @@ void emu64::set_position(unsigned int vtx) {
     }
 
     /* Vertex color */
+#ifdef TARGET_PC
+    /* On little-endian, color.raw has reversed byte order vs GXColor1u32's
+       big-endian bit extraction. Use individual bytes instead. */
+    GXColor4u8(emu_vtx->color.rgba.r, emu_vtx->color.rgba.g,
+               emu_vtx->color.rgba.b, emu_vtx->color.rgba.a);
+#else
     GXColor1u32(emu_vtx->color.raw);
+#endif
 
     /* If texture is on, write texture coordinates */
     if (this->texture_gfx.on != G_OFF) {
@@ -2938,6 +3722,17 @@ void emu64::setup_1tri_2tri_1quad(unsigned int vtx_idx) {
         GXSetCurrentMtx(NONSHARED_MTX);
         this->using_nonshared_mtx = true;
     }
+#ifdef PC_GX_VERBOSE
+    {
+        extern int diag_frame;
+        static int flag_diag_count = 0;
+        if (diag_frame == 6 && flag_diag_count < 10 && this->projection_type == GX_ORTHOGRAPHIC) {
+            flag_diag_count++;
+            printf("[VTX FLAG] ortho draw #%d: vtx_idx=%d flag=%d (raw flag word=0x%X)\n",
+                   flag_diag_count, vtx_idx, vtx_p->flag, vtx_p->flag);
+        }
+    }
+#endif
 
     GXClearVtxDesc();
     GXSetVtxDesc(GX_VA_POS, GX_DIRECT);
@@ -3269,9 +4064,25 @@ void emu64::dirty_check(int tile, int n_tiles, int do_texture_matrix) {
             f32 endz =
                 -guMtxXFM1F_dol3(this->projection_mtx, this->projection_type, ((f32)(u32)max - 1000.0f) / 1016.0f);
 
+#ifdef TARGET_PC
+            /* On LE, EmuColor.raw is shift-packed (R<<24|G<<16|B<<8|A) but the
+               union's GXColor member has byte-swapped fields. Extract via shifts. */
+            {
+                GXColor fc;
+                fc.r = (this->fog_color.raw >> 24) & 0xFF;
+                fc.g = (this->fog_color.raw >> 16) & 0xFF;
+                fc.b = (this->fog_color.raw >> 8) & 0xFF;
+                fc.a = this->fog_color.raw & 0xFF;
+                GXSetFog(GX_FOG_PERSP_LIN, startz, endz, this->near, this->far, fc);
+            }
+        } else {
+            GXColor fc = {0, 0, 0, 0};
+            GXSetFog(GX_FOG_NONE, 0.0f, 0.0f, 0.0f, 0.0f, fc);
+#else
             GXSetFog(GX_FOG_PERSP_LIN, startz, endz, this->near, this->far, this->fog_color.color);
         } else {
             GXSetFog(GX_FOG_NONE, 0.0f, 0.0f, 0.0f, 0.0f, this->fog_color.color);
+#endif
         }
     }
 
@@ -3415,9 +4226,13 @@ void emu64::dirty_check(int tile, int n_tiles, int do_texture_matrix) {
 
                     dol_fmt.raw = cvtN64ToDol(tex_info_p->format, tex_info_p->size);
                     if (((u32)img_addr & 0x1F) != 0) {
+#ifndef TARGET_PC
                         /* Translation: Texture (%08x) alignment isn't 32 bytes */
                         this->Printf0("テクスチャ(%08x)のアライメントが３２バイトになっていません\n", img_addr);
+                        /* GC hardware DMA requires 32-byte alignment; truncate.
+                         * On PC we decode in software so the raw address is correct. */
                         img_addr = (void*)((u32)img_addr & ~0x1F);
+#endif
                     }
 
                     if ((this->geometry_mode & G_TEXTURE_GEN_LINEAR) != 0 &&
@@ -3497,6 +4312,23 @@ void emu64::dl_G_DL(void) {
     Gfx* gfx = this->gfx_p;
 
     this->work_ptr = (void*)this->seg2k0(gfx->dma.addr);
+#ifdef TARGET_PC
+    if (this->work_ptr == NULL) {
+        return;
+    }
+    {
+        /* Validate only regular F3DEX display lists.
+         * G_DL_GXDL payload is a GX binary command stream, not a Gfx list. */
+        if (gfx->dma.par != G_DL_GXDL) {
+            Gfx* target = (Gfx*)this->work_ptr;
+            u8 first_opcode = (u8)((target->words.w0 >> 24) & 0xFF);
+            u8 first_idx = first_opcode - G_FIRST_CMD;
+            if (first_idx >= NUM_COMMANDS) {
+                return;
+            }
+        }
+    }
+#endif
 
     switch (gfx->dma.par) {
         case G_DL_PUSH:
@@ -3657,6 +4489,57 @@ void emu64::dl_G_SETTILE() {
     this->dirty_flags[EMU64_DIRTY_FLAG_TEX_TILE0 + settile->tile] = true;
 }
 
+#ifdef TARGET_PC
+void emu64::dl_G_SETTILE_DOLPHIN() {
+    u32 w0 = this->gfx.words.w0;
+    int dol_fmt = (w0 >> 20) & 0xF;
+    int tile = (w0 >> 16) & 0x7;
+    int tlut_name = (w0 >> 12) & 0xF;
+    int wrap_s = (w0 >> 10) & 0x3;
+    int wrap_t = (w0 >> 8) & 0x3;
+    int shift_s = (w0 >> 4) & 0xF;
+    int shift_t = w0 & 0xF;
+    Gsettile_dolphin decoded = {};
+    decoded.cmd = G_SETTILE_DOLPHIN;
+    decoded.dol_fmt = dol_fmt;
+    decoded.tile = tile;
+    decoded.tlut_name = tlut_name;
+    decoded.wrap_s = wrap_s;
+    decoded.wrap_t = wrap_t;
+    decoded.shift_s = shift_s;
+    decoded.shift_t = shift_t;
+
+#ifdef EMU64_DEBUG
+    if (this->print_commands != false) {
+        this->Printf2("gsDPSetTile_Dolphin(G_TF_%s,%d,%d,GX_%s,GX_%s,%d,%d),", dolfmttbl[dol_fmt], tile, tlut_name,
+                      doltexwrapmode[wrap_s], doltexwrapmode[wrap_t], shift_s, shift_t);
+    }
+#endif
+
+    this->use_dolphin_settile[tile] = true;
+    this->settile_dolphin_cmds[tile] = decoded;
+    bzero(&this->settile_cmds[tile], sizeof(Gsettile));
+    this->setimg2_cmds[tile] = this->now_setimg.setimg2;
+
+    /* Setup tile size using S (X): [0, width - 1], T (Y): [0, height - 1] */
+    this->settilesize_dolphin_cmds[tile].sl = 0;
+    this->settilesize_dolphin_cmds[tile].tl = 0;
+    this->settilesize_dolphin_cmds[tile].slen = this->now_setimg.setimg2.wd;
+    this->settilesize_dolphin_cmds[tile].tlen = EXPAND_HEIGHT(this->now_setimg.setimg2.ht) - 1;
+    this->settilesize_dolphin_cmds[tile].tile = tile;
+    this->settilesize_dolphin_cmds[tile].isDolphin = 1;
+
+    /* Set texture info for use in GC texture object initialization */
+    this->texture_info[tile].img_addr = (void*)this->now_setimg.setimg2.imgaddr;
+    this->texture_info[tile].format = this->now_setimg.setimg2.fmt;
+    this->texture_info[tile].size = this->now_setimg.setimg2.siz;
+    this->texture_info[tile].width = EXPAND_WIDTH(this->now_setimg.setimg2.wd);
+    this->texture_info[tile].height = EXPAND_HEIGHT(this->now_setimg.setimg2.ht);
+
+    /* Mark texture tile as dirty */
+    this->dirty_flags[EMU64_DIRTY_FLAG_TEX_TILE0 + tile] = true;
+}
+#else
 void emu64::dl_G_SETTILE_DOLPHIN() {
     Gsettile_dolphin* settile_dolphin = (Gsettile_dolphin*)this->gfx_p;
 
@@ -3689,6 +4572,7 @@ void emu64::dl_G_SETTILE_DOLPHIN() {
     /* Mark texture tile as dirty */
     this->dirty_flags[EMU64_DIRTY_FLAG_TEX_TILE0 + settile_dolphin->tile] = true;
 }
+#endif
 
 void emu64::dl_G_LOADTILE() {
     Gloadtile& loadtile = this->gfx_p->loadtile;
@@ -3762,6 +4646,63 @@ void emu64::dl_G_LOADBLOCK() {
 #endif
 }
 
+#ifdef TARGET_PC
+void emu64::dl_G_SETTILESIZE() {
+    Gsettilesize* settilesize = (Gsettilesize*)this->gfx_p;
+    u32 w0 = this->gfx.words.w0;
+    u32 w1 = this->gfx.words.w1;
+    int tile;
+
+    if (((w1 >> 31) & 1) != 0) {
+        int sl = (w0 >> 10) & 0x3FFF;
+        int slen = w0 & 0x3FF;
+        int tl = (w1 >> 10) & 0x3FFF;
+        int tlen = w1 & 0x3FF;
+        tile = (w1 >> 24) & 0x7;
+#ifdef EMU64_DEBUG
+        /* Seems they checked it twice in source code... */
+        if (this->print_commands != false && this->print_commands != false) {
+            this->Printf2("gsDPSetTileSize_Dolphin(%d,%d,%d,%d,%d),", tile, sl, tl, slen, tlen);
+        }
+#endif
+        this->settilesize_dolphin_cmds[tile].cmd = G_SETTILESIZE;
+        this->settilesize_dolphin_cmds[tile].sl = sl;
+        this->settilesize_dolphin_cmds[tile].tl = tl;
+        this->settilesize_dolphin_cmds[tile].slen = slen;
+        this->settilesize_dolphin_cmds[tile].tlen = tlen;
+        this->settilesize_dolphin_cmds[tile].tile = tile;
+        this->settilesize_dolphin_cmds[tile].isDolphin = 1;
+    } else { /* Gsettilesize */
+        u16 s_len = (((settilesize->sh) - (settilesize->sl)) >> 2) + 1;
+        u16 t_len = ((settilesize->th - (settilesize->tl)) >> 2) + 1;
+        tile = settilesize->tile;
+
+#ifdef EMU64_DEBUG
+        if (this->print_commands != false) {
+            if (this->print_commands != false) {
+                this->Printf2("gsDPSetTileSize(%d,%d,%d,%d,%d),", tile, settilesize->sl, settilesize->tl,
+                              settilesize->sh, settilesize->th);
+            }
+
+            if (this->print_commands != false) {
+                this->Printf2(" /* %dx%d */", s_len, t_len + 1);
+            }
+        }
+#endif
+
+        /* Convert from N64 Gsettilesize to Gsettilesize_dolphin */
+        this->settilesize_dolphin_cmds[tile].sl = settilesize->sl * 4;
+        this->settilesize_dolphin_cmds[tile].tl = settilesize->tl * 4;
+        this->settilesize_dolphin_cmds[tile].slen = s_len - 1;
+        this->settilesize_dolphin_cmds[tile].tlen = t_len - 1;
+        this->settilesize_dolphin_cmds[tile].tile = tile;
+        this->settilesize_dolphin_cmds[tile].isDolphin = 0;
+    }
+
+    /* Mark texture tile as dirty */
+    this->dirty_flags[EMU64_DIRTY_FLAG_TEX_TILE0 + tile] = true;
+}
+#else
 void emu64::dl_G_SETTILESIZE() {
     Gsettilesize* settilesize = (Gsettilesize*)this->gfx_p;
     Gsettilesize_Dolphin* settilesize_dolphin = (Gsettilesize_Dolphin*)this->gfx_p;
@@ -3805,6 +4746,12 @@ void emu64::dl_G_SETTILESIZE() {
     /* Mark texture tile as dirty */
     this->dirty_flags[EMU64_DIRTY_FLAG_TEX_TILE0 + settilesize_dolphin->tile] = true;
 }
+#endif
+
+#ifdef TARGET_PC
+extern "C" void pc_gx_tlut_set_native_le(unsigned int idx);
+extern "C" u16 s_tlut_first_word[16];
+#endif
 
 void emu64::dl_G_LOADTLUT() {
     Gloadtlut_dolphin* loadtlut_dol = (Gloadtlut_dolphin*)this->gfx_p;
@@ -3827,22 +4774,43 @@ void emu64::dl_G_LOADTLUT() {
             if (tlut_addr == this->tlut_addresses[tlut_name]) {
                 /* Translation: ### Same TLUT address */
                 EMU64_INFO("### 同じTLUTアドレスです\n");
+#ifdef TARGET_PC
+                /* On PC, the game reuses memory buffers — same address can hold
+                 * different TLUT data (e.g., different NPC clothing palettes).
+                 * GC hardware always re-DMA'd, so the skip was harmless there.
+                 * On PC we must detect content changes and force a reload. */
+                if (tlut_addr != nullptr) {
+                    u16 first = *(u16*)tlut_addr;
+                    if (s_tlut_first_word[tlut_name] != first) {
+                        s_tlut_first_word[tlut_name] = first;
+                        this->tlut_addresses[tlut_name] = nullptr;
+                    }
+                }
+#endif
             } else { /* tlut_addr != this->tlut_addresses[tlut_name] */
                 aligned_addr = tlut_addr;
 
                 this->tlut_addresses[tlut_name] = tlut_addr;
                 if (tlut_addr != nullptr) {
                     if (((u32)tlut_addr & (0x1F)) != 0) {
+#ifndef TARGET_PC
                         /* The alignment of the palette (%08x) is not 32 bytes. */
                         EMU64_PRINTF(
                             VT_COL(RED, WHITE) "パレット(%08x)のアライメントが３２バイトになっていません\n" VT_RST,
                             tlut_addr)
 
+                        /* GC hardware DMA requires 32-byte alignment; truncate.
+                         * On PC we decode in software so the raw address is correct. */
                         aligned_addr = (void*)((u32)tlut_addr & (~0x1F));
+#endif
                     }
 
                     GXInitTlutObj(&this->tlut_objs[tlut_name], aligned_addr, GX_TL_RGB5A3, count);
                     GXLoadTlut(&this->tlut_objs[tlut_name], tlut_name);
+#ifdef TARGET_PC
+                    pc_gx_tlut_set_native_le(tlut_name);
+                    s_tlut_first_word[tlut_name] = *(u16*)aligned_addr;
+#endif
 
                     EMU64_INFOF("GXInitTlutObj %08x %d pal_no=%d\n", tlut_addr, count, tlut_name);
                 }
@@ -3864,6 +4832,18 @@ void emu64::dl_G_LOADTLUT() {
             if (addr == (u32)this->tlut_addresses[tlut_name]) {
                 /* Translation: ### Same TLUT address %08x %d */
                 EMU64_INFOF("### 同じTLUTアドレスです %08x %d\n", addr, tlut_name);
+#ifdef TARGET_PC
+                /* Same fix as type-2 path: detect content change at reused address.
+                 * Note: addr here is already a direct pointer (not a segment address),
+                 * so do NOT call seg2k0() — just cast directly. */
+                if (addr != 0) {
+                    u16 first = *(u16*)(uintptr_t)addr;
+                    if (s_tlut_first_word[tlut_name] != first) {
+                        s_tlut_first_word[tlut_name] = first;
+                        this->tlut_addresses[tlut_name] = nullptr;
+                    }
+                }
+#endif
             } else {
                 /* Convert TLUT */
                 if (this->now_setimg.setimg2.isDolphin) {
@@ -3877,6 +4857,9 @@ void emu64::dl_G_LOADTLUT() {
                         tlut_addresses[tlut_name] = (void*)addr;
                         GXInitTlutObj(&this->tlut_objs[tlut_name], tlut, GX_TL_RGB5A3, count);
                         GXLoadTlut(&this->tlut_objs[tlut_name], tlut_name);
+#ifdef TARGET_PC
+                        pc_gx_tlut_set_native_le(tlut_name);
+#endif
 
                         EMU64_INFOF("GXInitTlutObj %08x %d pal_no=%d\n", addr, (u16)count, tlut_name);
 
@@ -3925,7 +4908,14 @@ void emu64::dl_G_SETCOMBINE() {
 
     /* N64 Combiner -> GC TEV */
     if (this->gfx_cmd != G_SETCOMBINE_NOTEV && aflags[AFLAGS_SKIP_COMBINE_TEV] == 0) {
+#ifdef TARGET_PC
+        /* On PC, convert the writable combine_gfx copy instead of the
+           read-only display list data. combine_tev() will then see
+           G_SETCOMBINE_TEV and use the proper TEV color/alpha inputs. */
+        this->replace_combine_to_tev(&this->combine_gfx);
+#else
         this->replace_combine_to_tev(this->gfx_p);
+#endif
     }
 }
 
@@ -4346,6 +5336,18 @@ void emu64::dl_G_NOOP() {
 
     switch (noop->tag) {
         case G_TAG_NONE:
+#ifdef TARGET_PC
+            /* PC widescreen: skip aspect correction for transitions / bg blits.
+             * See pc_platform.h for how the marker/flag mechanism works. */
+            if (this->gfx.words.w1 == PC_NOOP_WIDESCREEN_STRETCH) {
+                g_pc_widescreen_stretch = 1;
+                break;
+            }
+            if (this->gfx.words.w1 == PC_NOOP_WIDESCREEN_STRETCH_OFF) {
+                g_pc_widescreen_stretch = 2; /* pillarbox mode for UI */
+                break;
+            }
+#endif
             if (this->gfx.words.w1 == 0) {
                 EMU64_LOG("gsDPNoOp(),");
             } else {
@@ -4422,6 +5424,27 @@ void emu64::dl_G_MTX() {
         Mtx_t* mtx =
             (Mtx_t*)this->seg2k0(mtx_gfx->addr); /* Matrix is in N64 s16.16 format. (First 8 elements are s16 integer
                                                     components, second 8 elements are s16 fractional components) */
+#ifdef TARGET_PC
+        if (mtx == NULL) {
+            EMU64_TIMED_SEGMENT_END(matrix_time);
+            return;
+        }
+#endif
+#ifdef PC_GX_VERBOSE
+        {
+            extern int diag_frame;
+            static int mtx_cmd_frame = -1, mtx_cmd_count = 0;
+            if (diag_frame != mtx_cmd_frame) { mtx_cmd_frame = diag_frame; mtx_cmd_count = 0; }
+            if (diag_frame == 6) {
+                mtx_cmd_count++;
+                printf("[MTX CMD #%d] %s %s %s type=0x%02X\n", mtx_cmd_count,
+                       (mtx_gfx->type & G_MTX_PROJECTION) != G_MTX_MODELVIEW ? "PROJ" : "MV",
+                       (mtx_gfx->type & G_MTX_LOAD) != G_MTX_MUL ? "LOAD" : "MUL",
+                       (mtx_gfx->type & G_MTX_PUSH) == G_MTX_NOPUSH ? "PUSH" : "NOPUSH",
+                       mtx_gfx->type);
+            }
+        }
+#endif
         GC_Mtx mtx34;
         Mtx44 mtx44; /* float-based matrix */
 
@@ -4441,6 +5464,17 @@ void emu64::dl_G_MTX() {
                     bcopy(mtx44, this->projection_mtx, sizeof(Mtx44));
                     this->projection_type = GX_PERSPECTIVE;
                 } else { /* Orthographic projection */
+#ifdef PC_GX_VERBOSE
+                    {
+                        extern int diag_frame;
+                        if (diag_frame == 6) {
+                            printf("[ORTHO PROJ] mtx44: [%.6f %.6f %.6f %.6f] [%.6f %.6f %.6f %.6f] [%.6f %.6f %.6f %.6f]\n",
+                                   mtx44[0][0], mtx44[0][1], mtx44[0][2], mtx44[0][3],
+                                   mtx44[1][0], mtx44[1][1], mtx44[1][2], mtx44[1][3],
+                                   mtx44[2][0], mtx44[2][1], mtx44[2][2], mtx44[2][3]);
+                        }
+                    }
+#endif
                     this->near = (mtx44[2][3] + 1.0f) / mtx44[2][2];
                     this->far = (mtx44[2][3] - 1.0f) / mtx44[2][2];
                     mtx44[2][2] = 1.0f / (this->near - this->far);
@@ -4538,6 +5572,30 @@ void emu64::dl_G_VTX() {
 
     if (this->disable_polygons == false) {
         Vtx* vtx_p = (Vtx*)this->seg2k0(this->gfx.dma.addr);
+#ifdef TARGET_PC
+        if (vtx_p == NULL) {
+            EMU64_TIMED_SEGMENT_END(spvertex_time);
+            return;
+        }
+#endif
+#ifdef PC_GX_VERBOSE
+        {
+            static int vtx_diag_done = 0;
+            if (vtx_diag_done < 2) {
+                int has_nonzero = 0;
+                for (u32 di = 0; di < n && !has_nonzero; di++) {
+                    if (vtx_p[di].n.ob[0] != 0 || vtx_p[di].n.ob[1] != 0 || vtx_p[di].n.ob[2] != 0)
+                        has_nonzero = 1;
+                }
+                if (vtx_diag_done == 0 || has_nonzero) {
+                    printf("[VTX DIAG] %s: n=%d v0=%d\n",
+                           vtx_diag_done == 0 ? "First SPVertex" : "First non-zero SPVertex", n, v0);
+                    if (vtx_diag_done == 0 && !has_nonzero) vtx_diag_done = 1;
+                    else vtx_diag_done = 2;
+                }
+            }
+        }
+#endif
         Vertex* emu_vtx_p = &this->vertices[v0];
 
         GC_Mtx& position_mtx = this->position_mtx_stack[this->mtx_stack_size];
@@ -4682,6 +5740,149 @@ void emu64::dl_G_TRIN_INDEPEND() {
     this->dl_G_TRIN();
 }
 
+#ifdef TARGET_PC
+void emu64::dl_G_TRIN() {
+    Gtrin* g;
+    int n_faces;
+    int first_pass = TRUE;
+    Gfx* first_cmd = this->gfx_p;
+    int is_7bit = (first_cmd->words.w1 & POLY_BITMASK) == POLY_7b;
+    int first_vtx = is_7bit ? POLY_GET_V0_7b(first_cmd) : POLY_GET_V0_5b(first_cmd);
+
+    EMU64_TIMED_SEGMENT_BEGIN();
+
+    this->dirty_check(this->texture_gfx.tile, this->texture_gfx.level, TRUE);
+    this->setup_1tri_2tri_1quad(first_vtx);
+    n_faces = ((first_cmd->words.w0 >> 17) & 0x7F) + 1;
+    int n_verts = n_faces * 3;
+
+
+    EMU64_LOGF("gsSPNTriangles(%d),\n", n_faces);
+    if (aflags[AFLAGS_WIREFRAME] == 0) {
+        GXBegin(GX_TRIANGLES, GX_VTXFMT0, n_verts);
+    }
+
+    while (n_faces > 0) {
+        g = (Gtrin*)this->gfx_p;
+        Gfx* gcmd = (Gfx*)g;
+
+        if ((gcmd->words.w1 & POLY_BITMASK) == POLY_5b) {
+            this->gfx_p++;
+            /* 5 bits per vertex index, first pass = 3 faces, consecutive passes = 4 faces */
+            int v0 = POLY_GET_V0_5b(gcmd);
+            int v1 = POLY_GET_V1_5b(gcmd);
+            int v2 = POLY_GET_V2_5b(gcmd);
+            this->set_position3(v0, v1, v2);
+            this->polygons++;
+            EMU64_LOGF("gsSPNTriangleData1(%d, %d, %d, 0),\n", v0, v1, v2);
+
+            n_faces--;
+            if (n_faces == 0)
+                break;
+
+            int v3 = POLY_GET_V3_5b(gcmd);
+            int v4 = POLY_GET_V4_5b(gcmd);
+            int v5 = POLY_GET_V5_5b(gcmd);
+            this->set_position3(v3, v4, v5);
+            this->polygons++;
+            EMU64_LOGF("gsSPNTriangleData1(%d, %d, %d, 0),\n", v3, v4, v5);
+
+            n_faces--;
+            if (n_faces == 0)
+                break;
+
+            int v6 = POLY_GET_V6_5b(gcmd);
+            int v7 = POLY_GET_V7_5b(gcmd);
+            int v8 = POLY_GET_V8_5b(gcmd);
+            this->set_position3(v6, v7, v8);
+            this->polygons++;
+            EMU64_LOGF("gsSPNTriangleData1(%d, %d, %d, 0),\n", v6, v7, v8);
+
+            n_faces--;
+            if (n_faces == 0)
+                break;
+
+            /* Only 3 faces on the first pass */
+            if (first_pass) {
+                first_pass = FALSE;
+            } else {
+                int v9 = POLY_GET_V9_5b(gcmd);
+                int v10 = POLY_GET_V10_5b(gcmd);
+                int v11 = POLY_GET_V11_5b(gcmd);
+                this->set_position3(v9, v10, v11);
+                this->polygons++;
+                EMU64_LOGF("gsSPNTriangleData1(%d, %d, %d, 0),\n", v9, v10, v11);
+
+                n_faces--;
+                if (n_faces == 0)
+                    break;
+            }
+        } else {
+            this->gfx_p++;
+
+            /* 7 bits per vertex index, max 3 faces per Gfx */
+            int v0 = POLY_GET_V0_7b(gcmd);
+            int v1 = POLY_GET_V1_7b(gcmd);
+            int v2 = POLY_GET_V2_7b(gcmd);
+            this->set_position3(v0, v1, v2);
+#ifdef EMU64_FIXES
+            this->polygons++;
+#endif
+            EMU64_LOGF("gsSPNTriangleData1(%d, %d, %d, 0),\n", v0, v1, v2);
+
+            n_faces--;
+            if (n_faces == 0)
+                break;
+
+            int v3 = POLY_GET_V3_7b(gcmd);
+            int v4 = POLY_GET_V4_7b(gcmd);
+            int v5 = POLY_GET_V5_7b(gcmd);
+            this->set_position3(v3, v4, v5);
+
+#ifdef EMU64_FIXES
+            this->polygons++;
+#endif
+            EMU64_LOGF("gsSPNTriangleData1(%d, %d, %d, 0),\n", v3, v4, v5);
+
+            n_faces--;
+            if (n_faces == 0)
+                break;
+
+            /* Only 2 faces on the first pass */
+            if (first_pass) {
+                first_pass = FALSE;
+            } else {
+                int v6 = POLY_GET_V6_7b(gcmd);
+                int v7 = POLY_GET_V7_7b(gcmd);
+                int v8 = POLY_GET_V8_7b(gcmd);
+                this->set_position3(v6, v7, v8);
+#ifdef EMU64_FIXES
+                this->polygons++;
+#endif
+                EMU64_LOGF("gsSPNTriangleData1(%d, %d, %d, 0),\n", v6, v7, v8);
+
+                n_faces--;
+                if (n_faces == 0)
+                    break;
+            }
+        }
+    }
+
+    if (aflags[AFLAGS_WIREFRAME] == 0) {
+        GXEnd();
+    }
+
+    this->gfx_p += (int)n_faces - 1; /* Should equate to gfx_p--, as the emulator will increment it once. */
+
+    /* Flush triangle batch immediately. On real HW the GXEnd is implicit,
+       but our deferred vertex model needs an explicit flush so that state
+       changes (viewport, projection) between batches don't affect this draw. */
+    GXEnd();
+
+    EMU64_TIMED_SEGMENT_END(polygons_time);
+    this->rdp_pipe_sync_needed = true;
+}
+#else
 void emu64::dl_G_TRIN() {
     Gtrin* g;
     int n_faces;
@@ -4797,7 +5998,126 @@ void emu64::dl_G_TRIN() {
     EMU64_TIMED_SEGMENT_END(polygons_time);
     this->rdp_pipe_sync_needed = true;
 }
+#endif
 
+#ifdef TARGET_PC
+void emu64::dl_G_QUADN() {
+    Gquad* g;
+    int n_faces;
+    int first_pass = TRUE;
+    Gfx* first_cmd = this->gfx_p;
+    int is_7bit = (first_cmd->words.w1 & POLY_BITMASK) == POLY_7b;
+    int first_vtx = is_7bit ? ((first_cmd->words.w1 >> 4) & 0x7F) : ((first_cmd->words.w1 >> 4) & 0x1F);
+
+    EMU64_TIMED_SEGMENT_BEGIN();
+
+    this->dirty_check(this->texture_gfx.tile, this->texture_gfx.level, TRUE);
+    this->setup_1tri_2tri_1quad(first_vtx);
+    n_faces = ((first_cmd->words.w0 >> 17) & 0x7F) + 1;
+    int n_verts = n_faces * 4;
+
+    EMU64_LOGF("gsSPNQuadrangles(%d),\n", n_faces);
+    if (aflags[AFLAGS_WIREFRAME] == 0) {
+        GXBegin(GX_QUADS, GX_VTXFMT0, n_verts);
+    }
+
+    while (n_faces > 0) {
+        g = (Gquad*)this->gfx_p;
+        Gfx* gcmd = (Gfx*)g;
+        if ((gcmd->words.w1 & POLY_BITMASK) == POLY_5b) {
+            this->gfx_p++;
+            /* 5 bits per vertex index, first pass = 2 faces, consecutive passes = 3 faces */
+            int v0 = POLY_GET_V0_5b(gcmd);
+            int v1 = POLY_GET_V1_5b(gcmd);
+            int v2 = POLY_GET_V2_5b(gcmd);
+            int v3 = POLY_GET_V3_5b(gcmd);
+            this->set_position4(v0, v1, v2, v3);
+            this->polygons++;
+            EMU64_LOGF("gsSPNQuadrangleData1(%d, %d, %d, %d, 0),\n", v0, v1, v2, v3);
+
+            n_faces--;
+            if (n_faces == 0)
+                break;
+
+            int v4 = POLY_GET_V4_5b(gcmd);
+            int v5 = POLY_GET_V5_5b(gcmd);
+            int v6 = POLY_GET_V6_5b(gcmd);
+            int v7 = POLY_GET_V7_5b(gcmd);
+            this->set_position4(v4, v5, v6, v7);
+            this->polygons++;
+            EMU64_LOGF("gsSPNQuadrangleData1(%d, %d, %d, %d, 0),\n", v4, v5, v6, v7);
+
+            n_faces--;
+            if (n_faces == 0)
+                break;
+
+            /* Only 2 faces on the first pass */
+            if (first_pass) {
+                first_pass = FALSE;
+            } else {
+                int v8 = POLY_GET_V8_5b(gcmd);
+                int v9 = POLY_GET_V9_5b(gcmd);
+                int v10 = POLY_GET_V10_5b(gcmd);
+                int v11 = POLY_GET_V11_5b(gcmd);
+                this->set_position4(v8, v9, v10, v11);
+                this->polygons++;
+                EMU64_LOGF("gsSPNQuadrangleData1(%d, %d, %d, %d, 0),\n", v8, v9, v10, v11);
+
+                n_faces--;
+                if (n_faces == 0)
+                    break;
+            }
+        } else {
+            this->gfx_p++;
+            /* 7 bits per vertex index, max 2 faces per Gfx */
+            int v0 = (gcmd->words.w1 >> 4) & 0x7F;
+            int v1 = (gcmd->words.w1 >> 11) & 0x7F;
+            int v2 = (gcmd->words.w1 >> 18) & 0x7F;
+            int v3 = (gcmd->words.w1 >> 25) & 0x7F;
+
+            this->set_position4(v0, v1, v2, v3);
+#ifdef EMU64_FIXES
+            this->polygons++;
+#endif
+            EMU64_LOGF("gsSPNQuadrangleData1(%d, %d, %d, %d, 0),\n", v0, v1, v2, v3);
+
+            n_faces--;
+            if (n_faces == 0)
+                break;
+
+            /* Only 1 face on the first pass */
+            if (first_pass) {
+                first_pass = FALSE;
+            } else {
+                int q0 = (gcmd->words.w0 >> 4) & 0x7F;
+                int q1 = (gcmd->words.w0 >> 11) & 0x7F;
+                int q2 = (gcmd->words.w0 >> 18) & 0x7F;
+                int q3 = (gcmd->words.w0 >> 25) & 0x7F;
+                this->set_position4(q0, q1, q2, q3);
+#ifdef EMU64_FIXES
+                this->polygons++;
+#endif
+                EMU64_LOGF("gsSPNQuadrangleData1(%d, %d, %d, %d, 0),\n", q0, q1, q2, q3);
+
+                n_faces--;
+                if (n_faces == 0)
+                    break;
+            }
+        }
+    }
+
+    if (aflags[AFLAGS_WIREFRAME] == 0) {
+        GXEnd();
+    }
+
+    this->gfx_p += (int)n_faces - 1; /* Should equate to gfx_p--, as the emulator will increment it once. */
+
+    GXEnd();
+
+    EMU64_TIMED_SEGMENT_END(polygons_time);
+    this->rdp_pipe_sync_needed = true;
+}
+#else
 void emu64::dl_G_QUADN() {
     Gquad* g;
     int n_faces;
@@ -4890,6 +6210,7 @@ void emu64::dl_G_QUADN() {
     EMU64_TIMED_SEGMENT_END(polygons_time);
     this->rdp_pipe_sync_needed = true;
 }
+#endif
 
 void emu64::dl_G_TRI2() {
     int unused[2];
@@ -4995,6 +6316,10 @@ void emu64::dl_G_TRI2() {
         EMU64_TIMED_SEGMENT_END(polygons_time);
     }
 
+#ifdef TARGET_PC
+    GXEnd();
+#endif
+
     this->rdp_pipe_sync_needed = true;
 }
 
@@ -5023,6 +6348,120 @@ void emu64::dl_G_QUAD() {
     EMU64_TIMED_SEGMENT_END(polygons_time);
 }
 
+#ifdef TARGET_PC
+void emu64::dl_G_CULLDL() {
+    f32 ox;
+    f32 oy;
+    f32 oz;
+    f32 ox2;
+    f32 oy2;
+    f32 oz2;
+    Vec o;
+    u32 vstart = ((Gculldl*)&this->gfx)->vstart / 2;
+    u32 vend = ((Gculldl*)&this->gfx)->vend / 2;
+    u32 mask;
+    u32 i;
+    Vertex* vtx;
+
+    EMU64_WARNF("gsSPCullDisplayList(%d, %d),", vstart, vend);
+
+    EMU64_LOG("vn mask   x     y    z  \n");
+    mask = G_CULL_Z_GREATERTHAN | G_CULL_Z_LESSTHAN | G_CULL_Y_GREATERTHAN | G_CULL_Y_LESSTHAN | G_CULL_X_GREATERTHAN |
+           G_CULL_X_LESSTHAN; /* 0x3F00 */
+
+    for (i = vstart; i <= vend; i++) {
+        vtx = &this->vertices[i];
+        /* Recompute cull classification fresh each call; keep only non-cull flag bits. */
+        vtx->flag &= ~(G_CULL_Z_GREATERTHAN | G_CULL_Z_LESSTHAN |
+                       G_CULL_Y_GREATERTHAN | G_CULL_Y_LESSTHAN |
+                       G_CULL_X_GREATERTHAN | G_CULL_X_LESSTHAN);
+
+        /* Vertex position -> camera space calculations */
+        if ((vtx->flag & MTX_NONSHARED) == MTX_SHARED) {
+#ifdef EMU64_DEBUG
+            if (this->print_commands != false) {
+                this->print_guMtxXFM1F_dol2(this->projection_mtx, this->projection_type, vtx->position.x,
+                                            vtx->position.y, vtx->position.z);
+            }
+#endif
+
+            guMtxXFM1F_dol2(this->projection_mtx, this->projection_type, vtx->position.x, vtx->position.y,
+                            vtx->position.z, &ox, &oy, &oz);
+        } else {
+            /* MTX_NONSHARED */
+            if (aflags[AFLAGS_USE_GUVECMULT] != 0) {
+                guMtxXFM1F_dol(this->position_mtx_stack[this->mtx_stack_size], vtx->position.x, vtx->position.y,
+                    vtx->position.z, &ox2, &oy2, &oz2);
+            } else {
+                PSMTXMultVec(this->position_mtx_stack[this->mtx_stack_size], &vtx->position, &o);
+                ox2 = o.x;
+                oy2 = o.y;
+                oz2 = o.z;
+            }
+
+#ifdef EMU64_DEBUG
+            if (this->print_commands != false) {
+                this->print_guMtxXFM1F_dol2(this->projection_mtx, this->projection_type, oVec.x, oVec.y, oVec.z);
+            }
+#endif
+            guMtxXFM1F_dol2(this->projection_mtx, this->projection_type, ox2, oy2, oz2, &ox, &oy, &oz);
+        }
+
+        /* Assign culling flags to vertex */
+        if (ox < -1.0f) {
+            vtx->flag |= G_CULL_X_LESSTHAN;
+        } else if (ox > 1.0f) {
+            vtx->flag |= G_CULL_X_GREATERTHAN;
+        }
+
+        if (oy < -1.0f) {
+            vtx->flag |= G_CULL_Y_LESSTHAN;
+        } else if (oy > 1.0f) {
+            vtx->flag |= G_CULL_Y_GREATERTHAN;
+        }
+
+        if (oz > 0.0f) {
+            vtx->flag |= G_CULL_Z_LESSTHAN;
+        } else if (oz < -1.0f) {
+            vtx->flag |= G_CULL_Z_GREATERTHAN;
+        }
+
+        EMU64_LOGF("%2d %04x %1d%1d%1d%1d%1d%1d %1d %6.3f %6.3f %6.3f  %8.2f %8.2f %8.2f \n", vstart, vtx->flag,
+                   vtx->cull_z_greater, vtx->cull_z_lesser, vtx->cull_y_greater, vtx->cull_y_lesser,
+                   vtx->cull_x_greater, vtx->cull_x_lesser, vtx->nonshared, ox, oy, oz
+/* The devs seem to have forgotten to add the last three float values */
+#ifdef EMU64_FIX_CULL_INFO_LOG
+                   ,
+                   vtx->position.x, vtx->position.y, vtx->position.z /* Not sure if this is correct. */
+#endif
+        );
+
+        /* Update culled state */
+        mask &= vtx->flag;
+
+        /* TODO: An optimization here would be to break immediately if culling occurs? */
+        /* I'm not sure if these flags are checked anywhere else. */
+    }
+
+    this->cullDL_calls++;
+    if (mask != 0) {
+        EMU64_LOGF("カリングされました mask=%02x\n", mask); /* Translation: Was culled mask=%02x */
+
+        if (this->DL_stack_level <= 0) {
+            this->end_dl = true;
+        } else {
+            this->gfx_p = (Gfx*)this->DL_stack[--DL_stack_level] - 1;
+        }
+
+        this->cullDL_outside_obj_count++;
+        pc_emu64_frame_cull_rejected++;
+    } else {
+        EMU64_LOG("カリングされませんでした\n"); /* Translation: Wasn't culled */
+        this->cullDL_visible_obj_count++;
+        pc_emu64_frame_cull_visible++;
+    }
+}
+#else
 void emu64::dl_G_CULLDL() {
     f32 ox;
     f32 oy;
@@ -5130,6 +6569,7 @@ void emu64::dl_G_CULLDL() {
         this->cullDL_visible_obj_count++;
     }
 }
+#endif
 
 void emu64::dl_G_BRANCH_Z() {
     this->work_ptr = (void*)this->seg2k0(this->rdpHalf_1);
@@ -5252,6 +6692,86 @@ static emu64 emu64_class;
 char* emu64::warningString[EMU64_WARNING_COUNT];
 u32 emu64::warningTime[EMU64_WARNING_COUNT];
 
+#ifdef TARGET_PC
+void emu64::dl_G_MOVEWORD() {
+    static char s1[20];
+    static char s2[64];
+    static char s3[64];
+    Gmoveword* moveword = (Gmoveword*)this->gfx_p;
+
+    switch (moveword->index) {
+        case G_MW_SEGMENT: {
+            u32 segment = moveword->offset / 4;
+            EMU64_WARNF("gsSPSegmentA(%d, 0x%08x),", segment, moveword->data);
+            /* On PC, store address directly (no GC physical address mapping) */
+            this->segments[segment] = moveword->data;
+        } break;
+
+        case G_MW_CLIP: {
+            EMU64_LOGF("gsSPClipRatio(FRUSTRATIO_%d), ", moveword->data == 0 ? 0 : moveword->data);
+            this->gfx_p +=
+                3; /* gsSPClipRatio generates four moveword instructions, so skip three. Emulator will skip last one. */
+        } break;
+
+        case G_MW_NUMLIGHT: {
+            u32 num_lights = moveword->data / 24;
+            EMU64_LOGF("gsSPNumLights(%d), ", num_lights);
+            if (this->num_lights != num_lights) {
+                this->num_lights = num_lights;
+                this->dirty_flags[EMU64_DIRTY_FLAG_LIGHTS] = true;
+            }
+        } break;
+
+        case G_MW_LIGHTCOL: {
+            int light = (moveword->offset & 0xF0) / 32;
+
+/* Seems like the devs used the light table index as the enum number */
+/* TODO: This could be correct. Investigate if they changed the light definitions. */
+#ifdef EMU64_FIX_MOVEWORD_LIGHT_NUM_LOG
+            EMU64_LOGF("gsSPLightColor(LIGHT_%d, %08x), ", (moveword->offset / 0x18) + 1, moveword->data);
+#else
+            EMU64_LOGF("gsSPLightColor(LIGHT_%d, %08x), ", light + 1, moveword->data);
+#endif
+
+            this->gfx_p++; /* gsSPLightColor generates two commands */
+
+            GXColor* color = (GXColor*)&((Gmoveword*)&this->gfx)->data;
+            this->lights[light].color.rgba.r = color->r;
+            this->lights[light].color.rgba.g = color->g;
+            this->lights[light].color.rgba.b = color->b;
+
+            this->dirty_flags[EMU64_DIRTY_FLAG_LIGHTS] = true;
+        } break;
+
+        case G_MW_FOG: {
+            s16 fm = (s16)(moveword->data >> 16); /* z multiplier */
+            s16 fo = (s16)moveword->data;         /* z offset */
+            if (fm != 0) {
+                int min = 500 - (fo * 500) / fm;
+                EMU64_LOGF("gsSPFogFactor(%d, %d),", fm, fo);
+                EMU64_LOGF("gsSPFogPosition(%d, %d),", min, 128000 / fm + min);
+            } else {
+                EMU64_LOGF("gsSPFogFactor(%d, %d), /* fm=0, no fog */", fm, fo);
+            }
+
+            this->fog_zmult = fm;
+            this->fog_zoffset = fo;
+            this->dirty_flags[EMU64_DIRTY_FLAG_FOG] = true;
+        } break;
+
+        case G_MW_PERSPNORM: {
+            EMU64_LOGF("gsSPPerspNormalize(%d),", moveword->data);
+        } break;
+
+        default: {
+            EMU64_LOGF("gsMoveWd(%d, %d, %d), /* ### what */", moveword->index, moveword->offset, moveword->data);
+
+            this->num_unknown_cmds++;
+            this->Printf0("未知の命令に出くわした\n"); /* Translation: Came across an unknown command */
+        } break;
+    }
+}
+#else
 void emu64::dl_G_MOVEWORD() {
     static char s1[20];
     static char s2[64];
@@ -5342,6 +6862,7 @@ void emu64::dl_G_MOVEWORD() {
         } break;
     }
 }
+#endif
 
 void emu64::dl_G_MOVEMEM() {
     Gmovemem* movemem = (Gmovemem*)this->gfx_p;
@@ -5366,6 +6887,16 @@ void emu64::dl_G_MOVEMEM() {
                 f32 ht = (f32)vp->vscale[1] / 2.0f;
                 f32 nearz = ((f32)(vp->vscale[2] - vp->vtrans[2]) * 2.0f) / 1023.0f;
                 f32 farz = ((f32)vp->vscale[2] * 2.0f) / 1023.0f;
+
+#ifdef PC_GX_VERBOSE
+                {
+                    extern int diag_frame;
+                    if (diag_frame == 6) {
+                        printf("[VIEWPORT] left=%.1f top=%.1f wd=%.1f ht=%.1f near=%.3f far=%.3f\n",
+                               left, top, wd, ht, nearz, farz);
+                    }
+                }
+#endif
 
                 EMU64_INFOF("GXSetViewport %7.3f %7.3f %7.3f %7.3f %7.3f %7.3f\n", left, top, wd, ht, nearz, farz);
 
@@ -5552,11 +7083,42 @@ static dl_func dl_func_tbl[NUM_COMMANDS] = {
 };
 
 u32 emu64::emu64_taskstart_r(Gfx* dl_p) {
+#ifdef TARGET_PC
+    pc_crash_protection_init();
+#endif
     this->gfx_p = dl_p;
     EMU64_INFO("*** emu64taskstart ***\n");
     int some_flag = aflags[0];
     OSInitFastCast();
     this->end_dl = false;
+
+#ifdef TARGET_PC
+    pc_crash_set_jmpbuf(&pc_dl_crash_jmpbuf);
+    volatile int pc_dl_recovery_point = 0; /* 0=normal, 1=from crash */
+    if (setjmp(pc_dl_crash_jmpbuf) != 0) {
+        pc_dl_recovery_point = 1;
+    }
+    if (pc_dl_recovery_point) {
+        pc_emu64_frame_crashes++;
+        pc_dl_recovery_point = 0;
+        /* Re-arm the crash protection for the next iteration */
+        pc_crash_set_jmpbuf(&pc_dl_crash_jmpbuf);
+        /* Pop DL stack to return to parent display list instead of terminating */
+        if (this->DL_stack_level > 0) {
+            this->gfx_p = (Gfx*)(this->DL_stack[--this->DL_stack_level]);
+            /* gfx_p now points to the command AFTER the bad gsSPDisplayList.
+               The while loop will read *gfx_p, process it, then gfx_p++ at the bottom.
+               No adjustment needed - we want to process the next command. */
+            /* Continue the main loop */
+        } else {
+            /* No parent DL to return to - skip the bad command and continue.
+               Previously we terminated here, but that cuts off ALL remaining
+               DL commands (including 2D sprites, inventory icons, etc.) */
+            this->gfx_p++;
+            /* Continue the main loop - gfx_p now points past the crashed command */
+        }
+    }
+#endif
 
     while (!this->end_dl && !FrameCansel) {
         this->cmds_processed++;
@@ -5578,6 +7140,29 @@ u32 emu64::emu64_taskstart_r(Gfx* dl_p) {
         }
 
         u8 cmd_index = this->gfx_cmd - G_FIRST_CMD;
+#ifdef TARGET_PC
+        {
+            pc_emu64_frame_cmds++;
+            /* Track specific command types by opcode */
+            switch (this->gfx_cmd) {
+                case 0x00: pc_emu64_frame_noop_cmds++; break; /* G_SPNOOP */
+                case 0x01: pc_emu64_frame_vtx_cmds++; break;  /* G_VTX */
+                case 0x05: case 0x06: case 0x07: case 0x09: case 0x0A: case 0x0D:
+                    pc_emu64_frame_tri_cmds++; break; /* G_TRI1/TRI2/QUAD/TRIN/etc */
+                case 0xDE: pc_emu64_frame_dl_cmds++; break;  /* G_DL */
+            }
+        }
+#endif
+#ifdef PC_GX_VERBOSE
+        {
+            static int cmd_diag = 0;
+            if (cmd_diag < 500) {
+                printf("[PC] emu64 cmd[%d]: op=0x%02X w0=0x%08X w1=0x%08X\n",
+                       this->cmds_processed, this->gfx_cmd, this->gfx.words.w0, this->gfx.words.w1);
+                cmd_diag++;
+            }
+        }
+#endif
         if (cmd_index < NUM_COMMANDS) {
             if (dl_func_tbl[cmd_index] != nullptr) {
                 EMU64_TIMED_SEGMENT_BEGIN();
@@ -5588,8 +7173,19 @@ u32 emu64::emu64_taskstart_r(Gfx* dl_p) {
                 p[(u32)cmd_index * 2 + 1]++;
             }
         } else {
+#ifdef TARGET_PC
+            static int unexpected_cmd_count = 0;
+            if (unexpected_cmd_count < 5) {
+                this->Printf0(
+                    "予期しないコマンドがありました。中断します。(cmd=%02x)\n", this->gfx_cmd);
+                unexpected_cmd_count++;
+                if (unexpected_cmd_count == 5)
+                    this->Printf0("[PC] (suppressing further unexpected command messages)\n");
+            }
+#else
             this->Printf0(
                 "予期しないコマンドがありました。中断します。\n"); /* There was an unexpected command. Aborting. */
+#endif
             break;
         }
 
@@ -5597,9 +7193,28 @@ u32 emu64::emu64_taskstart_r(Gfx* dl_p) {
         this->gfx_p++;
     }
 
+#ifdef TARGET_PC
+    pc_crash_set_jmpbuf(NULL);
+#endif
+
+#ifdef PC_GX_VERBOSE
+    printf("[PC] emu64: loop done, cmds=%d end_dl=%d\n", this->cmds_processed, this->end_dl);
+#endif
+
     if (FrameCansel != FALSE) {
         this->Printf0("フレームキャンセル\n"); /* Translation: Frame cancel. */
     }
+
+#ifdef PC_GX_VERBOSE
+    {
+        static int task_diag = 0;
+        if (task_diag < 10) {
+            this->Printf0("[PC] emu64_taskstart_r[%d]: cmds=%d err=%d\n",
+                           task_diag, this->cmds_processed, this->err_count);
+            task_diag++;
+        }
+    }
+#endif
 
     return this->err_count;
 }

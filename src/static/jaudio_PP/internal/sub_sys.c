@@ -232,17 +232,37 @@ extern void Nap_SetS32(u32 cmd, s32 param) {
     Nap_PortSet(cmd, (s32*)&param);
 }
 
+#ifdef TARGET_PC
+extern void Nap_SetS8(u32 cmd, s8 param) {
+    u32 mod_param;
+    /* AudioPort.param is read through asS8/asU8 on LE, so keep value in low byte. */
+    mod_param = (u8)param;
+
+    Nap_PortSet(cmd, (s32*)&mod_param);
+}
+#else
 extern void Nap_SetS8(u32 cmd, s8 param) {
     u32 mod_param = (param << 24);
 
     Nap_PortSet(cmd, (s32*)&mod_param);
 }
+#endif
 
+#ifdef TARGET_PC
+extern void Nap_SetU16(u32 cmd, u16 param) {
+    u32 mod_param;
+    /* AudioPort.param is read through asU16 on LE, so keep value in low 16 bits. */
+    mod_param = param;
+
+    Nap_PortSet(cmd, (s32*)&mod_param);
+}
+#else
 extern void Nap_SetU16(u32 cmd, u16 param) {
     u32 mod_param = (param << 16);
 
     Nap_PortSet(cmd, (s32*)&mod_param);
 }
+#endif
 
 extern s32 Nap_SendStart(void) {
     static u8 worst = 0;
@@ -333,6 +353,27 @@ extern void Nap_AudioPortProcess(u32 msg) {
     }
 }
 
+#ifdef TARGET_PC
+extern s32 Nap_CheckSpecChange(void) {
+    s32 msg;
+    s32 res;
+
+    /* Spec-change is not complete until reset pipeline fully settles. */
+    if (AG.reset_status != 0) {
+        return 0;
+    }
+
+    res = Z_osRecvMesg(AG.spec_change_mq_p, (OSMesg*)&msg, OS_MESG_NOBLOCK);
+
+    if (res == -1) {
+        return 0;
+    } else if (msg != AG.spec_id) {
+        return -1;
+    } else {
+        return 1;
+    }
+}
+#else
 extern s32 Nap_CheckSpecChange(void) {
     s32 msg;
     s32 res = Z_osRecvMesg(AG.spec_change_mq_p, (OSMesg*)&msg, OS_MESG_NOBLOCK);
@@ -345,6 +386,7 @@ extern s32 Nap_CheckSpecChange(void) {
         return 1;
     }
 }
+#endif
 
 static void __ClearSpecChangeQ(void) {
     s32 msg;
@@ -374,7 +416,9 @@ extern s32 Nap_StartSpecChange(s32 spec_id) {
             return -3;
         }
 
+#ifndef TARGET_PC
         Z_osRecvMesg(AG.spec_change_mq_p, &msg, OS_MESG_BLOCK);
+#endif
     }
 
     __ClearSpecChangeQ();
@@ -584,8 +628,15 @@ static void __SetSubParam(sub* subtrack, AudioPort* port) {
 }
 
 extern void Nap_WaitVsync(void) {
+#ifdef TARGET_PC
+    /* On PC, audio runs synchronously on the main thread.
+       Blocking on task_start_mq would deadlock since no separate
+       audio thread is posting messages. */
+    return;
+#else
     Z_osRecvMesg(AG.task_start_mq_p, (OSMesg*)0, OS_MESG_NOBLOCK);
     Z_osRecvMesg(AG.task_start_mq_p, (OSMesg*)0, OS_MESG_BLOCK);
+#endif
 }
 
 static s32 Nap_SilenceCheck_Inner(s32 flags) {
@@ -701,6 +752,7 @@ extern s32 CreateAudioTask(Acmd* cmds, s16* pSamples, u32 nSamples, s32 param_4)
         }
 
         Nas_smzAudioFrame(cmds, &processed_cmds, pSamples, nSamples);
+
         return processed_cmds;
     }
 }

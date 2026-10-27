@@ -1,5 +1,12 @@
 #ifndef CMATH_GCN_H
 #define CMATH_GCN_H
+#ifdef TARGET_PC
+/* On PC, system <cmath> provides all needed functions */
+#include <math.h>
+#ifndef HALF_PI
+#define HALF_PI    1.5707964f
+#endif
+#else
 
 #include "MSL_C/w_math.h"
 // #include "MSL_C/MSL_Common/float.h"
@@ -85,5 +92,7 @@ namespace std {
 
 //     return x;
 // }
+
+#endif /* !TARGET_PC */
 
 #endif

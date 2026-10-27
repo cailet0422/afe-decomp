@@ -189,9 +189,11 @@ extern void Nas_UpdateChannel(void) {
         playback_chan = &chan->playback_ch;
 
         if (playback_chan->current_parent_note != NA_NO_NOTE) {
+#ifndef TARGET_PC
             if ((u32)playback_chan->current_parent_note < 0x7FFFFFFF) {
                 continue;
             }
+#endif
 
             if (chan != playback_chan->current_parent_note->channel && playback_chan->status == 0) {
                 playback_chan->adsr_envp.state.flags.release = TRUE;
@@ -374,17 +376,45 @@ extern voicetable* ProgToVp(s32 prog, s32 inst) {
 
     if (!Nas_CheckIDbank(prog)) {
         AG.audio_error_flags = 0x10000000 + prog;
+#ifdef TARGET_PC
+        {
+            static u32 ptv_nobank = 0;
+            if (ptv_nobank < 20) {
+                printf("[ProgToVp] FAIL bank_not_loaded prog=%d inst=%d\n", prog, inst);
+                ptv_nobank++;
+            }
+        }
+#endif
         return NULL;
     }
 
     if (inst >= AG.voice_info[prog].num_instruments) {
         AG.audio_error_flags = 0x03000000 + (prog << 8) + inst;
+#ifdef TARGET_PC
+        {
+            static u32 ptv_oob = 0;
+            if (ptv_oob < 20) {
+                printf("[ProgToVp] FAIL inst_oob prog=%d inst=%d num=%d\n",
+                    prog, inst, AG.voice_info[prog].num_instruments);
+                ptv_oob++;
+            }
+        }
+#endif
         return NULL;
     }
 
     vtbl = AG.voice_info[prog].instruments[inst];
     if (vtbl == NULL) {
         AG.audio_error_flags = 0x01000000 + (prog << 8) + inst;
+#ifdef TARGET_PC
+        {
+            static u32 ptv_null = 0;
+            if (ptv_null < 20) {
+                printf("[ProgToVp] FAIL inst_null prog=%d inst=%d\n", prog, inst);
+                ptv_null++;
+            }
+        }
+#endif
         return vtbl;
     }
 
@@ -400,21 +430,32 @@ extern perctable* PercToPp(s32 prog, s32 drum) {
 
     if (!Nas_CheckIDbank(prog)) {
         AG.audio_error_flags = 0x10000000 + prog;
+#ifdef TARGET_PC
+        { static u32 c=0; if(c++<20) printf("[PercToPp] FAIL bank prog=%d drum=%d\n",prog,drum); }
+#endif
         return NULL;
     }
 
     if (drum >= AG.voice_info[prog].num_drums) {
         AG.audio_error_flags = 0x04000000 + (prog << 8) + drum;
+#ifdef TARGET_PC
+        { static u32 c=0; if(c++<20) printf("[PercToPp] FAIL drum_oob prog=%d drum=%d num=%d\n",prog,drum,AG.voice_info[prog].num_drums); }
+#endif
         return NULL;
     }
 
+#ifndef TARGET_PC
     if ((u32)AG.voice_info[prog].percussion < OS_BASE_CACHED) {
         return NULL;
     }
+#endif
 
     vtbl = AG.voice_info[prog].percussion[drum];
     if (vtbl == NULL) {
         AG.audio_error_flags = 0x05000000 + (prog << 8) + drum;
+#ifdef TARGET_PC
+        { static u32 c=0; if(c++<20) printf("[PercToPp] FAIL perc_null prog=%d drum=%d\n",prog,drum); }
+#endif
         return vtbl;
     }
 
@@ -438,9 +479,11 @@ extern percvoicetable* VpercToVep(s32 prog, s32 sfx) {
         return NULL;
     }
 
+#ifndef TARGET_PC
     if ((u32)AG.voice_info[prog].effects < OS_BASE_CACHED) {
         return NULL;
     }
+#endif
 
     vtbl = &AG.voice_info[prog].effects[sfx];
     if (vtbl == NULL) {

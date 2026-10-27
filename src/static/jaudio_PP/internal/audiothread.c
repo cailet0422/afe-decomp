@@ -2,8 +2,6 @@
 
 #include "dolphin/os.h"
 #include "dolphin/os/OSFastCast.h"
-#include "dolphin/hw_regs.h"
-#include "dolphin/ai.h"
 #include "jaudio_NES/dspproc.h"
 #include "jaudio_NES/cpubuf.h"
 #include "jaudio_NES/dummyprobe.h"
@@ -17,6 +15,103 @@
 #include "jaudio_NES/dspinterface.h"
 #include "jaudio_NES/playercall.h"
 #include "jaudio_NES/dspbuf.h"
+
+#ifdef TARGET_PC
+/*==========================================================================
+ * PC: Synchronous audio — no threads, no message queues, no DSP interrupts.
+ * StartAudioThread does all init inline. pc_audio_process_frame() is called
+ * each game frame to drive audio processing.
+ *==========================================================================*/
+
+volatile int intcount = 0;
+static BOOL pc_audio_initialized = FALSE;
+
+extern void DspSyncCountClear(int count) {
+    intcount = count;
+}
+
+extern int DspSyncCountCheck(void) {
+    return intcount;
+}
+
+/* NeosSync on PC: no-op. On GC this signals the CPU that the NEOS
+ * thread finished processing. On PC (synchronous), the buffer ring
+ * is driven by Jac_VframeWork → MixCpu → CpubufProcess(MIX) path.
+ * Calling CpuFrameEnd here would stall the ring buffer because read
+ * hasn't advanced yet. */
+extern void NeosSync(void) {
+    /* no-op on PC */
+}
+
+/* Defined in os.c — must be called before audio thread starts */
+extern void pc_audio_mq_init(void);
+/* Defined in pc_audio.c — starts the audio producer thread */
+extern void pc_audio_start_producer_thread(void);
+
+extern void StartAudioThread(void* pHeap, s32 heapSize, u32 aramSize, u32 flags) {
+    u32 neos_flag;
+
+    /* Init thread-safe message queues before any audio processing */
+    pc_audio_mq_init();
+
+    Jac_HeapSetup(pHeap, heapSize);
+    Jac_SetAudioARAMSize(aramSize);
+
+    neos_flag = flags & AUDIO_THREAD_FLAG_NEOS;
+    Jac_InitARAM(neos_flag);
+
+    /* Init audio subsystem inline (replaces audioproc thread) */
+    OSInitFastCast();
+    Jac_Init();
+    Jac_InitSinTable();
+    ResetPlayerCallback();
+    DspbufProcess(DSPBUF_EVENT_INIT);
+    CpubufProcess(DSPBUF_EVENT_INIT);
+    /* Skip DspBoot() — no DSP microcode on PC */
+    DSP_InitBuffer();
+    AISetDSPSampleRate(JAC_AI_SETTING);
+    AIStartDMA();
+
+    /* Init DVD task system (synchronous) */
+    if ((flags & AUDIO_THREAD_FLAG_DVD)) {
+        jac_dvdproc_init();
+    }
+
+    /* Init NEOS (synchronous) */
+    if (neos_flag) {
+        pc_neos_init_sync();
+    }
+
+    pc_audio_initialized = TRUE;
+
+    /* Start dedicated audio producer thread — decouples audio from game frame */
+    pc_audio_start_producer_thread();
+}
+
+/* Called by the audio producer thread to generate samples */
+void pc_audio_process_frame(void) {
+    if (!pc_audio_initialized) return;
+
+    /* Process DSP subframes from previous frame's setup */
+    if (intcount > 0) {
+        while (intcount > 0) {
+            intcount--;
+            if (intcount == 0) {
+                DspFrameEnd();
+            } else {
+                UpdateDSP();
+            }
+        }
+    }
+
+    /* Update DAC — mixes DSP + NEOS output into dac[] buffers */
+    Jac_UpdateDAC();
+}
+
+#else /* !TARGET_PC — original GC code */
+
+#include "dolphin/hw_regs.h"
+#include "dolphin/ai.h"
 
 #define AUDIO_STACK_SIZE 0x2000
 #define AUDIOPROC_MQ_BUF_COUNT 16
@@ -186,3 +281,5 @@ extern void StartAudioThread(void* pHeap, s32 heapSize, u32 aramSize, u32 flags)
         OSResumeThread(&jac_neosThread);
     }
 }
+
+#endif /* TARGET_PC */

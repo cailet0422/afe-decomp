@@ -741,6 +741,9 @@ static s32 __Command_Seq(note* n) {
                 break;
             case NOTE_CMD_SET_ADSR_ENVELOPE_DECAY_IDX:
                 n->adsr_env.envelope = (envdat*)(grp->seq_data + (Nas_ReadWordData(m) & 0xFFFF));
+#ifdef TARGET_PC
+                pc_swap_envdat_seq(n->adsr_env.envelope);
+#endif
                 // fallthrough 0xCB -> 0xCF
             case NOTE_CMD_SET_ADSR_DECAY_IDX:
                 n->adsr_env.decay_idx = Nas_ReadByteData(m);
@@ -1022,6 +1025,7 @@ static s32 __SetVoice(note* n, s32 arg) {
     }
 
     subtrack->note_semitone = n->semitone;
+
     return same_sample;
 }
 
@@ -1205,6 +1209,587 @@ static void Nas_SubVolumeSet(sub* subtrack, u8 volume) {
     subtrack->volume = (f32)(s32)volume / 127.0f;
 }
 
+#ifdef TARGET_PC
+static void Nas_SubSeq(sub* subtrack) {
+    u8 cmd;
+    u8 cmdArgU8;
+    s32 i;
+    u8* data;
+    group* grp;
+    macro* m;
+    s16 temp1;
+    u16 cmdArgU16;
+    u32 cmdArgs[3];
+    s8 cmdArgS8;
+    u8 lo_bits;
+    u8 hi_bits;
+    u8* seq_data;
+    u32 new_var2;
+    s32 new_var3;
+
+    if (subtrack->stop_script == FALSE) {
+        grp = subtrack->group;
+
+        if (grp->flags.muted && (subtrack->mute_flags & AUDIO_MUTE_FLAG_STOP_SCRIPT)) {
+            return;
+        }
+
+        if (subtrack->delay > 1) {
+            subtrack->delay--;
+        } else {
+            /* Sub-Track sequence command process loop */
+            while (TRUE) {
+                m = &subtrack->macro_player;
+                cmd = Nas_ReadByteData(m);
+                if (cmd >= 0xA0) {
+                    /* Load command arguments */
+                    hi_bits = SCOM_TABLE[(u8)cmd - 0xA0];
+                    lo_bits = hi_bits & 3;
+
+                    for (i = 0; i < lo_bits; i++) {
+                        if ((hi_bits & 0x80) == SCOM_TYPE_U8) {
+                            cmdArgs[i] = Nas_ReadByteData(m);
+                        } else {
+                            cmdArgs[i] = Nas_ReadWordData(m);
+                        }
+
+                        hi_bits = hi_bits << 1;
+                    }
+
+                    if (cmd >= COMMON_CMD_BRANCH_REL_NOT_EQ_ZERO) {
+                        s32 delay = Common_Com(grp, m, cmd, cmdArgs[0]);
+
+                        if (delay != 0) {
+                            if (delay == COMMON_SCRIPT_END) {
+                                Nas_ReleaseSubTrack(subtrack);
+                            } else {
+                                subtrack->delay = delay;
+                            }
+
+                            break;
+                        }
+                    } else {
+                        switch ((u8)cmd) {
+                            case SUBTRACK_CMD_STOP: // stop subtrack seq script
+                                subtrack->stop_script = TRUE;
+                                goto note_seq;
+                            case SUBTRACK_CMD_ALLOC_VOICES: // alloc voices
+                                Nas_DeAllocAllVoices(&subtrack->channel_node);
+                                Nas_AllocVoices(&subtrack->channel_node, cmdArgs[0] & 0xFF);
+                                break;
+                            case SUBTRACK_CMD_DEALLOC_VOICES: // dealloc voices
+                                Nas_DeAllocAllVoices(&subtrack->channel_node);
+                                break;
+                            case SUBTRACK_CMD_SET_DYNTBL: // set dynamic table
+                                subtrack->dyn_tbl = (unsigned char(*)[][2])&grp->seq_data[(u16)cmdArgs[0]];
+                                break;
+                            case SUBTRACK_CMD_JMP_DYNTBL: // jump to entry in dynamic table
+                                if (m->value != -1) {
+                                    data = (*subtrack->dyn_tbl)[m->value];
+                                    cmdArgU16 = (u16)((data[0] << 8) + data[1]);
+                                    m->pc = (u8*)&grp->seq_data[cmdArgU16];
+                                }
+                                break;
+                            case SUBTRACK_CMD_INIT_INSTRUMENTS: // Load subtrack bank and set instruments
+                                cmdArgU8 = cmdArgs[0];
+                                if (grp->bank_id != 0xFF) {
+                                    cmdArgU16 = ((u16*)AG.map_header)[grp->seq_id];
+                                    lo_bits = Nas_MapHeaderReadByte(cmdArgU16);
+                                    cmdArgU8 = Nas_MapHeaderReadByte(cmdArgU16 + lo_bits - cmdArgU8);
+                                }
+
+                                if (Nas_SzCacheCheck(BANK_TABLE, CACHE_EITHER, cmdArgU8)) {
+                                    subtrack->bank_id = cmdArgU8;
+                                }
+
+                                cmdArgs[0] = cmdArgs[1];
+                                // fallthrough 0xEB -> 0xC1
+                            case SUBTRACK_CMD_VOICE_SET: // Set subtrack voice
+                                Nas_SubVoiceSet(subtrack, cmdArgs[0]);
+                                break;
+                            case SUBTRACK_CMD_LARGE_NOTE_OFF: // turn off large notes
+                                subtrack->large_notes = FALSE;
+                                break;
+                            case SUBTRACK_CMD_LARGE_NOTE_ON: // turn on large notes
+                                subtrack->large_notes = TRUE;
+                                break;
+                            case SUBTRACK_CMD_SET_VOL: // set volume
+                                cmdArgU8 = (u8)cmdArgs[0];
+                                Nas_SubVolumeSet(subtrack, cmdArgU8);
+                                subtrack->changes.flags.volume = TRUE;
+                                break;
+                            case SUBTRACK_CMD_SET_VOL_SCALE: // set volume scale
+                                cmdArgU8 = (u8)cmdArgs[0];
+                                subtrack->volume_scale = (f32)(s32)cmdArgU8 / 128.0f;
+                                subtrack->changes.flags.volume = TRUE;
+                                break;
+                            case SUBTRACK_CMD_SET_FREQ_SCALE: // set frequency scale
+                                cmdArgU16 = (u16)cmdArgs[0];
+                                subtrack->frequency_scale = (f32)(s32)cmdArgU16 / (f32)0x8000;
+                                subtrack->changes.flags.frequency_scale = TRUE;
+                                break;
+                            case SUBTRACK_CMD_LARGE_BEND_PITCH: // large bend pitch
+                                cmdArgU8 = (u8)cmdArgs[0];
+                                cmdArgU8 += 128;
+                                subtrack->frequency_scale = PCENTTABLE[cmdArgU8];
+                                subtrack->changes.flags.frequency_scale = TRUE;
+                                break;
+                            case SUBTRACK_CMD_SMALL_BEND_PITCH: // small bend pitch
+                                cmdArgU8 = 128 + (u8)cmdArgs[0];
+                                subtrack->frequency_scale = PCENTTABLE2[cmdArgU8];
+                                subtrack->changes.flags.frequency_scale = TRUE;
+                                break;
+                            case SUBTRACK_CMD_SET_PAN: // set pan
+                                cmdArgU8 = (u8)cmdArgs[0];
+                                subtrack->new_pan = cmdArgU8;
+                                subtrack->changes.flags.pan = TRUE;
+                                break;
+                            case SUBTRACK_CMD_SET_PAN_WEIGHT: // set pan mix/channel weight
+                                cmdArgU8 = (u8)cmdArgs[0];
+                                subtrack->pan_channel_weight = cmdArgU8;
+                                subtrack->changes.flags.pan = TRUE;
+                                break;
+                            case SUBTRACK_CMD_SET_TRANSPOSITION: // set transposition
+                                cmdArgS8 = (s8)cmdArgs[0];
+                                subtrack->transposition = cmdArgS8;
+                                break;
+                            case SUBTRACK_CMD_SET_ENVELOPE: // set envelope
+                                cmdArgU16 = (u16)cmdArgs[0];
+                                subtrack->adsr_env.envelope = (envdat*)&grp->seq_data[cmdArgU16];
+                                pc_swap_envdat_seq(subtrack->adsr_env.envelope);
+                                break;
+                            case SUBTRACK_CMD_SET_DECAY_IDX: // set decay index
+                                cmdArgU8 = (u8)cmdArgs[0];
+                                subtrack->adsr_env.decay_idx = cmdArgU8;
+                                break;
+                            case SUBTRACK_CMD_SET_VIBRATO_DEPTH: // set vibrato depth
+                                cmdArgU8 = (u8)cmdArgs[0];
+                                subtrack->vibrato_params.depth_target = cmdArgU8 * 8;
+                                subtrack->vibrato_params.depth_start = 0;
+                                subtrack->vibrato_params.depth_change_delay = 0;
+                                break;
+                            case SUBTRACK_CMD_SET_VIBRATO_RATE: // set vibrato rate
+                                cmdArgU8 = (u8)cmdArgs[0];
+                                subtrack->vibrato_params.rate_target = cmdArgU8 * 32;
+                                subtrack->vibrato_params.rate_start = cmdArgU8 * 32;
+                                subtrack->vibrato_params.rate_change_delay = 0;
+                                break;
+                            case SUBTRACK_CMD_SET_VIBRATO_DEPTH_LINEAR: // set vibrato depth linear
+                                cmdArgU8 = (u8)cmdArgs[0];
+                                subtrack->vibrato_params.depth_start = cmdArgU8 * 8;
+                                cmdArgU8 = (u8)cmdArgs[1];
+                                subtrack->vibrato_params.depth_target = cmdArgU8 * 8;
+                                cmdArgU8 = (u8)cmdArgs[2];
+                                subtrack->vibrato_params.depth_change_delay = cmdArgU8 * 16;
+                                break;
+                            case SUBTRACK_CMD_SET_VIBRATO_RATE_LINEAR: // set vibrato rate linear
+                                cmdArgU8 = (u8)cmdArgs[0];
+                                subtrack->vibrato_params.rate_start = cmdArgU8 * 32;
+                                cmdArgU8 = (u8)cmdArgs[1];
+                                subtrack->vibrato_params.rate_target = cmdArgU8 * 32;
+                                cmdArgU8 = (u8)cmdArgs[2];
+                                subtrack->vibrato_params.rate_change_delay = cmdArgU8 * 16;
+                                break;
+                            case SUBTRACK_CMD_SET_VIBRATO_DELAY: // set vibrato delay
+                                cmdArgU8 = (u8)cmdArgs[0];
+                                subtrack->vibrato_params.delay = cmdArgU8 * 16;
+                                break;
+                            case SUBTRACK_CMD_SET_REVERB_VOL: // set reverb volume
+                                cmdArgU8 = (u8)cmdArgs[0];
+                                subtrack->target_reverb_vol = cmdArgU8;
+                                break;
+                            case SUBTRACK_CMD_SET_INSTRUMENT_BANK: // set bank
+                                cmdArgU8 = cmdArgs[0];
+                                if (grp->bank_id != 0xFF) {
+                                    cmdArgU16 = ((u16*)AG.map_header)[grp->seq_id];
+                                    lo_bits = Nas_MapHeaderReadByte(cmdArgU16);
+                                    cmdArgU8 = Nas_MapHeaderReadByte(cmdArgU16 + lo_bits - cmdArgU8);
+                                }
+
+                                if (Nas_SzCacheCheck(BANK_TABLE, CACHE_EITHER, cmdArgU8)) {
+                                    subtrack->bank_id = cmdArgU8;
+                                }
+                                break;
+                            case SUBTRACK_CMD_WRITE_GROUP_SEQ: // write to sequence script
+                                cmdArgU8 = (u8)cmdArgs[0];
+                                cmdArgU16 = (u16)cmdArgs[1];
+                                seq_data = &grp->seq_data[cmdArgU16];
+                                seq_data[0] = (u8)m->value + cmdArgU8;
+                                break;
+                            case SUBTRACK_CMD_MACRO_SUBTRACT: // subtract macro value
+                            case SUBTRACK_CMD_MACRO_SET: // set macro value
+                            case SUBTRACK_CMD_MACRO_AND: // bit& macro value
+                                cmdArgS8 = (s8)cmdArgs[0];
+                                if (cmd == SUBTRACK_CMD_MACRO_SUBTRACT) {
+                                    m->value -= cmdArgS8;
+                                } else if (cmd == SUBTRACK_CMD_MACRO_SET) {
+                                    m->value = cmdArgS8;
+                                } else {
+                                    m->value &= cmdArgS8;
+                                }
+                                break;
+                            case SUBTRACK_CMD_DISABLE_SUBTRACK: // disable subtrack
+                                cmdArgU8 = (u8)cmdArgs[0];
+                                Nas_ReleaseSubTrack(grp->subtracks[cmdArgU8]);
+                                break;
+                            case SUBTRACK_CMD_SET_MUTE_FLAGS: // set mute flags
+                                cmdArgU8 = (u8)cmdArgs[0];
+                                subtrack->mute_flags = cmdArgU8;
+                                subtrack->changes.flags.volume = TRUE;
+                                break;
+                            case SUBTRACK_CMD_MACRO_LOAD_FROM_GROUP_SEQ: // load macro register value from table
+                                cmdArgU16 = (u16)cmdArgs[0];
+                                m->value = grp->seq_data[(u32)(cmdArgU16 + m->value)];
+                                break;
+                            case SUBTRACK_CMD_SET_DYNVAL: // set stored sequence data index
+                                cmdArgU16 = (u16)cmdArgs[0];
+                                subtrack->dynamic_value = cmdArgU16;
+                                break;
+                            case SUBTRACK_CMD_WRITE_DYNVAL_TO_GROUP_SEQ: // write u16 into sequence script
+                                cmdArgU16 = (u16)cmdArgs[0];
+                                seq_data = &grp->seq_data[cmdArgU16];
+                                seq_data[0] = (subtrack->dynamic_value >> 8) & 0xFF;
+                                seq_data[1] = subtrack->dynamic_value & 0xFF;
+                                break;
+                            case SUBTRACK_CMD_STEREO_PHASE_SET: // stereo phase effects
+                                cmdArgU8 = (u8)cmdArgs[0];
+                                if (cmdArgU8 & 0x80) {
+                                    subtrack->stereo_effects = TRUE;
+                                } else {
+                                    subtrack->stereo_effects = FALSE;
+                                }
+
+                                *(u8*)&subtrack->stereo_phase = cmdArgU8 & 0x7F;
+                                break;
+                            case SUBTRACK_CMD_SET_NOTE_ALLOC_POLICY: // set note allocation policy
+                                cmdArgU8 = (u8)cmdArgs[0];
+                                subtrack->note_alloc_policy = cmdArgU8;
+                                break;
+                            case SUBTRACK_CMD_SET_SUSTAIN: // set sustain
+                                cmdArgU8 = (u8)cmdArgs[0];
+                                subtrack->adsr_env.sustain = cmdArgU8;
+                                break;
+                            case SUBTRACK_CMD_SET_REVERB_IDX: // set reverb index
+                                cmdArgU8 = (u8)cmdArgs[0];
+                                subtrack->reverb_idx = cmdArgU8;
+                                break;
+                            case SUBTRACK_CMD_DYNTBL_CALL: // dynamic call
+                                if (m->value != -1) {
+                                    data = (*subtrack->dyn_tbl)[m->value];
+                                    /* @BUG - missing stack depth bounds check */
+                                    m->stack[m->depth++] = m->pc;
+                                    cmdArgU16 = (u16)((data[0] << 8) + data[1]);
+                                    m->pc = &grp->seq_data[cmdArgU16];
+                                }
+                                break;
+                            case SUBTRACK_CMD_SET_BOOK_OFS: // set book ofs
+                                cmdArgU8 = (u8)cmdArgs[0];
+                                subtrack->book_ofs = cmdArgU8;
+                                break;
+                            case SUBTRACK_CMD_SET_ENV_PARAMS_FROM_GROUP_SEQ: //
+                                cmdArgU16 = (u16)cmdArgs[0];
+                                data = &grp->seq_data[cmdArgU16];
+                                subtrack->mute_flags = data[0];
+                                subtrack->note_alloc_policy = data[1];
+                                Nas_PriorityChanger(subtrack, data[2]);
+                                subtrack->transposition = (s8)data[3];
+                                subtrack->new_pan = data[4];
+                                subtrack->pan_channel_weight = data[5];
+                                subtrack->target_reverb_vol = data[6];
+                                subtrack->reverb_idx = data[7];
+                                /* @BUG - didn't update reverb state as changed */
+                                subtrack->changes.flags.pan = TRUE;
+                                break;
+                            case SUBTRACK_CMD_SET_ENV_PARAMS: //
+                                subtrack->mute_flags = cmdArgs[0];
+                                subtrack->note_alloc_policy = cmdArgs[1];
+                                cmdArgU8 = (u8)cmdArgs[2];
+                                Nas_PriorityChanger(subtrack, cmdArgU8);
+                                subtrack->transposition = (s8)Nas_ReadByteData(m);
+                                subtrack->new_pan = Nas_ReadByteData(m);
+                                subtrack->pan_channel_weight = Nas_ReadByteData(m);
+                                subtrack->target_reverb_vol = Nas_ReadByteData(m);
+                                subtrack->reverb_idx = Nas_ReadByteData(m);
+                                /* @BUG - didn't update reverb state as changed */
+                                subtrack->changes.flags.pan = TRUE;
+                                break;
+                            case SUBTRACK_CMD_RESET_VIBRATO: // reset vibrato
+                                subtrack->frequency_scale = 1.0f;
+                                subtrack->vibrato_params.depth_target = 0;
+                                subtrack->vibrato_params.depth_start = 0;
+                                subtrack->vibrato_params.depth_change_delay = 0;
+                                subtrack->vibrato_params.rate_target = 0;
+                                subtrack->vibrato_params.rate_start = 0;
+                                subtrack->vibrato_params.rate_change_delay = 0;
+                                subtrack->filter = nullptr;
+                                subtrack->gain = 0;
+                                subtrack->adsr_env.sustain = 0;
+                                subtrack->velocity_random_variance = 0;
+                                subtrack->gate_time_random_variance = 0;
+                                subtrack->comb_filter_size = 0;
+                                subtrack->comb_filter_gain = 0;
+                                subtrack->book_ofs = 0;
+                                subtrack->sample_start_pos = 0;
+                                subtrack->_E0 = 0;
+                                break;
+                            case SUBTRACK_CMD_SET_PRIORITY: // set priority
+                                cmdArgU8 = (u8)cmdArgs[0];
+                                Nas_PriorityChanger(subtrack, cmdArgU8);
+                                break;
+                            case SUBTRACK_CMD_SET_GAIN: // set gain
+                                cmdArgU8 = (u8)cmdArgs[0];
+                                subtrack->gain = cmdArgU8;
+                                break;
+                            case SUBTRACK_CMD_SET_FILTER: // set filter
+                                cmdArgU16 = (u16)cmdArgs[0];
+                                data = &grp->seq_data[cmdArgU16];
+                                subtrack->filter = (s16*)data;
+                                break;
+                            case SUBTRACK_CMD_CLEAR_FILTER: // clear filter
+                                subtrack->filter = nullptr;
+                                break;
+                            case SUBTRACK_CMD_LOAD_FILTER: // load filter
+                                cmdArgU8 = (u8)cmdArgs[0];
+                                if (subtrack->filter != nullptr) {
+                                    lo_bits = (cmdArgU8 >> 4) & 0xF;
+                                    cmdArgU8 &= 0xF;
+                                    Nas_SetBPFilter(subtrack->filter, lo_bits, cmdArgU8);
+                                }
+                                break;
+                            case SUBTRACK_CMD_LOAD_DYNVAL_FROM_GROUP_SEQ: // load dynamic idx
+                                cmdArgU16 = (u16)cmdArgs[0];
+                                new_var3 = cmdArgU16 + (m->value * 2);
+                                subtrack->dynamic_value =
+                                    (grp->seq_data[new_var3] << 8) | grp->seq_data[new_var3 + 1];
+                                break;
+                            case SUBTRACK_CMD_SET_DYNTBL_FROM_GROUP_SEQ: // set dynamic table
+                                subtrack->dyn_tbl = (unsigned char(*)[][2]) & grp->seq_data[subtrack->dynamic_value];
+                                break;
+                            case SUBTRACK_CMD_LOAD_DYNVAL_FROM_DYNTBL: // read from dynamic table
+                                data = (u8*)subtrack->dyn_tbl;
+                                new_var3 = m->value * 2;
+                                subtrack->dynamic_value = (data[new_var3] << 8) | data[new_var3 + 1];
+                                break;
+                            case SUBTRACK_CMD_MACRO_LOAD_FROM_DYNTBL: // read to macro register from dynamic table
+                                m->value = (*subtrack->dyn_tbl)[0][m->value];
+                                break;
+                            case SUBTRACK_CMD_RANDOM_DYNVAL: // random dynamic value
+                                if (cmdArgs[0] == 0) {
+                                    subtrack->dynamic_value = Nap_GetRandom();
+                                } else {
+                                    subtrack->dynamic_value = Nap_GetRandom() % cmdArgs[0];
+                                }
+                                break;
+                            case SUBTRACK_CMD_MACRO_RANDOM_VAL: // macro register random value
+                                if (cmdArgs[0] == 0) {
+                                    m->value = Nap_GetRandom();
+                                } else {
+                                    m->value = Nap_GetRandom() % cmdArgs[0];
+                                }
+                                break;
+                            case SUBTRACK_CMD_SET_VEL_RANDOM_VARIANCE: // set velocity random variance
+                                cmdArgU8 = (u8)cmdArgs[0];
+                                subtrack->velocity_random_variance = cmdArgU8;
+                                break;
+                            case SUBTRACK_CMD_SET_GATE_TIME_RANDOM_VARIANCE: // set gate time random variance
+                                cmdArgU8 = (u8)cmdArgs[0];
+                                subtrack->gate_time_random_variance = cmdArgU8;
+                                break;
+                            case SUBTRACK_CMD_SET_COMB_FILTER_SIZE_GAIN: // set comb filter size & gain
+                                cmdArgU8 = (u8)cmdArgs[0];
+                                subtrack->comb_filter_size = cmdArgU8;
+                                cmdArgU16 = (u16)cmdArgs[1];
+                                subtrack->comb_filter_gain = cmdArgU16;
+                                break;
+                            case SUBTRACK_CMD_ADD_DYNVAL: // Add to dynamic value
+                                subtrack->dynamic_value += cmdArgs[0];
+                                break;
+                            case SUBTRACK_CMD_DYNVAL_SPECIAL: // Dynamic value bit shift & negate (when s16), differs from OoT and MM
+                                new_var2 = (subtrack->dynamic_value & 0x7F);
+                                new_var2 |= 0x8000 | ((subtrack->dynamic_value & 0x7FC0) << 1);
+                                subtrack->dynamic_value = new_var2;
+                                break;
+                            case SUBTRACK_CMD_SET_SAMPLE_START_POS: // set sample start pos
+                                subtrack->sample_start_pos = cmdArgs[0];
+                                break;
+                            case SUBTRACK_CMD_MACRO_SET_FROM_CALLBACK: // call custom sequence callback and update macro register value
+                                if (cmdArgs[0] <= 4) {
+                                    if (AG.seq_callbacks[cmdArgs[0]] != nullptr) {
+                                        NA_CALLBACK = AG.seq_callbacks[cmdArgs[0]];
+                                        m->value = (*NA_CALLBACK)(m->value, subtrack);
+                                    }
+                                }
+                                break;
+                            case SUBTRACK_CMD_MACRO_LOAD_FROM_SFX_STATE: // read from sfx state using macro register value as index
+                            case SUBTRACK_CMD_MACRO_LOAD_FROM_SFX_STATE_DYNVAL: // read from sfx state using dynamic value as index
+                            case SUBTRACK_CMD_SFX_STATE_SET: // write to sfx state using macro register value as index
+                            case SUBTRACK_CMD_SFX_STATE_SET_DYNVAL: // write to sfx state using dynamic value as index
+                                if (cmd == SUBTRACK_CMD_MACRO_LOAD_FROM_SFX_STATE || cmd == SUBTRACK_CMD_SFX_STATE_SET) {
+                                    cmdArgU16 = cmdArgs[0];
+                                } else {
+                                    cmdArgU16 = subtrack->dynamic_value;
+                                }
+
+                                if (subtrack->sfx_state != nullptr) {
+                                    if (cmd == SUBTRACK_CMD_MACRO_LOAD_FROM_SFX_STATE || cmd == SUBTRACK_CMD_MACRO_LOAD_FROM_SFX_STATE_DYNVAL) {
+                                        m->value = subtrack->sfx_state[cmdArgU16];
+                                    } else {
+                                        subtrack->sfx_state[cmdArgU16] = m->value;
+                                    }
+                                }
+                                break;
+                            case SUBTRACK_CMD_SURROUND_EFFECT_IDX_SET: // set surround effect index
+                                subtrack->surround_effect_idx = cmdArgs[0];
+                                break;
+                            case SUBTRACK_CMD_MACRO_ADD_SUBTRACK_IDX: // add subtrack index to macro register value
+                                m->value += subtrack->subtrack_idx;
+                                break;
+                            case SUBTRACK_CMD_WRITE_GOUP_SEQ_OFFSET_BY_SUBTRACK: // Set value in sequence data to macro register value plus arg value
+                                cmdArgU8 = (u8)cmdArgs[0];
+                                cmdArgU16 = (u16)cmdArgs[1];
+                                seq_data = &grp->seq_data[cmdArgU16 + subtrack->subtrack_idx];
+                                *seq_data = (u8)m->value + cmdArgU8;
+                                break;
+                            case SUBTRACK_CMD_MACRO_BIT_MOD: // manipulate macro register value
+                                u32 shift = (cmdArgs[0] & 0xF);
+                                lo_bits = (m->value & 0x80);
+                                new_var2 = (cmdArgs[0] & 0x80);
+                                new_var3 = (cmdArgs[0] & 0x40);
+
+                                if (new_var2 == 0) {
+                                    cmdArgU8 = m->value << shift;
+                                } else {
+                                    cmdArgU8 = m->value >> shift;
+                                }
+
+                                if (new_var3) {
+                                    cmdArgU8 &= (u8)~0x80;
+                                    cmdArgU8 |= lo_bits;
+                                }
+
+                                m->value = cmdArgU8;
+                                break;
+                        }
+                    }
+                    // continue;
+                } else if (cmd >= SUBTRACK_CMD_PORT_WRITE_MACRO_REG_MASK) {
+                    s32 hi_bits = (cmd & (u8)~7);
+                    lo_bits = cmd;
+                    lo_bits &= ~0xF8;
+
+                    /* if command is not in range [0x70, 0x77] and the lower 4 bits are >= 4, set them to be 0xY0*/
+                    if (hi_bits != SUBTRACK_CMD_PORT_WRITE_MACRO_REG_MASK && lo_bits >= ARRAY_COUNT(subtrack->note_layers)) {
+                        lo_bits = 0;
+                    }
+
+                    switch (hi_bits) {
+                        // [0x80 - 0x83]
+                        case SUBTRACK_CMD_READ_NOTE_FINISHED_MASK: // macro register value = subtrack->note_layers[idx]->finished
+                            if (subtrack->note_layers[lo_bits] != nullptr) {
+                                m->value = subtrack->note_layers[lo_bits]->finished;
+                            } else {
+                                m->value = -1;
+                            }
+                            break;
+                        // [0x88 - 0x8B]
+                        case SUBTRACK_CMD_NOTE_SET_PC_MASK: // start note layer and initialize note macro pc
+                            cmdArgU16 = Nas_ReadWordData(m);
+                            if (Nas_EntryNoteTrack(subtrack, lo_bits) == 0) {
+                                subtrack->note_layers[lo_bits]->macro_player.pc = &grp->seq_data[cmdArgU16];
+                            }
+                            break;
+                        // [0x90 - 0x97] NOTE: 0x94-0x97 are invalid and will be changed to 0x90.
+                        case SUBTRACK_CMD_NOTE_STOP_MASK: // stop note layer
+                            Nas_CloseNoteTrack(subtrack, lo_bits);
+                            break;
+                        // [0x98 - 0x9B]
+                        case SUBTRACK_CMD_NOTE_START_DYNTBL_MASK: // start note layer and initialize note macro pc from data at macro register offset
+                            if (m->value != -1) {
+                                if (Nas_EntryNoteTrack(subtrack, lo_bits) != -1) {
+                                    data = (*subtrack->dyn_tbl)[m->value];
+                                    cmdArgU16 = (u16)((data[0] << 8) + data[1]);
+                                    subtrack->note_layers[lo_bits]->macro_player.pc = &grp->seq_data[cmdArgU16];
+                                }
+                            }
+                            break;
+                        // [0x70 - 0x77]
+                        case SUBTRACK_CMD_PORT_WRITE_MACRO_REG_MASK: // write macro register value into subtrack port
+                            subtrack->port[lo_bits] = m->value;
+                            break;
+                        // [0x78 - 0x7B]
+                        case SUBTRACK_CMD_NOTE_START_MASK: // start note layer and initialize note macro pc from subtrack pc and rel offset
+                            temp1 = Nas_ReadWordData(m);
+                            if (Nas_EntryNoteTrack(subtrack, lo_bits) == 0) {
+                                subtrack->note_layers[lo_bits]->macro_player.pc = m->pc + temp1;
+                            }
+                            break;
+                    }
+                } else {
+                    /* Process commands 0x00 - 0x6F */
+                    lo_bits = cmd & 0xF; // each command has 16 indicies which come from the lower 4 bits
+                    switch (cmd & 0xF0) {
+                        // [0x00, 0x0F]
+                        case SUBTRACK_CMD_DELAY_MASK: // set delay
+                            subtrack->delay = lo_bits;
+                            if (lo_bits == 0) {
+                                break; /* clear delay, continue processing */
+                            } else {
+                                goto note_seq; /* delay > 0 so stop processing subtrack commands for now */
+                            }
+                        // [0x10, 0x17] & [0x18, 0x1F]
+                        case SUBTRACK_CMD_VOICELOAD_MASK: // load new wave samples
+                            if (lo_bits < 8) {
+                                subtrack->port[lo_bits] = -1; // clear port
+                                /* Load samples from bank with inst id being macro's register value, load result in
+                                 * port[lo_bits] */
+                                VoiceLoad(subtrack->bank_id, m->value, &subtrack->port[lo_bits]);
+                            } else {
+                                lo_bits -= 8;
+                                subtrack->port[lo_bits] = -1;
+                                /* Load synth? samples based on dynamic value */
+                                VoiceLoad(subtrack->bank_id, 0x100 + subtrack->dynamic_value, &subtrack->port[lo_bits]);
+                            }
+                            break;
+                        // [0x60, 0x6F] (only 0x60, 0x67 are valid)
+                        case SUBTRACK_CMD_MACRO_READ_PORT0_MASK: // read port value into macro register value
+                            m->value = subtrack->port[lo_bits];
+                            if (lo_bits < 2) {
+                                subtrack->port[lo_bits] = -1;
+                            }
+                            break;
+                        // [0x50, 0x5F] (only 0x50, 0x57 are valid)
+                        case SUBTRACK_CMD_MACRO_SUBTRACT_MASK: // subtrack port value from macro register value
+                            m->value -= subtrack->port[lo_bits];
+                            break;
+                        // [0x20, 0x2F]
+                        case SUBTRACK_CMD_START_SUBTRACK_MASK: // start subtrack
+                            cmdArgU16 = (u16)Nas_ReadWordData(m);
+                            Nas_OpenSub(grp, lo_bits, &grp->seq_data[cmdArgU16]);
+                            break;
+                        // [0x30, 0x3F]
+                        case SUBTRACK_CMD_WRITE_SUBTRACK_PORT_MASK: // set subtrack port to this subtrack's macro register value
+                            cmdArgU8 = Nas_ReadByteData(m);
+                            grp->subtracks[lo_bits]->port[cmdArgU8] = m->value;
+                            break;
+                        // [0x40, 0x4F]
+                        case SUBTRACK_CMD_READ_SUBTRACK_PORT_MASK: // set this subtrack's macro register value to other subtrack's port
+                            cmdArgU8 = Nas_ReadByteData(m);
+                            m->value = grp->subtracks[lo_bits]->port[cmdArgU8];
+                            break;
+                    }
+                }
+            }
+        }
+    }
+
+note_seq:
+    for (i = 0; i < ARRAY_COUNT(subtrack->note_layers); i++) {
+        if (subtrack->note_layers[i] != nullptr) {
+            Nas_NoteSeq(subtrack->note_layers[i]);
+        }
+    }
+}
+#else
 static void Nas_SubSeq(sub* subtrack) {
     u8 cmd;
     u8 cmdArgU8;
@@ -1781,7 +2366,336 @@ note_seq:
         }
     }
 }
+#endif
 
+#ifdef TARGET_PC
+static void Nas_GroupSeq(group* grp) {
+    u8 cmd;
+    u8 cmd_lo_bits;
+    macro* m;
+    s16 tempS;
+    u16 temp;
+    s32 i;
+    s32 value;
+    u8* data1;
+    u8* data2;
+    u8* data3;
+    u8* data4;
+    s32 tempo_change;
+    sub* subtrack;
+    s32 delay;
+    f32 tempf32;
+    s8 argS8;
+    s16 argS16;
+    u8 argU8;
+
+    if (grp->flags.enabled) {
+        if (Nas_CheckIDseq(grp->seq_id) == FALSE || Nas_CheckIDbank(grp->bank_id) == FALSE) {
+            Nas_CheckIDseq(grp->seq_id);
+            Nas_CheckIDseq(grp->bank_id);
+            Nas_ReleaseGroup(grp);
+        } else {
+            Nas_WriteIDseq(grp->seq_id, LOAD_STATUS_COMPLETE);
+            Nas_WriteIDbank(grp->bank_id, LOAD_STATUS_COMPLETE);
+
+            if (grp->flags.muted && (grp->mute_flags & AUDIO_MUTE_FLAG_STOP_SCRIPT)) {
+                return;
+            }
+
+            grp->script_counter++;
+            tempo_change = grp->tempo + grp->tempo_change;
+            if (tempo_change > AG.max_tempo) {
+                tempo_change = AG.max_tempo;
+            }
+
+            grp->tempo_acceleration += tempo_change;
+            if (grp->tempo_acceleration < AG.max_tempo) {
+                return;
+            }
+
+            grp->tempo_acceleration -= (u16)AG.max_tempo;
+            grp->counter++;
+
+            if (grp->flags.stop_seq_script == TRUE) {
+                return;
+            }
+
+            if (grp->delay > 1) {
+                grp->delay--;
+            } else {
+                m = &grp->macro_player;
+                grp->flags.recalculate_volume = TRUE;
+
+                /* Sequence group commands processing loop */
+                while (TRUE) {
+                    cmd = Nas_ReadByteData(m);
+                    if (cmd >= COMMON_CMD_BRANCH_REL_NOT_EQ_ZERO) {
+                        u16 arg = Convert_Com(m, cmd);
+                        delay = Common_Com(grp, m, cmd, arg);
+
+                        if (delay != 0) {
+                            /* Group is on delay or script has exited */
+                            if (delay == COMMON_SCRIPT_END) {
+                                Nas_ReleaseGroup(grp);
+                            } else {
+                                grp->delay = delay;
+                            }
+
+                            break;
+                        }
+                    } else if (cmd >= 0xC0) {
+                        switch (cmd) {
+                            case GRP_CMD_RESERVE_VOICES: // reserve voices
+                                Nas_DeAllocAllVoices(&grp->channel_node);
+                                cmd = Nas_ReadByteData(m);
+                                Nas_AllocVoices(&grp->channel_node, (u8)cmd);
+                                break;
+                            case GRP_CMD_RELEASE_VOICES: // release voices
+                                Nas_DeAllocAllVoices(&grp->channel_node);
+                                break;
+                            case GRP_CMD_TRANSPOSITION_ABSOLUTE: // absolute transposition
+                                grp->transposition = 0;
+                                // fallthrough 0xDF -> 0xDE
+                            case GRP_CMD_TRANSPOSITION_RELATIVE: // relative transposition
+                                argU8 = Nas_ReadByteData(m);
+                                grp->transposition = grp->transposition + (s8)argU8;
+                                break;
+                            case GRP_CMD_SET_TEMPO: // set tempo
+                                grp->tempo = Nas_ReadByteData(m) * AUDIO_TATUMS_PER_BEAT;
+                                if (grp->tempo > AG.max_tempo) {
+                                    grp->tempo = AG.max_tempo;
+                                }
+                                if ((s16)grp->tempo < 1) {
+                                    grp->tempo = 1;
+                                }
+                                break;
+                            case GRP_CMD_SET_TEMPO_CHANGE: // adjust tempo relative
+                                grp->tempo_change = (s8)Nas_ReadByteData(m) * AUDIO_TATUMS_PER_BEAT;
+                                break;
+                            case GRP_CMD_CHANGE_VOLUME: // change volume
+                                cmd = Nas_ReadByteData(m);
+                                temp = Nas_ReadWordData(m);
+                                switch (cmd) {
+                                    case GROUP_STATE_0:
+                                    case GROUP_STATE_FADE_IN:
+                                        if (grp->state != GROUP_STATE_FADE_OUT) {
+                                            grp->stored_fade_timer = temp;
+                                            grp->state = cmd;
+                                        }
+                                        break;
+                                    case GROUP_STATE_FADE_OUT:
+                                        grp->fade_timer = temp;
+                                        grp->state = cmd;
+                                        grp->fade_velocity = -grp->fade_volume / (f32)(s32)grp->fade_timer;
+                                        break;
+                                }
+                                break;
+                            case GRP_CMD_SET_VOLUME: // set volume
+                                tempf32 = (s32)Nas_ReadByteData(m) / 127.0f;
+                                switch (grp->state) {
+                                    case GROUP_STATE_FADE_IN:
+                                        grp->fade_volume = 0.0f;
+                                        grp->state = GROUP_STATE_0;
+                                        // fallthrough GROUP_STATE_FADE_IN
+                                    case GROUP_STATE_0:
+                                        temp = grp->stored_fade_timer;
+                                        grp->fade_timer = temp;
+                                        if (temp != 0) {
+                                            grp->fade_velocity =
+                                                (tempf32 - grp->fade_volume) / (f32)(s32)grp->fade_timer;
+                                        } else {
+                                            grp->fade_volume = tempf32;
+                                        }
+                                        break;
+
+                                    case GROUP_STATE_FADE_OUT:
+                                        break;
+                                }
+                                break;
+                            case GRP_CMD_SET_VOLUME_SCALE: // set volume scale
+                                grp->fade_volume_scale = (s8)Nas_ReadByteData(m) / 127.0f;
+                                break;
+                            case GRP_CMD_ALLOC_SUBTRACKS: // initialize subtracks
+                                temp = Nas_ReadWordData(m);
+                                Nas_AllocSub(grp, temp);
+                                break;
+                            case GRP_CMD_DISABLE_SUBTRACKS: // [ineffective] - disable subtracks
+                                Nas_ReadWordData(m);
+                                break;
+                            case GRP_CMD_SET_MUTE_SCALE: // set mute scale
+                                grp->mute_volume_scale = (s8)Nas_ReadByteData(m) / 127.0f;
+                                break;
+                            case GRP_CMD_MUTE: // mute
+                                grp->flags.muted = TRUE;
+                                break;
+                            case GRP_CMD_SET_MUTE_BEHAVIOR: // set mute behaivor
+                                grp->mute_flags = Nas_ReadByteData(m);
+                                break;
+                            case GRP_CMD_SET_SHORT_NOTE_GATE_TIME_TBL: // set short note gate-time table
+                            case GRP_CMD_SET_SHORT_NOTE_VELOCITY_TBL: // set short note velocity table
+                                temp = Nas_ReadWordData(m);
+                                data3 = &grp->seq_data[temp];
+                                if (cmd == GRP_CMD_SET_SHORT_NOTE_VELOCITY_TBL) {
+                                    grp->short_note_velocity_tbl = data3;
+                                } else {
+                                    grp->short_note_gate_time_tbl = data3;
+                                }
+                                break;
+                            case GRP_CMD_SET_NOTE_ALLOC_POLICY: // set note allocation policy
+                                grp->note_alloc_policy = Nas_ReadByteData(m);
+                                break;
+                            case GRP_CMD_MACRO_VALUE_RANDOM: // set macro register value to random value
+                                cmd = Nas_ReadByteData(m);
+                                if (cmd == 0) {
+                                    /* 0-255 */
+                                    m->value = (AG.audio_random_seed >> 2) & 0xFF;
+                                } else {
+                                    /* 0-N */
+                                    m->value = (AG.audio_random_seed >> 2) % cmd;
+                                }
+                                break;
+                            case GRP_CMD_DYN_TBL_CALL: // dynamic look-up table call
+                                temp = Nas_ReadWordData(m);
+                                if (m->value != -1 && m->depth != 3) {
+                                    data1 = &grp->seq_data[(u32)(temp + (m->value << 1))];
+                                    m->stack[m->depth++] = m->pc;
+                                    temp = (data1[0] << 8) + data1[1];
+                                    m->pc = &grp->seq_data[temp];
+                                }
+                                break;
+                            case GRP_CMD_MACRO_VALUE_LOAD: // set macro register value
+                                m->value = Nas_ReadByteData(m);
+                                break;
+                            case GRP_CMD_MACRO_VALUE_BIT_AND: // macro register bit mask
+                                m->value &= Nas_ReadByteData(m);
+                                break;
+                            case GRP_CMD_MACRO_VALUE_SUBTRACT: // macro register subtraction
+                                m->value -= Nas_ReadByteData(m);
+                                break;
+                            case GRP_CMD_MACRO_VALUE_STORE: // write macro register value to sequence data
+                                cmd = Nas_ReadByteData(m);
+                                temp = Nas_ReadWordData(m);
+                                data2 = &grp->seq_data[temp];
+                                data2[0] = (u8)m->value + cmd;
+                                break;
+                            case GRP_CMD_DYNAMIC_BRANCH: // dynamic lookup branch (no return)
+                                temp = Nas_ReadWordData(m);
+                                if (m->value != -1) {
+                                    data4 = &grp->seq_data[(u32)(temp + (m->value << 1))];
+                                    temp = (data4[0] << 8) + data4[1];
+                                    m->pc = &grp->seq_data[temp];
+                                }
+                                break;
+                            case GRP_CMD_STOP_SEQ: // stop script
+                                grp->flags.stop_seq_script = TRUE;
+                                return;
+                            case GRP_CMD_UPDATE_COUNTER: // update counter
+                                grp->counter = Nas_ReadWordData(m);
+                                break;
+                            case GRP_CMD_EF: //
+                                Nas_ReadWordData(m);
+                                Nas_ReadByteData(m);
+                                break;
+                            case GRP_CMD_START_SEQ: // start sequence script
+                                /* Get sequence group index */
+                                cmd = Nas_ReadByteData(m);
+                                if (cmd == 0xFF) {
+                                    cmd = grp->group_idx;
+                                }
+
+                                Nas_StartMySeq(cmd, Nas_ReadByteData(m));
+                                if (cmd == (u8)grp->group_idx) {
+                                    return; // stop processing since we just used this group for a new sequence
+                                }
+                                break;
+                            case GRP_CMD_MUTE_SUBTRACKS: // mute subtracks from u16 bitfield
+                                temp = Nas_ReadWordData(m);
+                                if (m->value != -1) {
+                                    u32 mask_idx = (u32)(temp + m->value * 2);
+                                    temp = (grp->seq_data[mask_idx] << 8) | grp->seq_data[mask_idx + 1];
+                                    for (i = 0; i < ARRAY_COUNT(grp->subtracks); i++) {
+                                        grp->subtracks[i]->muted = temp & 1;
+                                        temp = temp >> 1;
+                                    }
+                                }
+                                break;
+                        }
+                    } else if (cmd == GRP_CMD_CALLBACK) {
+                        cmd = Nas_ReadByteData(m);
+                        if (cmd <= 4) {
+                            if (AG.seq_callbacks[cmd] != nullptr) {
+                                NA_GRP_CALLBACK = (GRP_CALLBACK)AG.seq_callbacks[cmd];
+                                m->value = (*(GRP_CALLBACK)AG.seq_callbacks[cmd])(m->value, grp);
+                            }
+                        } else {
+                            break;
+                        }
+                    } else {
+                        /* Commands 0x00 - 0xBD & 0xBF */
+                        cmd_lo_bits = cmd & 0x0F;
+                        switch (cmd & 0xF0) {
+                            // [0x00, 0x0F]
+                            case GRP_CMD_MACRO_VALUE_LOAD_SUBTRACK_DISABLED_MASK: // macro register value = !subtrack->enabled
+                                m->value = grp->subtracks[cmd_lo_bits]->enabled ^ TRUE;
+                                break;
+                            // [0x50, 0x57] @BUG - ([0x58, 0x5F] end here but would result in undefined behavior)
+                            case GRP_CMD_MACRO_VALUE_SUBTRACT_FROM_PORT_MASK: // macro register subtract port value
+                                m->value -= grp->port[cmd_lo_bits];
+                                break;
+                            // [0x70, 0x77] @BUG - ([0x78, 0x7F] end here but would result in undefined behavior)
+                            case GRP_CMD_MACRO_VALUE_WRITE_PORT_MASK: // write macro register value into port
+                                grp->port[cmd_lo_bits] = m->value;
+                                break;
+                            // [0x80, 0x87] @BUG - ([0x88, 0x8F] end here but would result in undefined behavior)
+                            case GRP_CMD_MACRO_VALUE_READ_PORT_MASK: // read macro register value from port
+                                m->value = grp->port[cmd_lo_bits];
+                                if (cmd_lo_bits < 2) {
+                                    grp->port[cmd_lo_bits] = -1;
+                                }
+                                break;
+                            // [0x40, 0x4F]
+                            case GRP_CMD_DISABLE_SUBTRACK_MASK: // disable subtrack
+                                Nas_ReleaseSubTrack(grp->subtracks[cmd_lo_bits]);
+                                break;
+                            // [0x90, 0x9F]
+                            case GRP_CMD_START_SUBTRACK_MASK: // start subtrack w/ absolute script address
+                                temp = Nas_ReadWordData(m);
+                                Nas_OpenSub(grp, cmd_lo_bits, &grp->seq_data[temp]);
+                                break;
+                            // [0xA0, 0xAF]
+                            case GRP_CMD_START_RELATIVE_SUBTRACK_MASK: // start subtrack w/ relative script address
+                                tempS = Nas_ReadWordData(m);
+                                Nas_OpenSub(grp, cmd_lo_bits, &m->pc[tempS]);
+                                break;
+                            // [0xB0, 0xB7] @BUG - ([0xB8, 0xBF] end here but would result in undefined behavior)
+                            case GRP_CMD_SEQ_LOAD_MASK: // load sequence
+                                cmd = Nas_ReadByteData(m);
+                                temp = Nas_ReadWordData(m);
+                                data2 = &grp->seq_data[temp];
+                                SeqLoad(cmd, data2, &grp->port[cmd_lo_bits]);
+                                break;
+                            // [0x60, 0x67] @BUG - ([0x68, 0x6F] end here but would result in undefined behavior)
+                            case GRP_CMD_ASYNC_LOAD_MASK: // async load
+                                cmd = (u8)Nas_ReadByteData(m);
+                                argU8 = Nas_ReadByteData(m);
+                                MK_load(cmd, argU8, (u8*)&grp->port[cmd_lo_bits]);
+                                break;
+                        }
+                    }
+                }
+            }
+
+            for (i = 0; i < AUDIO_SUBTRACK_NUM; i++) {
+                subtrack = grp->subtracks[i];
+                if (subtrack->enabled) {
+                    Nas_SubSeq(subtrack);
+                }
+            }
+
+        }
+    }
+}
+#else
 static void Nas_GroupSeq(group* grp) {
     u8 cmd;
     u8 cmd_lo_bits;
@@ -2108,6 +3022,7 @@ static void Nas_GroupSeq(group* grp) {
         }
     }
 }
+#endif
 
 extern void Nas_MySeqMain(u32 frames_left) {
     group* grp;
@@ -2127,6 +3042,7 @@ extern void Nas_MySeqMain(u32 frames_left) {
     main_grp = &AG.main_group;
     Nas_GroupSeq(main_grp);
     Nas_MainCtrl(main_grp);
+
     Nas_UpdateChannel();
 }
 

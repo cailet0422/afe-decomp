@@ -1,5 +1,8 @@
 #include "jaudio_NES/dspdriver.h"
 
+#ifdef TARGET_PC
+#include <stdbool.h>
+#endif
 #include "jaudio_NES/dspinterface.h"
 #include "jaudio_NES/audiothread.h"
 #include "jaudio_NES/driverinterface.h"

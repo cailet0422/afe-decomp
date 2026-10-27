@@ -1,5 +1,8 @@
 #include "jaudio_NES/playercall.h"
 #include "jaudio_NES/audiostruct.h"
+#ifdef TARGET_PC
+#include <stdbool.h>
+#endif
 
 static PLAYER_CALL PLAYER_CALLLIST[16];
 

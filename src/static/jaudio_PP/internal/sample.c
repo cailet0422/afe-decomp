@@ -2,6 +2,12 @@
 
 #include "dolphin/os/OSCache.h"
 
+#ifdef TARGET_PC
+/* reinterpret_cast -> C cast so sample.c compiles as C on PC */
+#define CAST_PTR_U32(p) ((u32)(uintptr_t)(p))
+#include <string.h> /* memmove */
+#endif
+
 extern void Jac_imixcopy(s16* ta, s16* tb, s16* td, s32 s) {
     for (s; s > 0; s--) {
         *td++ = *ta++;
@@ -24,6 +30,14 @@ extern void Jac_bcopyfast(u32* src, u32* dest, u32 size) {
 }
 
 extern void Jac_bcopy(void* src, void* dest, s32 size) {
+#ifdef TARGET_PC
+    /* N64 RSP bcopy must be overlap-safe (delay lines, ring buffers, DMEM slides).
+       The original forward-only copy corrupts overlapping regions (dst > src),
+       causing audible pops on one channel at frame boundaries. */
+    if (size > 0) {
+        memmove(dest, src, (size_t)size);
+    }
+#else
     u8 alignedSrc, alignedDst;
     u32* usrc;
     u32* udest;
@@ -63,6 +77,7 @@ extern void Jac_bcopy(void* src, void* dest, s32 size) {
             *bdest++ = (u32)*bsrc++;
         }
     }
+#endif
 }
 
 extern void Jac_bzerofast(u32* dest, u32 size) {
@@ -77,7 +92,11 @@ extern void Jac_bzerofast(u32* dest, u32 size) {
 extern void Jac_bzero(void* dest, s32 size) {
     u32* udest;
     u8* bdest = (u8*)dest;
+#ifdef TARGET_PC
+    u8 alignedbitsDst = CAST_PTR_U32(bdest) & 0x3;
+#else
     u8 alignedbitsDst = reinterpret_cast<u32>(bdest) & 0x3;
+#endif
     if (alignedbitsDst == 0) {
         if ((size & 0x1f) == 0) {
             DCZeroRange(dest, size);

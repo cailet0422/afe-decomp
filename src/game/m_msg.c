@@ -26,6 +26,9 @@
 #include "sys_matrix.h"
 #include "m_flashrom.h"
 #include "libultra/libultra.h"
+#ifdef TARGET_PC
+#include "pc_bswap.h"
+#endif
 
 static u32 Msg_rom_start = 0;
 u32 Msg_color_start = 0;
