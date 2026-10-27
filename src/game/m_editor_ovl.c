@@ -1943,35 +1943,29 @@ static int mED_pc_typing(Submenu* submenu, mSM_MenuInfo_c* menu_info, mED_EDIT_F
         int command = mED_COMMAND_NONE;
         int code = 0;
         int trail = -1;
+        int preedit = (op & PC_TYPING_PREEDIT) != 0;
+        int grown;
         u8 pair[2];
 
         if (type == mED_TYPE_PASSWORDMAKE || type == mED_TYPE_PASSWORDCHK) {
             continue; /* passwords use their own character set */
         }
 
-        if (op & PC_TYPING_PREEDIT) {
-            int glyph = op & PC_TYPING_GLYPH_MASK;
+        if (op == PC_TYPING_CMD_PREEDIT_CLEAR) {
+            /* The composition sits right before the cursor */
+            while (mED_pc_preedit_len > 0) {
+                int deleted = -mED_pc_run(submenu, menu_info, edit_func, mED_COMMAND_BACKSPACE, 0, -1);
 
-            if (mED_pc_preedit_len != 0) {
-                mED_pc_run(submenu, menu_info, edit_func, mED_COMMAND_BACKSPACE, 0, -1);
-                mED_pc_preedit_len = 0;
-                se_command = mED_COMMAND_BACKSPACE;
+                if (deleted <= 0) {
+                    break;
+                }
+                mED_pc_preedit_len -= deleted;
                 ran = TRUE;
             }
-            if (op == PC_TYPING_PREEDIT_NONE) {
-                continue;
-            }
-            pc_ko_encode_glyph(glyph, pair);
-            if (mED_pc_run(submenu, menu_info, edit_func, mED_COMMAND_OUTPUT_CODE, pair[0], pair[1]) == 2) {
-                mED_pc_preedit_len = 2;
-                se_command = mED_COMMAND_OUTPUT_CODE;
-            } else {
-                pc_typing_preedit_rejected();
-                sAdo_SysTrgStart(0x1003);
-            }
-            ran = TRUE;
+            mED_pc_preedit_len = 0;
             continue;
         }
+        op &= ~PC_TYPING_PREEDIT;
 
         if (op & PC_TYPING_PAIR) {
             pc_ko_encode_glyph(op & PC_TYPING_GLYPH_MASK, pair);
@@ -1983,9 +1977,6 @@ static int mED_pc_typing(Submenu* submenu, mSM_MenuInfo_c* menu_info, mED_EDIT_F
             code = op;
         } else {
             switch (op) {
-                case PC_TYPING_CMD_COMMIT:
-                    mED_pc_preedit_len = 0;
-                    continue;
                 case PC_TYPING_CMD_BACKSPACE:
                     command = mED_COMMAND_BACKSPACE;
                     break;
@@ -2019,8 +2010,15 @@ static int mED_pc_typing(Submenu* submenu, mSM_MenuInfo_c* menu_info, mED_EDIT_F
             }
         }
 
-        mED_pc_run(submenu, menu_info, edit_func, command, code, trail);
+        grown = mED_pc_run(submenu, menu_info, edit_func, command, code, trail);
         ran = TRUE;
+        if (preedit) {
+            if (grown > 0) {
+                mED_pc_preedit_len += grown;
+            } else {
+                pc_typing_preedit_rejected();
+            }
+        }
         if (editor_ovl->se_flag) {
             se_command = command;
         } else if (command == mED_COMMAND_OUTPUT_CODE) {
