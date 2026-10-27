@@ -21,6 +21,10 @@ extern void DspSyncCountClear(int count);
 extern int DspSyncCountCheck(void);
 extern void StartAudioThread(void* pHeap, s32 heapSize, u32 aramSize, u32 flags);
 
+#ifdef TARGET_PC
+void pc_audio_process_frame(void);
+#endif
+
 #ifdef __cplusplus
 }
 #endif

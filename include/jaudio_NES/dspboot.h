@@ -13,10 +13,18 @@ typedef struct STRUCT_DSP_TASK2 {
     /* 0x16 */ u16 dsp_init_vector;
 }DSPTaskInfo2;
 
+#if defined(__cplusplus) && defined(TARGET_PC)
+extern "C" {
+#endif
+
 extern s32 __DSPCheckMXICBoot2(DSPTaskInfo2* task);
 extern void DSPInit2(DSPTaskInfo2* task);
 extern void DspBoot(void);
 
 extern u16 jdsp[];
+
+#if defined(__cplusplus) && defined(TARGET_PC)
+}
+#endif
 
 #endif

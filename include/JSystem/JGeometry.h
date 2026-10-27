@@ -4,9 +4,18 @@
 #include <dolphin/mtx.h>
 #include "types.h"
 
+#ifdef TARGET_PC
+#include <math.h>
+#include <float.h>
+#endif
+
 #ifdef __cplusplus
 inline f32 fsqrt_step(f32 mag) {
+#ifdef TARGET_PC
+    f32 root = (f32)(1.0 / sqrt((double)mag));
+#else
     f32 root = __frsqrte(mag);
+#endif
     return 0.5f * root * (3.0f - mag * (root * root));
 }
 
@@ -261,10 +270,10 @@ struct TBox2 : TBox<TVec2<T> > {
 	TBox2(f32 x0, f32 y0, TVec2<f32>& f) { set(x0, y0, x0 + f.x, y0 + f.y);	}
 	TBox2(f32 val)
 	{
-		f.y = val;
-		f.x = val;
-		i.y = val;
-		i.x = val;
+		this->f.y = val;
+		this->f.x = val;
+		this->i.y = val;
+		this->i.x = val;
 	}
 
 	// inline TBox2& operator=(const TBox2& other)

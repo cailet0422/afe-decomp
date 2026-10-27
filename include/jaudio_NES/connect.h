@@ -8,6 +8,10 @@ typedef struct WaveArchiveBank_ WaveArchiveBank_;
 typedef struct Ctrl_ Ctrl_;
 typedef struct CtrlGroup_ CtrlGroup_;
 
+#if defined(__cplusplus) && defined(TARGET_PC)
+extern "C" {
+#endif
+
 void Jac_SceneClose(WaveArchiveBank_*, CtrlGroup_*, u32, BOOL);
 BOOL Jac_SceneSet(WaveArchiveBank_*, CtrlGroup_*, u32, BOOL);
 struct WaveID_* GetSoundHandle(CtrlGroup_*, u32);
@@ -19,5 +23,9 @@ void Jac_WsConnectTableSet(u32, u32);
 void Jac_BnkConnectTableSet(u32, u32);
 void Jac_ConnectTableInit();
 struct WaveID_* __GetSoundHandle(CtrlGroup_*, u32, u32);
+
+#if defined(__cplusplus) && defined(TARGET_PC)
+}
+#endif
 
 #endif

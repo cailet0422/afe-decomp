@@ -15,6 +15,14 @@ struct FxlineConfig_ {
 	s16 filterCoeffs[8];    // _10
 };
 
+#if defined(__cplusplus) && defined(TARGET_PC)
+extern "C" {
+#endif
+
 BOOL DFX_SetFxLine(u8 idx, s16* circularBufferBase, FxlineConfig* fxlineConfig);
+
+#if defined(__cplusplus) && defined(TARGET_PC)
+}
+#endif
 
 #endif

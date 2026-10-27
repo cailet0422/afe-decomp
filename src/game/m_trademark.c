@@ -55,7 +55,7 @@ static mNpc_demo_npc_c demo_npc_list[] = {
     DEMO_NPC(BIFF, 4, 6, 5, 6),    DEMO_NPC(SAMSON, 5, 2, 12, 4), DEMO_NPC(JANE, 5, 2, 9, 11),
     DEMO_NPC(TYBALT, 5, 4, 11, 4),
 /* @BUG - mNpc_SetAnimalTitleDemo uses ANIMAL_NUM_MAX (15) but only 14 are set */
-#ifndef BUGFIXES
+#if !defined(BUGFIXES) && !defined(TARGET_PC)
     DEMO_NPC(CUBE, 5, 5, 5, 11)
 #else
     DEMO_NPC(CUBE, 5, 5, 5, 11),   { EMPTY_NO, 0, 0, 0, 0 }
@@ -67,6 +67,9 @@ static int demo_npc_num = sizeof(demo_npc_list) / sizeof(mNpc_demo_npc_c);
 static int set_npc_4_title_demo(GAME_TRADEMARK* trademark) {
     Animal_c* animals = Save_Get(animals);
 
+#ifdef TARGET_PC
+    mNpc_InitNpcList(Common_Get(npclist), ANIMAL_NUM_MAX);
+#endif
     mNpc_SetAnimalTitleDemo(demo_npc_list, animals, (GAME*)trademark);
     mNpc_SetNpcList(Common_Get(npclist), animals, demo_npc_num, 0);
 
@@ -137,8 +140,11 @@ static void trademark_goto_demo_scene(GAME_TRADEMARK* trademark) {
         Common_Set(door_data, *demo_door_data);
         Common_Set(door_data.next_scene_id, demo_door_data->next_scene_id + 1); // go to next demo scene
         mTM_demotime_set(demo_no);                                              // set demo date, time, and weather
-        mPr_RandomSetPlayerData_title_demo();                                   // randomize player data
-        set_npc_4_title_demo(trademark);                                        // set animals in the demo
+        /* These mutate Save_t data (player/animal data for the demo).
+         * On GC the real save lives on the memory card and gets reloaded.
+         * On PC, common_data_reinit reloads from the GCI file on disk. */
+        mPr_RandomSetPlayerData_title_demo();
+        set_npc_4_title_demo(trademark);
         Common_Set(transition.wipe_type, WIPE_TYPE_FADE_BLACK);
     }
 
@@ -304,6 +310,9 @@ extern void trademark_cleanup(GAME* game) {
 }
 
 extern void trademark_init(GAME* game) {
+#ifdef TARGET_PC
+    OSReport("[PC] trademark_init: enter\n");
+#endif
     GAME_TRADEMARK* trademark = (GAME_TRADEMARK*)game;
     GRAPH* g = game->graph;
 

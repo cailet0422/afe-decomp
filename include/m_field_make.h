@@ -382,6 +382,10 @@ extern mCoBG_Collision_u* mFM_GetBgName2Col(mActor_name_t bg_name);
 extern int mFM_GetBgPalIdx(void);
 extern mCoBG_Collision_u* mFM_GetBkNum2Col(int bx, int bz);
 
+#ifdef TARGET_PC
+extern void mFM_InitActableEndian(void);
+#endif
+
 #ifdef __cplusplus
 }
 #endif

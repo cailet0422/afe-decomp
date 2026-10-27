@@ -1,6 +1,27 @@
 #ifndef _FDLIBM_H
 #define _FDLIBM_H
 
+#ifdef TARGET_PC
+/* On PC, system math.h provides everything */
+#include <math.h>
+#include <float.h>
+#ifndef __HI
+#define __HI(x) *(1 + (int*)&x)
+#endif
+#ifndef __LO
+#define __LO(x) *(int*)&x
+#endif
+#ifndef __HIp
+#define __HIp(x) *(1 + (int*)x)
+#endif
+#ifndef __LOp
+#define __LOp(x) *(int*)x
+#endif
+#ifndef MAXFLOAT
+#define MAXFLOAT ((float)3.40282346638528860e+38)
+#endif
+#else /* !TARGET_PC */
+
 /* @(#)fdlibm.h 1.5 04/04/22 */
 /**
  * ====================================================
@@ -254,5 +275,7 @@ extern unsigned long __float_huge[];
 #ifdef __cplusplus
 };
 #endif // ifdef __cplusplus
+
+#endif /* !TARGET_PC */
 
 #endif

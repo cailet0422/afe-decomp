@@ -1,7 +1,17 @@
 #ifndef _DOLPHIN_HW_REGS_H_
 #define _DOLPHIN_HW_REGS_H_
 
-#ifdef __MWERKS__
+#ifdef TARGET_PC
+/* PC port: hardware registers are regular arrays defined in pc_misc.c */
+extern volatile u16 __VIRegs[59];
+extern volatile u32 __PIRegs[12];
+extern volatile u16 __MEMRegs[64];
+extern volatile u16 __DSPRegs[];
+extern volatile u32 __DIRegs[];
+extern volatile u32 __SIRegs[0x100];
+extern volatile u32 __EXIRegs[0x40];
+extern volatile u32 __AIRegs[8];
+#elif defined(__MWERKS__)
 volatile u16 __VIRegs[59]     : 0xCC002000;
 volatile u32 __PIRegs[12]     : 0xCC003000;
 volatile u16 __MEMRegs[64]    : 0xCC004000;

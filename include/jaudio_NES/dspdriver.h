@@ -7,6 +7,10 @@
 /////////// JAUDIO DSP DRIVER DEFINITIONS ///////////
 // Global functions (all C++, so no extern C wrap).
 
+#if defined(__cplusplus) && defined(TARGET_PC)
+extern "C" {
+#endif
+
 dspch_* GetDSPchannelHandle(u32 idx);
 void InitDSPchannel();
 dspch_* AllocDSPchannel(u32, u32);
@@ -19,5 +23,9 @@ BOOL BreakLowerActiveDSPchannel(u8);
 void UpdateDSPchannelAll();
 
 /////////////////////////////////////////////////////
+
+#if defined(__cplusplus) && defined(TARGET_PC)
+}
+#endif
 
 #endif

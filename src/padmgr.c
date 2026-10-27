@@ -4,6 +4,10 @@
 #include "m_debug.h"
 #include "jsyswrap.h"
 
+#ifdef TARGET_PC
+#include "dolphin/pad.h"
+#endif
+
 static int frame = 0;
 padmgr padmgr_class;
 static padmgr* this = &padmgr_class;
@@ -301,8 +305,108 @@ extern void padmgr_RequestPadData_NonLock(pad_t* pad, int flag) {
     }
 }
 
+#ifdef TARGET_PC
+/* On PC, the padmgr thread doesn't run (osStartThread is a no-op).
+   Poll input once per frame, then let all callers read the accumulated triggers.
+   On GC, the padmgr thread polls asynchronously and accumulates triggers between reads.
+   On PC, inline polling means a second call within the same frame sees no state change
+   (XOR of same button state = 0), producing zero triggers. The once-per-frame guard
+   is in padmgr_RequestPadData to skip redundant calls entirely. */
+extern u32 pc_frame_counter; /* incremented in VIWaitForRetrace */
+
+static void padmgr_UpdatePC(void) {
+    PADStatus pad_status[MAXCONTROLLERS];
+    int i;
+
+    JW_JUTGamePad_read();
+    PADRead(pad_status);
+
+    /* Convert PADStatus (GC format) to OSContPad (N64 format).
+       PADRead returns GC button masks; the game uses N64-style button constants.
+       GC PAD bits:  A=0x0100 B=0x0200 X=0x0400 Y=0x0800 START=0x1000
+                     Z=0x0010 R=0x0020 L=0x0040
+                     DUp=0x0008 DDown=0x0004 DLeft=0x0001 DRight=0x0002
+       N64 OSContPad: A=0x8000 B=0x4000 Z=0x2000 START=0x1000
+                     L=0x0020 R=0x0010 X=0x0040 Y=0x0080
+                     DUp=0x0800 DDown=0x0400 DLeft=0x0200 DRight=0x0100
+                     CUp=0x0008 CDown=0x0004 CLeft=0x0002 CRight=0x0001 */
+    for (i = 0; i < MAXCONTROLLERS; i++) {
+        u16 gc = pad_status[i].button;
+        u16 n64 = 0;
+        if (gc & 0x0100) n64 |= 0x8000; /* A */
+        if (gc & 0x0200) n64 |= 0x4000; /* B */
+        if (gc & 0x0400) n64 |= 0x0040; /* X */
+        if (gc & 0x0800) n64 |= 0x0080; /* Y */
+        if (gc & 0x1000) n64 |= 0x1000; /* START */
+        if (gc & 0x0010) n64 |= 0x2000; /* Z */
+        if (gc & 0x0020) n64 |= 0x0010; /* R */
+        if (gc & 0x0040) n64 |= 0x0020; /* L */
+        if (gc & 0x0008) n64 |= 0x0800; /* D-Up */
+        if (gc & 0x0004) n64 |= 0x0400; /* D-Down */
+        if (gc & 0x0001) n64 |= 0x0200; /* D-Left */
+        if (gc & 0x0002) n64 |= 0x0100; /* D-Right */
+        if (pad_status[i].substickX >= 29)  n64 |= 0x0001; /* C-Right */
+        if (pad_status[i].substickX <= -29) n64 |= 0x0002; /* C-Left */
+        if (pad_status[i].substickY >= 29)  n64 |= 0x0008; /* C-Up */
+        if (pad_status[i].substickY <= -29) n64 |= 0x0004; /* C-Down */
+        this->cur_pads[i].button = n64;
+        this->cur_pads[i].stick_x = pad_status[i].stickX;
+        this->cur_pads[i].stick_y = pad_status[i].stickY;
+        this->cur_pads[i].errno = 0; /* CONT_NO_ERROR */
+    }
+
+    {
+        extern int g_pc_paused;
+        extern int g_pc_pause_input_drain;
+        int suppress = g_pc_paused;
+        if (g_pc_pause_input_drain) {
+            /* Only buttons gate the drain. Gamepad stick drift could keep
+             * cur_pads[].stick_* non-zero indefinitely and lock the player
+             * out. Buttons reliably go to 0 on release. */
+            int any_button = 0;
+            for (i = 0; i < MAXCONTROLLERS; i++) {
+                if (this->cur_pads[i].button != 0) { any_button = 1; break; }
+            }
+            if (any_button) suppress = 1;
+            else            g_pc_pause_input_drain = 0;
+        }
+        if (suppress) {
+            for (i = 0; i < MAXCONTROLLERS; i++) {
+                this->cur_pads[i].button = 0;
+                this->cur_pads[i].stick_x = 0;
+                this->cur_pads[i].stick_y = 0;
+            }
+        }
+    }
+
+    /* Always report PAD0 as connected (keyboard is always available) */
+    this->device_type[0] = PADMGR_TYPE_CONTROLLER;
+
+    /* Process cur_pads into pads (button triggers, stick deltas, etc.) */
+    padmgr_HandleDoneReadPadMsg();
+}
+#endif
+
 extern void padmgr_RequestPadData(pad_t* pad, int flag) {
     padmgr_LockContData();
+#ifdef TARGET_PC
+    /* On GC, the padmgr thread runs asynchronously and accumulates triggers between
+       reads. padmgr_RequestPadData can be called multiple times per frame (e.g. from
+       graph_main and play_main) and each call gets the accumulated triggers.
+       On PC, we poll inline, so the second call would see no state change and overwrite
+       the game's pads with zero triggers. Fix: only do the full poll+copy once per frame.
+       Subsequent calls within the same frame are no-ops since game->pads already has
+       the correct data from the first call. */
+    {
+        static u32 last_request_frame = 0xFFFFFFFF;
+        if (last_request_frame == pc_frame_counter) {
+            padmgr_UnlockContData();
+            return;
+        }
+        last_request_frame = pc_frame_counter;
+    }
+    padmgr_UpdatePC();
+#endif
     padmgr_RequestPadData_NonLock(pad, flag);
     padmgr_UnlockContData();
 }

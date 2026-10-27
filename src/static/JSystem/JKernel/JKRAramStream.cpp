@@ -13,7 +13,7 @@ OSMessageQueue JKRAramStream::sMessageQueue = { 0 };
 
 JKRAramStream* JKRAramStream::sAramStreamObject = nullptr;
 u8* JKRAramStream::transBuffer = nullptr;
-u32 JKRAramStream::transSize = nullptr;
+u32 JKRAramStream::transSize = (u32)0;
 JKRHeap* JKRAramStream::transHeap = nullptr;
 
 JKRAramStream* JKRAramStream::create(s32 param) {
@@ -61,12 +61,12 @@ s32 JKRAramStream::writeToAram(JKRAramStreamCommand* command) {
     u32 bufferSize = command->mTransferBufferSize;
     JKRHeap* heap = command->mHeap;
     if (buffer) {
-        bufferSize = (bufferSize == nullptr) ? 0x8000 : bufferSize;
+        bufferSize = (bufferSize == (u32)0) ? 0x8000 : bufferSize;
 
         command->mTransferBufferSize = bufferSize;
         command->mAllocatedTransferBuffer = false;
     } else {
-        bufferSize = (bufferSize == nullptr) ? 0x8000 : bufferSize;
+        bufferSize = (bufferSize == (u32)0) ? 0x8000 : bufferSize;
 
         if (heap) {
             buffer = (u8*)JKRAllocFromHeap(heap, bufferSize, -0x20);
@@ -138,7 +138,12 @@ JKRAramStreamCommand* JKRAramStream::write_StreamToAram_Async(JSUFileInputStream
     }
 
     OSInitMessageQueue(&command->mMessageQueue, &command->mMessage, 1);
+#ifdef TARGET_PC
+    /* Execute synchronously on PC (no worker thread) */
+    sAramStreamObject->writeToAram(command);
+#else
     OSSendMessage(&sMessageQueue, command, OS_MESSAGE_BLOCK);
+#endif
     return command;
 }
 
@@ -160,11 +165,20 @@ JKRAramStreamCommand* JKRAramStream::write_StreamToAram_Async(JSUFileInputStream
     }
 
     OSInitMessageQueue(&command->mMessageQueue, &command->mMessage, 1);
+#ifdef TARGET_PC
+    /* Execute synchronously on PC (no worker thread) */
+    sAramStreamObject->writeToAram(command);
+#else
     OSSendMessage(&sMessageQueue, command, OS_MESSAGE_BLOCK);
+#endif
     return command;
 }
 
 JKRAramStreamCommand* JKRAramStream::sync(JKRAramStreamCommand* command, BOOL isNonBlocking) {
+#ifdef TARGET_PC
+    /* On PC, the write already happened synchronously - just return the command */
+    return command;
+#else
     OSMessage msg;
     if (isNonBlocking == FALSE) {
         OSReceiveMessage(&command->mMessageQueue, &msg, OS_MESSAGE_BLOCK);
@@ -186,6 +200,7 @@ JKRAramStreamCommand* JKRAramStream::sync(JKRAramStreamCommand* command, BOOL is
             return command;
         }
     }
+#endif
 }
 
 void JKRAramStream::setTransBuffer(u8* buffer, u32 bufferSize, JKRHeap* heap) {

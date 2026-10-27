@@ -1,5 +1,6 @@
 #include "m_fbdemo.h"
 
+#include "gfxalloc.h"
 #include "libc64/malloc.h"
 #include "libc64/sleep.h"
 #include "libultra/gu.h"
@@ -183,8 +184,21 @@ extern void fbdemo_draw(fbdemo_c* this, Gfx** gfxP) {
 
     gSPDisplayList(gfx++, fbdemo_gfx_init);
     fbdemo_update(this);
+#ifdef TARGET_PC
+    /* Copy matrices into gfxalloc buffers to avoid seg2k0 collision with
+       N64 segment range when struct is heap-allocated in 0x03-0x0F. */
+    {
+        Mtx* proj_copy = (Mtx*)gfxalloc(&gfx, sizeof(Mtx));
+        Mtx* mv_copy = (Mtx*)gfxalloc(&gfx, sizeof(Mtx));
+        *proj_copy = this->projection;
+        *mv_copy = this->modelView1;
+        gSPMatrix(gfx++, proj_copy, G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_PROJECTION);
+        gSPMatrix(gfx++, mv_copy, G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
+    }
+#else
     gSPMatrix(gfx++, &this->projection, G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_PROJECTION);
     gSPMatrix(gfx++, &this->modelView1, G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
+#endif
     gSPSegment(gfx++, ANIME_3_TXT_SEG, this->frame == 0 ? this->vtxFrame1 : this->vtxFrame2);
     gSPSegment(gfx++, ANIME_4_TXT_SEG, this->zBuffer);
     gSPDisplayList(gfx++, fbdemo_gfx_init);

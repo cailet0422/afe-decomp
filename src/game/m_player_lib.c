@@ -8,6 +8,9 @@
 #include "ac_t_umbrella.h"
 #include "ac_snowman.h"
 #include "ac_uki.h"
+#ifdef TARGET_PC
+#include "pc_bswap.h"
+#endif
 
 extern cKF_Animation_R_c cKF_ba_r_ply_1_wait1;
 extern cKF_Animation_R_c cKF_ba_r_ply_1_walk1;
@@ -1185,8 +1188,33 @@ static u32 mPlib_Get_UsePalletRom_p(void) {
     return mPlib_Get_PlayerPalletRom_p(Now_Private->cloth.idx);
 }
 
+#ifdef TARGET_PC
+static void mPlib_ByteSwapPlayerPalette(u16* pal);
+#endif
+
 static int Player_Pallet_bank_ID[] = { -1, -1 };
 
+#ifdef TARGET_PC
+extern void mPlib_Object_Exchange_keep_new_PlayerPallet(GAME_PLAY* play, int bank_idx, int bank) {
+    u32 pal = mPlib_Get_UsePalletRom_p();
+    int in_aram = mPlib_Check_PlayerClothInAram(Now_Private->cloth.idx);
+    int bank_no;
+    Object_Exchange_c* obj_ex = &play->object_exchange;
+
+    Player_Pallet_bank_ID[bank_idx] = bank + mPlib_Object_Exchange_keep_new(play, ACTOR_OBJ_BANK_15, pal, mNW_PALETTE_SIZE,
+                                                                             in_aram);
+
+    if (in_aram) {
+        bank_no = Player_Pallet_bank_ID[bank_idx];
+
+        if (bank_no >= 0 && obj_ex->banks[bank_no].bank_id > 0) {
+            u16* pal_p = (u16*)obj_ex->banks[bank_no].ram_start;
+            mPlib_ByteSwapPlayerPalette(pal_p);
+            DCStoreRangeNoSync(pal_p, mNW_PALETTE_SIZE);
+        }
+    }
+}
+#else
 extern void mPlib_Object_Exchange_keep_new_PlayerPallet(GAME_PLAY* play, int bank_idx, int bank) {
     u32 pal = mPlib_Get_UsePalletRom_p();
 
@@ -1194,6 +1222,7 @@ extern void mPlib_Object_Exchange_keep_new_PlayerPallet(GAME_PLAY* play, int ban
         bank + mPlib_Object_Exchange_keep_new(play, ACTOR_OBJ_BANK_15, pal, mNW_PALETTE_SIZE,
                                               mPlib_Check_PlayerClothInAram(Now_Private->cloth.idx));
 }
+#endif
 
 extern int mPlib_Check_PlayerClothInAram(int idx) {
     if (idx < (CLOTH_NUM + 1)) {
@@ -1210,6 +1239,14 @@ extern void mPlib_Object_Exchange_keep_new_PlayerFaceTex(GAME_PLAY* play) {
 }
 
 static int Player_face_pallet_bank_ID[] = { -1, -1 };
+
+#ifdef TARGET_PC
+static void mPlib_ByteSwapPlayerPalette(u16* pal) {
+    if (pal != NULL) {
+        pc_bswap16_array(pal, mNW_PALETTE_SIZE / (int)sizeof(u16));
+    }
+}
+#endif
 
 extern void mPlib_Object_Exchange_keep_new_PlayerFacePallet(GAME_PLAY* play, int bank, int bank_idx) {
     Player_face_pallet_bank_ID[bank_idx] =
@@ -1274,6 +1311,42 @@ extern u16* mPlib_get_player_face_pallet_p(GAME* game) {
     return NULL;
 }
 
+#ifdef TARGET_PC
+extern void mPlib_change_player_cloth(GAME* game, u16 cloth_idx) {
+    int idx = cloth_idx;
+    int in_aram = mPlib_Check_PlayerClothInAram(idx);
+    Change_Player_bank_ID_Index();
+
+    {
+        u8* player_tex_p = mPlib_get_player_tex_p(game);
+        u32 player_tex_rom_p = mPlib_Get_PlayerTexRom_p(idx);
+
+        if (in_aram) {
+            _JW_GetResourceAram(player_tex_rom_p, player_tex_p, mNW_DESIGN_TEX_SIZE);
+        } else {
+            bcopy((u8*)player_tex_rom_p, player_tex_p, mNW_DESIGN_TEX_SIZE);
+        }
+
+        DCStoreRangeNoSync(player_tex_p, mNW_DESIGN_TEX_SIZE);
+    }
+
+    {
+        u16* player_pallet_p = mPlib_get_player_pallet_p(game);
+        u32 player_pallet_rom_p = mPlib_Get_PlayerPalletRom_p(idx);
+
+        if (in_aram) {
+            _JW_GetResourceAram(player_pallet_rom_p, (u8*)player_pallet_p, mNW_PALETTE_SIZE);
+        } else {
+            bcopy((u16*)player_pallet_rom_p, player_pallet_p, mNW_PALETTE_SIZE);
+        }
+
+        if (in_aram) {
+            mPlib_ByteSwapPlayerPalette(player_pallet_p);
+        }
+        DCStoreRangeNoSync(player_pallet_p, mNW_PALETTE_SIZE);
+    }
+}
+#else
 extern void mPlib_change_player_cloth(GAME* game, u16 cloth_idx) {
     int idx = cloth_idx;
     Change_Player_bank_ID_Index();
@@ -1304,6 +1377,7 @@ extern void mPlib_change_player_cloth(GAME* game, u16 cloth_idx) {
         DCStoreRangeNoSync(player_pallet_p, mNW_PALETTE_SIZE);
     }
 }
+#endif
 
 extern void mPlib_change_player_face_pallet(GAME* game) {
     Change_Player_face_bank_ID_Index();
@@ -1314,6 +1388,9 @@ extern void mPlib_change_player_face_pallet(GAME* game) {
 
         if (player_face_pallet_p != NULL && player_face_pallet_rom_p != 0) {
             _JW_GetResourceAram(player_face_pallet_rom_p, (u8*)player_face_pallet_p, mNW_PALETTE_SIZE);
+#ifdef TARGET_PC
+            mPlib_ByteSwapPlayerPalette(player_face_pallet_p);
+#endif
             DCStoreRangeNoSync(player_face_pallet_p, mNW_PALETTE_SIZE);
         }
     }
@@ -1389,6 +1466,30 @@ extern void mPlib_change_player_cloth_info_lv2(Private_c* priv, mActor_name_t it
     mPlib_change_player_cloth_info(&priv->cloth, item);
 }
 
+#ifdef TARGET_PC
+extern void mPlib_Load_PlayerTexAndPallet(void* tex_p, void* pal_p, int idx) {
+    if (idx >= 0 && idx < (CLOTH_NUM + 1 + mPr_ORIGINAL_DESIGN_COUNT) && tex_p != NULL && pal_p != NULL) {
+        u32 tex_rom_p = mPlib_Get_PlayerTexRom_p(idx);
+        u32 pal_rom_p = mPlib_Get_PlayerPalletRom_p(idx);
+        int in_aram = mPlib_Check_PlayerClothInAram(idx);
+
+        if (in_aram) {
+            _JW_GetResourceAram(tex_rom_p, (u8*)tex_p, mNW_DESIGN_TEX_SIZE);
+            _JW_GetResourceAram(pal_rom_p, (u8*)pal_p, mNW_PALETTE_SIZE);
+        } else {
+            bcopy((u8*)tex_rom_p, tex_p, mNW_DESIGN_TEX_SIZE);
+            bcopy((u16*)pal_rom_p, pal_p, mNW_PALETTE_SIZE);
+        }
+
+        if (in_aram) {
+            mPlib_ByteSwapPlayerPalette((u16*)pal_p);
+        }
+
+        DCStoreRangeNoSync(tex_p, mNW_DESIGN_TEX_SIZE);
+        DCStoreRangeNoSync(pal_p, mNW_PALETTE_SIZE);
+    }
+}
+#else
 extern void mPlib_Load_PlayerTexAndPallet(void* tex_p, void* pal_p, int idx) {
     if (idx >= 0 && idx < (CLOTH_NUM + 1 + mPr_ORIGINAL_DESIGN_COUNT) && tex_p != NULL && pal_p != NULL) {
         u32 tex_rom_p = mPlib_Get_PlayerTexRom_p(idx);
@@ -1406,6 +1507,7 @@ extern void mPlib_Load_PlayerTexAndPallet(void* tex_p, void* pal_p, int idx) {
         DCStoreRangeNoSync(pal_p, mNW_PALETTE_SIZE);
     }
 }
+#endif
 
 static mPlayer_change_data_from_submenu_c change_data_from_submenu;
 

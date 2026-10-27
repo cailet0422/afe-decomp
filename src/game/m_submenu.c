@@ -136,7 +136,11 @@ static int mSM_ovlptr_dllcnv_sub(void* proc, mSM_dlftbl_c* dlftbl, Submenu* subm
 
 extern void* mSM_ovlptr_dllcnv(void* proc, Submenu* submenu, int dlf_idx) {
     if (SubmenuArea_visit != NULL) {
+#ifdef TARGET_PC
+        return proc; /* overlay already loaded, pointer is valid */
+#else
         return; // ??
+#endif
     } else if (mSM_ovlptr_dllcnv_sub(proc, SubmenuArea_dlftbl, submenu, dlf_idx) == FALSE) {
         return NULL;
     }

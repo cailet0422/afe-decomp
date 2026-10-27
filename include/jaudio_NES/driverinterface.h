@@ -4,8 +4,11 @@
 #include "types.h"
 #include "jaudio_NES/audiostruct.h"
 
+#if defined(__cplusplus) && defined(TARGET_PC)
+extern "C" {
+#endif
+
 /////////// JAUDIO DRIVER INTERFACE DEFINITIONS ///////////
-// Global functions (all C++, so no extern C wrap).
 void Channel_SetMixerLevel(f32);
 jcs_* Get_GlobalHandle();
 int List_CountChannel(jc_**);
@@ -34,5 +37,9 @@ void EntryCheck_WaitDSPChannel();
 BOOL ForceStopLogicalChannel(jc_*);
 
 ///////////////////////////////////////////////////////////
+
+#if defined(__cplusplus) && defined(TARGET_PC)
+}
+#endif
 
 #endif

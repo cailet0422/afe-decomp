@@ -3,6 +3,10 @@
 
 #include "types.h"
 
+#if defined(__cplusplus) && defined(TARGET_PC)
+extern "C" {
+#endif
+
 extern s32 DSPSendCommands(u32* commands, u32 count);
 extern u32 DSPReleaseHalt();
 extern void DSPWaitFinish();
@@ -11,5 +15,9 @@ extern void DsyncFrame(u32 subframes, u32 dspbuf_start, u32 dspbuf_end);
 extern void DwaitFrame();
 extern void DiplSec(u32 arg0);
 extern void DagbSec(u32 arg0);
+
+#if defined(__cplusplus) && defined(TARGET_PC)
+}
+#endif
 
 #endif

@@ -8,6 +8,14 @@ extern "C" {
 // clang-format off
 
 #include "types.h"
+
+#ifndef _GBI_STATIC_PTR
+#ifdef TARGET_PC
+#define _GBI_STATIC_PTR(s) (unsigned int)(uintptr_t)(s)
+#else
+#define _GBI_STATIC_PTR(s) (unsigned int)(s)
+#endif
+#endif
 #include <PR/mbi.h>
 #include "dolphin/gx.h"
 
@@ -219,6 +227,33 @@ extern "C" {
 #define COMBINER_TEV_GET_Ac1(words)((words.w0 >>  3) & 7)
 #define COMBINER_TEV_GET_Ad1(words)((words.w0 >>  0) & 7)
 
+/*
+ * NOTE: On TARGET_PC (little-endian), bitfield order is reversed within each
+ * 32-bit word so that fields map to the same bit positions as the GBI shift
+ * macros. See gbi.h for detailed explanation.
+ */
+
+#ifdef TARGET_PC
+typedef struct {
+    unsigned int c1:5;
+    unsigned int a1:4;
+    unsigned int Ac0:3;
+    unsigned int Aa0:3;
+    unsigned int c0:5;
+    unsigned int a0:4;
+    unsigned int cmd:8;
+    unsigned int Ad1:3;
+    unsigned int Ab1:3;
+    unsigned int d1:3;
+    unsigned int Ad0:3;
+    unsigned int Ab0:3;
+    unsigned int d0:3;
+    unsigned int Ac1:3;
+    unsigned int Aa1:3;
+    unsigned int b1:4;
+    unsigned int b0:4;
+} Gsetcombine_new;
+#else
 typedef struct {
     unsigned int cmd:8;
     unsigned int a0:4;
@@ -227,7 +262,6 @@ typedef struct {
     unsigned int Ac0:3;
     unsigned int a1:4;
     unsigned int c1:5;
-
     unsigned int b0:4;
     unsigned int b1:4;
     unsigned int Aa1:3;
@@ -239,59 +273,116 @@ typedef struct {
     unsigned int Ab1:3;
     unsigned int Ad1:3;
 } Gsetcombine_new;
+#endif
 
+#ifdef TARGET_PC
+typedef struct {
+    unsigned int Ad1:3;
+    unsigned int Ac1:3;
+    unsigned int Ab1:3;
+    unsigned int Aa1:3;
+    unsigned int Ad0:3;
+    unsigned int Ac0:3;
+    unsigned int Ab0:3;
+    unsigned int Aa0:3;
+    int cmd:8;
+    unsigned int d1:4;
+    unsigned int c1:4;
+    unsigned int b1:4;
+    unsigned int a1:4;
+    unsigned int d0:4;
+    unsigned int c0:4;
+    unsigned int b0:4;
+    unsigned int a0:4;
+} Gsetcombine_tev;
+#else
 typedef struct {
     int cmd:8; /* 0xCF */
     unsigned int Aa0:3;
     unsigned int Ab0:3;
     unsigned int Ac0:3;
     unsigned int Ad0:3;
-
     unsigned int Aa1:3;
     unsigned int Ab1:3;
     unsigned int Ac1:3;
     unsigned int Ad1:3;
-
     unsigned int a0:4;
     unsigned int b0:4;
     unsigned int c0:4;
     unsigned int d0:4;
-
     unsigned int a1:4;
     unsigned int b1:4;
     unsigned int c1:4;
     unsigned int d1:4;
 } Gsetcombine_tev;
+#endif
 
+#ifdef TARGET_PC
+typedef struct {
+    unsigned int lower0:16;
+    unsigned int upper0:8;
+    int cmd:8;
+    unsigned int lower1:16;
+    unsigned int upper1:16;
+} Gsetcombine_raw;
+#else
 typedef struct {
     int cmd:8;
     unsigned int upper0:8;
     unsigned int lower0:16;
-
     unsigned int upper1:16;
     unsigned int lower1:16;
 } Gsetcombine_raw;
+#endif
 
+#ifdef TARGET_PC
+typedef struct {
+    unsigned int yl:12;
+    unsigned int xl:12;
+    unsigned int cmd:8;
+    unsigned int yh:12;
+    unsigned int xh:12;
+    unsigned int tile:3;
+    unsigned int pad1:5;
+    unsigned int pad2:32;
+    unsigned int t:16;
+    unsigned int s:16;
+    unsigned int pad3:32;
+    unsigned int dtdy:16;
+    unsigned int dsdx:16;
+} Gtexrect2;
+#else
 typedef struct {
     unsigned int cmd:8;
-    unsigned int xl:12;	/* Top-left x coord */
-    unsigned int yl:12;	/* Top-left y coord */
+    unsigned int xl:12;
+    unsigned int yl:12;
     unsigned int pad1:5;
-    unsigned int tile:3; /* Tile descriptor index */
-    unsigned int xh:12;	/* Lower-right x coord */
-    unsigned int yh:12;	/* Lower-right y coord */
-
+    unsigned int tile:3;
+    unsigned int xh:12;
+    unsigned int yh:12;
     unsigned int pad2:32;
-
-    unsigned int s:16;	/* S (X) texture coord at top left */
-    unsigned int t:16;	/* T (Y) texture coord at top left */
-
+    unsigned int s:16;
+    unsigned int t:16;
     unsigned int pad3:32;
-
-    unsigned int dsdx:16; /* Change in S (X) per change in X */
-    unsigned int dtdy:16; /* Change in T (Y) per change in Y */
+    unsigned int dsdx:16;
+    unsigned int dtdy:16;
 } Gtexrect2;
+#endif
 
+#ifdef TARGET_PC
+typedef struct {
+    unsigned int shift_t:4;
+    unsigned int shift_s:4;
+    unsigned int wrap_t:2;
+    unsigned int wrap_s:2;
+    unsigned int tlut_name:4;
+    unsigned int tile:3;
+    unsigned int pad0:1;
+    unsigned int dol_fmt:4;
+    int cmd:8;
+    unsigned int pad1:32;
+} Gsettile_dolphin;
+#else
 typedef struct {
     int cmd:8;
     unsigned int dol_fmt:4;
@@ -304,82 +395,169 @@ typedef struct {
     unsigned int shift_t:4;
     unsigned int pad1:32;
 } Gsettile_dolphin;
+#endif
 
+#ifdef TARGET_PC
+typedef struct {
+    unsigned int slen:10;
+    unsigned int sl:14;
+    int cmd:8;
+    unsigned int tlen:10;
+    unsigned int tl:14;
+    unsigned int tile:3;
+    unsigned int pad:4;
+    s8 isDolphin:1;
+} Gsettilesize_Dolphin;
+#else
 typedef struct {
     int cmd:8;
-    unsigned int sl:14; /* Start of S coordinate */
-    unsigned int slen:10; /* Length of S coordinate */
-    
-    s8 isDolphin:1; /* If true, format is Gsettilesize_Dolphin. If false, format is Gsettilesize2 */
+    unsigned int sl:14;
+    unsigned int slen:10;
+    s8 isDolphin:1;
     unsigned int pad:4;
-    unsigned int tile:3; /* Tile descriptor */
-    unsigned int tl:14; /* Start of T coordinate */
-    unsigned int tlen:10; /* Length of T coordinate */
+    unsigned int tile:3;
+    unsigned int tl:14;
+    unsigned int tlen:10;
 } Gsettilesize_Dolphin;
+#endif
 
+#ifdef TARGET_PC
 typedef struct {
-    int cmd:8; /* Command */
-    unsigned int fmt:3; /* Image format */
-    unsigned int siz:2; /* Image format texel size */
-    unsigned int isDolphin:1; /* Is this Gsetimg2 or Gsetimg */
-    unsigned int ht:8; /* Height, packed: (height / 4) - 1 */
-    unsigned int wd:10; /* Width, packed: width - 1 */
-
-    unsigned int imgaddr:32; /* Image RAM address */
+    unsigned int wd:10;
+    unsigned int ht:8;
+    unsigned int isDolphin:1;
+    unsigned int siz:2;
+    unsigned int fmt:3;
+    int cmd:8;
+    unsigned int imgaddr:32;
 } Gsetimg2;
+#else
+typedef struct {
+    int cmd:8;
+    unsigned int fmt:3;
+    unsigned int siz:2;
+    unsigned int isDolphin:1;
+    unsigned int ht:8;
+    unsigned int wd:10;
+    unsigned int imgaddr:32;
+} Gsetimg2;
+#endif
 
 typedef union {
     Gsetimg setimg;
     Gsetimg2 setimg2;
 } Gsetimg_new;
 
+#ifdef TARGET_PC
 typedef struct {
-    int cmd:8;
-    unsigned int type:2; /* Type - if 2, is Gloadtlut_dolphin. Otherwise is Gloadtlut. */
-    unsigned int pad0:2;
-    unsigned int tlut_name:4; /* GC Palette/TLUT name(index). */
+    unsigned int count:14;
     unsigned int pad1:2;
-    unsigned int count:14; /* Number of entries in the TLUT. Max by GC spec is 0x4000. */
-    
+    unsigned int tlut_name:4;
+    unsigned int pad0:2;
+    unsigned int type:2;
+    int cmd:8;
     unsigned int tlut_addr:32;
 } Gloadtlut_dolphin;
+#else
+typedef struct {
+    int cmd:8;
+    unsigned int type:2;
+    unsigned int pad0:2;
+    unsigned int tlut_name:4;
+    unsigned int pad1:2;
+    unsigned int count:14;
+    unsigned int tlut_addr:32;
+} Gloadtlut_dolphin;
+#endif
 
+#ifdef TARGET_PC
+typedef struct {
+    unsigned int on:8;
+    unsigned int tile:3;
+    unsigned int level:3;
+    unsigned int pad:2;
+    unsigned int xparam:8;
+    unsigned int cmd:8;
+    unsigned short t;
+    unsigned short s;
+} Gtexture_internal;
+#else
 typedef struct {
     unsigned int cmd:8;
     unsigned int xparam:8;
     unsigned int pad:2;
     unsigned int level:3;
     unsigned int tile:3;
-    unsigned int on:8; /* Should be 7 bits w/ 1 bit padding, but emulator doesn't do this */
-
+    unsigned int on:8;
     unsigned short s;
     unsigned short t;
 } Gtexture_internal;
+#endif
 
+#ifdef TARGET_PC
+typedef struct {
+    unsigned int offset:16;
+    unsigned int index:8;
+    unsigned int cmd:8;
+    unsigned int data;
+} Gmoveword;
+#else
 typedef struct {
     unsigned int cmd:8;
     unsigned int index:8;
     unsigned int offset:16;
     unsigned int data;
 } Gmoveword;
+#endif
 
+#ifdef TARGET_PC
+typedef struct {
+    unsigned int index:8;
+    unsigned int offset:8;
+    unsigned int length:8;
+    unsigned int cmd:8;
+    unsigned int data;
+} Gmovemem;
+#else
 typedef struct {
     unsigned int cmd:8;
     unsigned int length:8;
     unsigned int offset:8;
     unsigned int index:8;
-
     unsigned int data;
 } Gmovemem;
+#endif
 
+#ifdef TARGET_PC
+typedef struct Gsettexedgealpha {
+    unsigned int unused0:24;
+    unsigned int cmd:8;
+    unsigned int tex_edge_alpha:8;
+    unsigned int unused1:24;
+} Gsettexedgealpha;
+#else
 typedef struct Gsettexedgealpha {
     unsigned int cmd:8;
     unsigned int unused0:24;
-
     unsigned int unused1:24;
     unsigned int tex_edge_alpha:8;
 } Gsettexedgealpha;
+#endif
 
+#ifdef TARGET_PC
+typedef struct {
+    unsigned int		y0frac:2;
+    unsigned int		y0:10;
+    unsigned int		x0frac:2;
+    unsigned int		x0:10;
+    int		            cmd:8;
+    unsigned int		y1frac:2;
+    unsigned int		y1:10;
+    unsigned int		x1frac:2;
+    unsigned int		x1:10;
+    unsigned int        pad:8;
+} Gscissor;
+#else
 typedef struct {
     int		            cmd:8;
     unsigned int		x0:10;
@@ -392,7 +570,22 @@ typedef struct {
     unsigned int		y1:10;
     unsigned int		y1frac:2;
 } Gscissor;
+#endif
 
+#ifdef TARGET_PC
+typedef struct {
+    unsigned int		y0frac:2;
+    unsigned int		y0:10;
+    unsigned int		x0frac:2;
+    unsigned int		x0:10;
+    int		            cmd:8;
+    unsigned int		y1frac:2;
+    unsigned int		y1:10;
+    unsigned int		x1frac:2;
+    unsigned int		x1:10;
+    unsigned int	    pad:8;
+} Gfillrect2;
+#else
 typedef struct {
     int		            cmd:8;
     unsigned int		x0:10;
@@ -405,196 +598,395 @@ typedef struct {
     unsigned int		y1:10;
     unsigned int		y1frac:2;
 } Gfillrect2;
+#endif
 
+#ifdef TARGET_PC
+typedef struct Gnoop {
+    unsigned int param0: 16;
+    unsigned int tag: 8;
+    unsigned int cmd: 8;
+    unsigned int param1;
+} Gnoop;
+#else
 typedef struct Gnoop {
     unsigned int cmd: 8;
     unsigned int tag: 8;
     unsigned int param0: 16;
-
     unsigned int param1;
 } Gnoop;
+#endif
 
+#ifdef TARGET_PC
+typedef struct Gmtx {
+    unsigned int type: 8;
+    unsigned int pad: 8;
+    unsigned int par: 8;
+    unsigned int cmd: 8;
+    unsigned int addr;
+} Gmtx;
+#else
 typedef struct Gmtx {
     unsigned int cmd: 8;
     unsigned int par: 8;
     unsigned int pad: 8;
     unsigned int type: 8;
-
     unsigned int addr;
 } Gmtx;
+#endif
 
+#ifdef TARGET_PC
+typedef struct Gvtx {
+    unsigned int vn:8;
+    unsigned int pad1: 4;
+    unsigned int n: 8;
+    unsigned int pad0: 4;
+    unsigned int cmd: 8;
+    unsigned int addr;
+} Gvtx;
+#else
 typedef struct Gvtx {
     unsigned int cmd: 8;
     unsigned int pad0: 4;
     unsigned int n: 8;
     unsigned int pad1: 4;
     unsigned int vn:8;
-
     unsigned int addr;
 } Gvtx;
+#endif
 
+#ifdef TARGET_PC
+typedef struct Gline3D_new {
+    unsigned int wd: 8;
+    unsigned int v1: 8;
+    unsigned int v0: 8;
+    unsigned int cmd: 8;
+    unsigned int pad;
+} Gline3D_new;
+#else
 typedef struct Gline3D_new {
     unsigned int cmd: 8;
     unsigned int v0: 8;
     unsigned int v1: 8;
     unsigned int wd: 8;
-
     unsigned int pad;
 } Gline3D_new;
+#endif
 
+#ifdef TARGET_PC
+typedef struct Gtri1 {
+    unsigned int v2: 8;
+    unsigned int v1: 8;
+    unsigned int v0: 8;
+    unsigned int cmd: 8;
+    unsigned int pad;
+} Gtri1;
+#else
 typedef struct Gtri1 {
     unsigned int cmd: 8;
     unsigned int v0: 8;
     unsigned int v1: 8;
     unsigned int v2: 8;
-
     unsigned int pad;
 } Gtri1;
+#endif
 
+#ifdef TARGET_PC
+typedef struct Gtri2 {
+    unsigned int t0v2: 8;
+    unsigned int t0v1: 8;
+    unsigned int t0v0: 8;
+    int cmd: 8;
+    unsigned int t1v2: 8;
+    unsigned int t1v1: 8;
+    unsigned int t1v0: 8;
+    unsigned int pad: 8;
+} Gtri2;
+#else
 typedef struct Gtri2 {
     int cmd: 8;
     unsigned int t0v0: 8;
     unsigned int t0v1: 8;
     unsigned int t0v2: 8;
-
     unsigned int pad: 8;
     unsigned int t1v0: 8;
     unsigned int t1v1: 8;
     unsigned int t1v2: 8;
 } Gtri2;
+#endif
 
+#ifdef TARGET_PC
 typedef struct Gtrin_independ {
-    unsigned int cmd: 8; // 32
-    unsigned int count: 7; // 24
-    unsigned int f2v2: 5; // 17
-    unsigned int f2v1: 5; // 12
-    unsigned int f2v0: 5; // 7
-    unsigned int f1v2_1: 2; // 2
-
-    unsigned int f1v2_0: 3; // 32
-    unsigned int f1v1: 5; // 29
-    unsigned int f1v0: 5; // 24
-    unsigned int f0v2: 5; // 19
-    unsigned int f0v1: 5; // 14
-    unsigned int f0v0: 5; // 9
-    unsigned int pad: 3; // 4
-    unsigned int is7bit: 1; // 1
+    unsigned int f1v2_1: 2;
+    unsigned int f2v0: 5;
+    unsigned int f2v1: 5;
+    unsigned int f2v2: 5;
+    unsigned int count: 7;
+    unsigned int cmd: 8;
+    unsigned int is7bit: 1;
+    unsigned int pad: 3;
+    unsigned int f0v0: 5;
+    unsigned int f0v1: 5;
+    unsigned int f0v2: 5;
+    unsigned int f1v0: 5;
+    unsigned int f1v1: 5;
+    unsigned int f1v2_0: 3;
 } Gtrin_independ;
+#else
+typedef struct Gtrin_independ {
+    unsigned int cmd: 8;
+    unsigned int count: 7;
+    unsigned int f2v2: 5;
+    unsigned int f2v1: 5;
+    unsigned int f2v0: 5;
+    unsigned int f1v2_1: 2;
+    unsigned int f1v2_0: 3;
+    unsigned int f1v1: 5;
+    unsigned int f1v0: 5;
+    unsigned int f0v2: 5;
+    unsigned int f0v1: 5;
+    unsigned int f0v0: 5;
+    unsigned int pad: 3;
+    unsigned int is7bit: 1;
+} Gtrin_independ;
+#endif
 
+#ifdef TARGET_PC
 typedef struct Gtrin {
-    unsigned int f3v2: 5; // 32
-    unsigned int f3v1: 5; // 27
-    unsigned int f3v0: 5; // 22
-    unsigned int f2v2: 5; // 17
-    unsigned int f2v1: 5; // 12
-    unsigned int f2v0: 5; // 7
-    unsigned int f1v2_1: 2; // 2
-
-    unsigned int f1v2_0: 3; // 32
-    unsigned int f1v1: 5; // 29
-    unsigned int f1v0: 5; // 24
-    unsigned int f0v2: 5; // 19
-    unsigned int f0v1: 5; // 14
-    unsigned int f0v0: 5; // 9
-    unsigned int pad: 3; // 32
-    unsigned int is7bit: 1; // 1
+    unsigned int f1v2_1: 2;
+    unsigned int f2v0: 5;
+    unsigned int f2v1: 5;
+    unsigned int f2v2: 5;
+    unsigned int f3v0: 5;
+    unsigned int f3v1: 5;
+    unsigned int f3v2: 5;
+    unsigned int is7bit: 1;
+    unsigned int pad: 3;
+    unsigned int f0v0: 5;
+    unsigned int f0v1: 5;
+    unsigned int f0v2: 5;
+    unsigned int f1v0: 5;
+    unsigned int f1v1: 5;
+    unsigned int f1v2_0: 3;
 } Gtrin;
+#else
+typedef struct Gtrin {
+    unsigned int f3v2: 5;
+    unsigned int f3v1: 5;
+    unsigned int f3v0: 5;
+    unsigned int f2v2: 5;
+    unsigned int f2v1: 5;
+    unsigned int f2v0: 5;
+    unsigned int f1v2_1: 2;
+    unsigned int f1v2_0: 3;
+    unsigned int f1v1: 5;
+    unsigned int f1v0: 5;
+    unsigned int f0v2: 5;
+    unsigned int f0v1: 5;
+    unsigned int f0v0: 5;
+    unsigned int pad: 3;
+    unsigned int is7bit: 1;
+} Gtrin;
+#endif
 
+#ifdef TARGET_PC
 typedef struct Gtrin_7b {
-    unsigned int f2v2: 7; // 32
-    unsigned int f2v1: 7; // 25
-    unsigned int f2v0: 7; // 18
-    unsigned int f1v2: 7; // 11
-    unsigned int f1v1_1: 4; // 4
-
-    unsigned int f1v1_0: 3; // 32
-    unsigned int f1v0: 7; // 29
-    unsigned int f0v2: 7; // 22
-    unsigned int f0v1: 7; // 15
-    unsigned int f0v0: 7; // 8
-    unsigned int is7bit: 1; // 1
+    unsigned int f1v1_1: 4;
+    unsigned int f1v2: 7;
+    unsigned int f2v0: 7;
+    unsigned int f2v1: 7;
+    unsigned int f2v2: 7;
+    unsigned int is7bit: 1;
+    unsigned int f0v0: 7;
+    unsigned int f0v1: 7;
+    unsigned int f0v2: 7;
+    unsigned int f1v0: 7;
+    unsigned int f1v1_0: 3;
 } Gtrin_7b;
+#else
+typedef struct Gtrin_7b {
+    unsigned int f2v2: 7;
+    unsigned int f2v1: 7;
+    unsigned int f2v0: 7;
+    unsigned int f1v2: 7;
+    unsigned int f1v1_1: 4;
+    unsigned int f1v1_0: 3;
+    unsigned int f1v0: 7;
+    unsigned int f0v2: 7;
+    unsigned int f0v1: 7;
+    unsigned int f0v0: 7;
+    unsigned int is7bit: 1;
+} Gtrin_7b;
+#endif
 
+#ifdef TARGET_PC
 typedef struct Gquad_independ {
-    unsigned int cmd: 8; // 32
-    unsigned int count: 7; // 24
-    unsigned int unused: 5; // 17
-    unsigned int f1v3: 5; // 12
-    unsigned int f1v2: 5; // 7
-    unsigned int f1v1_1: 2; // 2
-
-    unsigned int f1v1_0: 3; // 32
-    unsigned int f1v0: 5; // 29
-    unsigned int f0v3: 5; // 24
-    unsigned int f0v2: 5; // 19
-    unsigned int f0v1: 5; // 14
-    unsigned int f0v0: 5; // 9
-    unsigned int pad: 3; // 4
-    unsigned int is7bit: 1; // 1
+    unsigned int f1v1_1: 2;
+    unsigned int f1v2: 5;
+    unsigned int f1v3: 5;
+    unsigned int unused: 5;
+    unsigned int count: 7;
+    unsigned int cmd: 8;
+    unsigned int is7bit: 1;
+    unsigned int pad: 3;
+    unsigned int f0v0: 5;
+    unsigned int f0v1: 5;
+    unsigned int f0v2: 5;
+    unsigned int f0v3: 5;
+    unsigned int f1v0: 5;
+    unsigned int f1v1_0: 3;
 } Gquad_independ;
+#else
+typedef struct Gquad_independ {
+    unsigned int cmd: 8;
+    unsigned int count: 7;
+    unsigned int unused: 5;
+    unsigned int f1v3: 5;
+    unsigned int f1v2: 5;
+    unsigned int f1v1_1: 2;
+    unsigned int f1v1_0: 3;
+    unsigned int f1v0: 5;
+    unsigned int f0v3: 5;
+    unsigned int f0v2: 5;
+    unsigned int f0v1: 5;
+    unsigned int f0v0: 5;
+    unsigned int pad: 3;
+    unsigned int is7bit: 1;
+} Gquad_independ;
+#endif
 
+#ifdef TARGET_PC
 typedef struct Gquad {
-    unsigned int f2v3: 5; // 32
-    unsigned int f2v2: 5; // 27
-    unsigned int f2v1: 5; // 22
-    unsigned int f2v0: 5; // 17
-    unsigned int f1v3: 5; // 12
-    unsigned int f1v2: 5; // 7
-    unsigned int f1v1_1: 2; // 2
-
-    unsigned int f1v1_0: 3; // 32
-    unsigned int f1v0: 5; // 29
-    unsigned int f0v3: 5; // 24
-    unsigned int f0v2: 5; // 19
-    unsigned int f0v1: 5; // 14
-    unsigned int f0v0: 5; // 9
-    unsigned int pad: 3; // 4
-    unsigned int is7bit: 1; // 1
+    unsigned int f1v1_1: 2;
+    unsigned int f1v2: 5;
+    unsigned int f1v3: 5;
+    unsigned int f2v0: 5;
+    unsigned int f2v1: 5;
+    unsigned int f2v2: 5;
+    unsigned int f2v3: 5;
+    unsigned int is7bit: 1;
+    unsigned int pad: 3;
+    unsigned int f0v0: 5;
+    unsigned int f0v1: 5;
+    unsigned int f0v2: 5;
+    unsigned int f0v3: 5;
+    unsigned int f1v0: 5;
+    unsigned int f1v1_0: 3;
 } Gquad;
+#else
+typedef struct Gquad {
+    unsigned int f2v3: 5;
+    unsigned int f2v2: 5;
+    unsigned int f2v1: 5;
+    unsigned int f2v0: 5;
+    unsigned int f1v3: 5;
+    unsigned int f1v2: 5;
+    unsigned int f1v1_1: 2;
+    unsigned int f1v1_0: 3;
+    unsigned int f1v0: 5;
+    unsigned int f0v3: 5;
+    unsigned int f0v2: 5;
+    unsigned int f0v1: 5;
+    unsigned int f0v0: 5;
+    unsigned int pad: 3;
+    unsigned int is7bit: 1;
+} Gquad;
+#endif
 
+#ifdef TARGET_PC
 typedef struct Gquad_7b {
-    unsigned int f1v3: 7; // 32
-    unsigned int f1v2: 7; // 25
-    unsigned int f1v1: 7; // 18
-    unsigned int f1v0_1: 4; // 11
-    unsigned int f1v0_0: 3; // 7
-    unsigned int pad: 4; // 4
-
-    unsigned int f0v3: 7; // 32
-    unsigned int f0v2: 7; // 25
-    unsigned int f0v1: 7; // 18
-    unsigned int f0v0: 7; // 11
-    unsigned int pad0: 3; // 4
-    unsigned int is7bit: 1; // 1
+    unsigned int pad: 4;
+    unsigned int f1v0_0: 3;
+    unsigned int f1v0_1: 4;
+    unsigned int f1v1: 7;
+    unsigned int f1v2: 7;
+    unsigned int f1v3: 7;
+    unsigned int is7bit: 1;
+    unsigned int pad0: 3;
+    unsigned int f0v0: 7;
+    unsigned int f0v1: 7;
+    unsigned int f0v2: 7;
+    unsigned int f0v3: 7;
 } Gquad_7b;
+#else
+typedef struct Gquad_7b {
+    unsigned int f1v3: 7;
+    unsigned int f1v2: 7;
+    unsigned int f1v1: 7;
+    unsigned int f1v0_1: 4;
+    unsigned int f1v0_0: 3;
+    unsigned int pad: 4;
+    unsigned int f0v3: 7;
+    unsigned int f0v2: 7;
+    unsigned int f0v1: 7;
+    unsigned int f0v0: 7;
+    unsigned int pad0: 3;
+    unsigned int is7bit: 1;
+} Gquad_7b;
+#endif
 
+#ifdef TARGET_PC
+typedef struct Gquad0 {
+    unsigned int v2: 8;
+    unsigned int v1: 8;
+    unsigned int v0: 8;
+    int cmd: 8;
+    unsigned int v3: 8;
+    unsigned int pad: 24;
+} Gquad0;
+#else
 typedef struct Gquad0 {
     int cmd: 8;
     unsigned int v0: 8;
     unsigned int v1: 8;
     unsigned int v2: 8;
-
     unsigned int pad: 24;
     unsigned int v3: 8;
 } Gquad0;
+#endif
 
+#ifdef TARGET_PC
+typedef struct Gculldl {
+    unsigned int vstart: 16;
+    unsigned int pad0: 8;
+    int cmd: 8;
+    unsigned int vend: 16;
+    unsigned int pad1: 16;
+} Gculldl;
+#else
 typedef struct Gculldl {
     int cmd: 8;
     unsigned int pad0: 8;
     unsigned int vstart: 16;
-
     unsigned int pad1: 16;
     unsigned int vend: 16;
 } Gculldl;
+#endif
 
+#ifdef TARGET_PC
+typedef struct Gspecial1 {
+    unsigned int param0: 16;
+    int mode: 8;
+    int cmd: 8;
+    unsigned int param1;
+} Gspecial1;
+#else
 typedef struct Gspecial1 {
     int cmd: 8;
     int mode: 8;
     unsigned int param0: 16;
-
     unsigned int param1;
 } Gspecial1;
+#endif
 
+#ifdef TARGET_PC
+typedef struct {
+		u32		len:8;
+		u32		sft:8;
+		int		pad0:8;
+		int		cmd:8;
+		unsigned int	data:32;
+} Gsetothermode_dolphin;
+#else
 typedef struct {
 		int		cmd:8;
 		int		pad0:8;
@@ -602,6 +994,7 @@ typedef struct {
 		u32		len:8;
 		unsigned int	data:32;
 } Gsetothermode_dolphin;
+#endif
 
 typedef struct {
     unsigned char col[3];
@@ -690,13 +1083,13 @@ do { \
 
 #define gsDPLoadTLUT_Dolphin(name, count, unk, addr) \
 {{ \
-    _SHIFTL(G_LOADTLUT, 24, 8) | _SHIFTL(G_TLUT_DOLPHIN, 22, 2) | _SHIFTL(name, 16, 4) | _SHIFTL(unk, 14, 2) | _SHIFTL(count, 0, 14), (unsigned int)addr \
+    _SHIFTL(G_LOADTLUT, 24, 8) | _SHIFTL(G_TLUT_DOLPHIN, 22, 2) | _SHIFTL(name, 16, 4) | _SHIFTL(unk, 14, 2) | _SHIFTL(count, 0, 14), _GBI_STATIC_PTR(addr) \
 }}
 
 #define gsDPSetTextureImage_Dolphin(fmt, siz, w, h, img) \
 {{ \
     _SHIFTL(G_SETTIMG, 24, 8) | _SHIFTL(fmt, 21, 3) | _SHIFTL(siz, 19, 2) | _SHIFTL(1, 18, 1) | \
-        _SHIFTL((h/4)-1, 10, 8) | _SHIFTL((w-1), 0, 10), (unsigned int)img \
+        _SHIFTL((h/4)-1, 10, 8) | _SHIFTL((w-1), 0, 10), _GBI_STATIC_PTR(img) \
 }}
 
 #define gsDPSetTile_Dolphin(d_fmt, tile, tlut_name, wrap_s, wrap_t, shift_s, shift_t) \
@@ -794,19 +1187,6 @@ do { \
   _g->words.w1 = (u32)(_SHIFTL(gsSPNTriangleData1(v3, v4, v5, 0), 19, 13) | _SHIFTL(gsSPNTriangleData1(v0, v1, v2, 0), 4, 15) | _SHIFTL(G_VTX_MODE_5bit, 0, 1)); \
 }}
 
-// TODO: convert
-#define gSPNTriangles_7b(v0, v1, v2, v3, v4, v5, v6, v7, v8) \
-{{ \
-    (unsigned long long)((gsSPNTriangleData2(v6, v7, v8) << 43) | (gsSPNTriangleData2(v3, v4, v5) << 22) | \
-        (gsSPNTriangleData2(v0, v1, v2) << 1)) | G_VTX_MODE_7bit \
-}}
-
-#define gSPNTrianglesInit_7b(n, v0, v1, v2, v3, v4, v5) \
-{{ \
-    (unsigned long long)((((unsigned long long)gsSPNTriangles_Independ(n)) << 32) | (gsSPNWTriangleData2(v3, v4, v5) << 22) | \
-        (gsSPNTriangleData2(v0, v1, v2) << 1)) | G_VTX_MODE_7bit \
-}}
-
 #define gsSPNTriangles_5b(v0, v1, v2, v3, v4, v5, v6, v7, v8, v9, v10, v11) \
 {{ \
     _SHIFTL(gsSPNTriangleData1(v9, v10, v11, 0), 17, 15) | _SHIFTL(gsSPNTriangleData1(v6, v7, v8, 0), 2, 15) | _SHIFTL(_SHIFTR(gsSPNTriangleData1(v3, v4, v5, 0), 13, 2), 0, 2), \
@@ -827,7 +1207,7 @@ do { \
 
 #define gsSPNTrianglesInit_7b(n, v0, v1, v2, v3, v4, v5) \
 {{ \
-    (unsigned long long)((((unsigned long long)gsSPNTriangles_Independ(n)) << 32) | (gsSPNWTriangleData2(v3, v4, v5) << 22) | \
+    (unsigned long long)((((unsigned long long)gsSPNTriangles_Independ(n)) << 32) | (gsSPNTriangleData2(v3, v4, v5) << 22) | \
         (gsSPNTriangleData2(v0, v1, v2) << 1)) | G_VTX_MODE_7bit \
 }}
 

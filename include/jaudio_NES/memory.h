@@ -4,6 +4,10 @@
 #include "types.h"
 #include "jaudio_NES/audiostruct.h"
 
+#if defined(__cplusplus) && defined(TARGET_PC)
+extern "C" {
+#endif
+
 extern void Nas_HeapInit(ALHeap* heap, u8* base, s32 len);
 extern void* Nas_HeapAlloc(ALHeap* heap, s32 size);
 extern void* Nas_HeapAlloc_CL(ALHeap* heap, s32 size);
@@ -29,5 +33,9 @@ extern void* EmemOnCheck(s32 table_type, s32 id);
 extern void* EmemAlloc(s32 table_type, s32 id, s32 size);
 
 extern void Nas_ForceStopChannel(s32 bank_id);
+
+#if defined(__cplusplus) && defined(TARGET_PC)
+}
+#endif
 
 #endif

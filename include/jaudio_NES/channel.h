@@ -4,6 +4,10 @@
 #include "types.h"
 #include "jaudio_NES/audiowork.h"
 
+#if defined(__cplusplus) && defined(TARGET_PC)
+extern "C" {
+#endif
+
 extern s32 OverwriteBank(s32 type, s32 bankId, s32 idx, s32 voicetable);
 extern channel* Nas_AllocationOnRequest(note* n);
 
@@ -26,4 +30,8 @@ extern void Nas_StopVoice(channel* chan);
 
 extern void Nas_ChannelInit(void);
 extern void Nas_InitChannelList(void);
+#if defined(__cplusplus) && defined(TARGET_PC)
+}
+#endif
+
 #endif

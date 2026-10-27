@@ -8,8 +8,13 @@ extern "C"{
 #endif
 
 typedef void (*voidfunctionptr)(void); // pointer to function returning void
+#ifndef TARGET_PC
 __declspec(section ".ctors") extern voidfunctionptr _ctors[];
 __declspec(section ".dtors") extern voidfunctionptr _dtors[];
+#else
+extern voidfunctionptr _ctors[];
+extern voidfunctionptr _dtors[];
+#endif
 
 /**
  * Linker Generated Symbols
@@ -83,9 +88,15 @@ typedef struct ExtabIndexInfo {
     u32 codeSize;    // at 0x10
 } ExtabIndexInfo;
 
+#ifndef TARGET_PC
 __declspec(section ".init") extern  RomSection _rom_copy_info[];
 __declspec(section ".init") extern  BssSection _bss_init_info[];
 __declspec(section ".init") extern  ExtabIndexInfo _eti_init_info[];
+#else
+extern RomSection _rom_copy_info[];
+extern BssSection _bss_init_info[];
+extern ExtabIndexInfo _eti_init_info[];
+#endif
 
 #ifdef __cplusplus
 }

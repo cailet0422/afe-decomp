@@ -8,6 +8,10 @@
 #define DUMMYROM_DRAM_TO_ARAM 0
 #define DUMMYROM_ARAM_TO_DRAM 1
 
+#if defined(__cplusplus) && defined(TARGET_PC)
+extern "C" {
+#endif
+
 extern u8* JAC_ARAM_DMA_BUFFER_TOP;
 extern ALHeap aram_hp; /* placed in common bss */
 
@@ -19,5 +23,9 @@ extern BOOL ARAMStartDMAmesg(u32 dir, u32 dramAddr, u32 aramAddr, u32 size, s32 
 extern void Jac_SetAudioARAMSize(u32 size);
 extern void* ARAllocFull(u32* outSize);
 extern void Jac_InitARAM(u32 loadAudiorom);
+
+#if defined(__cplusplus) && defined(TARGET_PC)
+}
+#endif
 
 #endif

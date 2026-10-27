@@ -31,6 +31,10 @@ union SOUNDID_ {
 	u8 bytes[4];
 };
 
+#if defined(__cplusplus) && defined(TARGET_PC)
+extern "C" {
+#endif
+
 void Effecter_Overwrite_1ShotD(jc_*, Osc_*, u32);
 Perc_* PercRead(u32, u32);
 Inst_* InstRead(u32, u32);
@@ -49,5 +53,9 @@ u32 One_CheckInstWave(SOUNDID_); // Return type unsure
 jc_* Play_1shot(jcs_*, SOUNDID_, u32);
 jc_* Play_1shot_Perc(jcs_*, SOUNDID_, u32);
 jc_* Play_1shot_Osc(jcs_*, SOUNDID_, u32);
+
+#if defined(__cplusplus) && defined(TARGET_PC)
+}
+#endif
 
 #endif

@@ -10,7 +10,11 @@ extern "C" {
 
 #define TEX_CACHE_ALIGNMENT (32 - 1) /* 32 byte alignment */
 #define NUM_TEXTURE_CACHE_DATA 10
+#ifdef TARGET_PC
+#define TEXTURE_CACHE_LIST_SIZE 1024  /* PC: larger list for more textures */
+#else
 #define TEXTURE_CACHE_LIST_SIZE 256
+#endif
 #define TMEM_ENTRIES 128
 
 #define TEX_CACHE_ALIGN(n) ((n + TEX_CACHE_ALIGNMENT) & ~TEX_CACHE_ALIGNMENT)
@@ -62,8 +66,14 @@ typedef struct texture_cache_t {
 /* TMEM map */
 // static tmem_t tmem_map[TMEM_ENTRIES];
 
+#ifdef TARGET_PC
+/* PC has plenty of RAM - use larger texture cache */
+#define TEX_BUFFER_DATA_SIZE 0x80000   /* 512 KB (was 48 KB) */
+#define TEX_BUFFER_BSS_SIZE 0x4000     /* 16 KB (was 1 KB) */
+#else
 #define TEX_BUFFER_DATA_SIZE 0xC000
 #define TEX_BUFFER_BSS_SIZE 0x400
+#endif
 
 #ifdef __cplusplus
 }

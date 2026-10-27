@@ -42,10 +42,19 @@ typedef struct group_ group;
 typedef struct AudioPort_ {
     union {
         struct {
+#ifdef TARGET_PC
+            /* On LE, reverse field order so u32 overlay matches
+             * NA_MAKE_COMMAND which puts opcode in bits 31-24. */
+            /* 0x03 */ u8 arg2;
+            /* 0x02 */ u8 arg1;
+            /* 0x01 */ u8 arg0;
+            /* 0x00 */ u8 opcode;
+#else
             /* 0x00 */ u8 opcode;
             /* 0x01 */ u8 arg0;
             /* 0x02 */ u8 arg1;
             /* 0x03 */ u8 arg2;
+#endif
         } command;
         /* 0x00 */ u32 raw_cmd;
     };
@@ -108,12 +117,26 @@ typedef struct adpcmbook_ {
 } adpcmbook;
 
 typedef struct smzwavetable_ {
+#ifdef TARGET_PC
+    /*
+     * LE compiler bitfields allocate from low bits first. The bank word is
+     * byte-swapped to host order in pc_swap_smzwavetable(), so declare fields
+     * from low->high bit positions to preserve BE semantic names.
+     */
+    /* 0x00 */ u32 size : 24;
+    /* 0x00 */ u32 is_relocated : 1;
+    /* 0x00 */ u32 bit26 : 1;
+    /* 0x00 */ u32 medium : 2;
+    /* 0x00 */ u32 codec : 3;
+    /* 0x00 */ u32 bit31 : 1;
+#else
     /* 0x00 */ u32 bit31 : 1;
     /* 0x00 */ u32 codec : 3;
     /* 0x00 */ u32 medium : 2;
     /* 0x00 */ u32 bit26 : 1;
     /* 0x00 */ u32 is_relocated : 1;
     /* 0x00 */ u32 size : 24;
+#endif
     /* 0x04 */ u8* sample;
     /* 0x08 */ adpcmloop* loop;
     /* 0x0C */ adpcmbook* book;
@@ -127,24 +150,23 @@ typedef struct wtstr_ {
 
 /* sizeof(phase) == 0x01 */
 typedef struct phase_ {
-    // union {
-    //     struct {
-    //         /* 0x00 */ u8 _unused : 2;
-    //         /* 0x00 */ u8 type : 2;
-    //         /* 0x00 */ u8 strong_right : 1;
-    //         /* 0x00 */ u8 strong_left : 1;
-    //         /* 0x00 */ u8 strong_reverb_right : 1;
-    //         /* 0x00 */ u8 strong_reverb_left : 1;
-    //     } flags;
-    //     /* 0x00 */ u8 asU8;
-    // };
-
+#ifdef TARGET_PC
+    /* x86 GCC: LSB-first bitfields. Reverse order so raw byte from
+       GC sequence data (MSB-first layout) maps to correct fields. */
+    /* 0x00 */ u8 strong_reverb_left : 1;
+    /* 0x00 */ u8 strong_reverb_right : 1;
+    /* 0x00 */ u8 strong_left : 1;
+    /* 0x00 */ u8 strong_right : 1;
+    /* 0x00 */ u8 type : 2;
+    /* 0x00 */ u8 _unused : 2;
+#else
     /* 0x00 */ u8 _unused : 2;
     /* 0x00 */ u8 type : 2;
     /* 0x00 */ u8 strong_right : 1;
     /* 0x00 */ u8 strong_left : 1;
     /* 0x00 */ u8 strong_reverb_right : 1;
     /* 0x00 */ u8 strong_reverb_left : 1;
+#endif
 } phase;
 
 /* sizeof(sweep) == 0x0C */
@@ -923,7 +945,15 @@ typedef struct AudioGlobals {
     /* 0x8A7C */ OSMesgQueue spec_change_mq;
     /* 0x8A94 */ OSMesg task_start_msg_buf[1];
     /* 0x8A98 */ OSMesg spec_change_msg_buf[1];
+#ifdef TARGET_PC
+    /* On PC (synchronous), port commands are only consumed once per frame
+     * in CreateAudioTask. During spec changes (reset_status!=0), consumption
+     * pauses for ~14 frames while the game keeps sending 55 cmds/frame.
+     * Need more queue slots to avoid overflow. */
+    /* 0x8A9C */ OSMesg thread_cmd_proc_msg_buf[64];
+#else
     /* 0x8A9C */ OSMesg thread_cmd_proc_msg_buf[4];
+#endif
     /* 0x8AAC */ AudioPort audio_port_cmds[256];
     /* 0x92AC */ s32 _92AC;
 } AudioGlobals;

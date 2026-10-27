@@ -239,7 +239,8 @@ static void mCD_set_base_dl(Submenu* submenu, GAME* game, f32 pos_x, f32 pos_y, 
     gSPDisplayList(POLY_OPA_DISP++, cal_win_monthT_model);
     Matrix_pull();
     gDPLoadTextureBlock_8b_Dolphin(POLY_OPA_DISP++, cal_win_box_tex_rgb_ia8, G_IM_FMT_IA, 32, 32, 0, GX_MIRROR, GX_MIRROR, 0, 0);
-    
+
+
     k = 0;
     for (i = 0; i < 37; k++) {
         for (j = 0; j < lbRTC_WEEK && i < 37; i++) {

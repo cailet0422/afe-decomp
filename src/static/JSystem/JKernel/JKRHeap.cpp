@@ -339,6 +339,17 @@ void operator delete(void* memory) {
 void operator delete[](void* memory) {
     JKRHeap::free(memory, nullptr);
 }
+#ifdef TARGET_PC
+/* C++14 sized deallocation - GCC 15 generates calls to these by default.
+   Without these, sized delete falls through to CRT free() which crashes
+   on pointers from the JKR heap (inside the game's arena memory). */
+void operator delete(void* memory, size_t) {
+    JKRHeap::free(memory, nullptr);
+}
+void operator delete[](void* memory, size_t) {
+    JKRHeap::free(memory, nullptr);
+}
+#endif
 
 /*JKRHeap::TState::TState(const JKRHeap::TState::TArgument &arg, const JKRHeap::TState::TLocation &location)
 {

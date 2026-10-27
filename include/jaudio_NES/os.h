@@ -4,6 +4,10 @@
 #include "types.h"
 #include "libultra/libultra.h"
 
+#if defined(__cplusplus) && defined(TARGET_PC)
+extern "C" {
+#endif
+
 extern void Z_osWritebackDCacheAll();
 extern void osInvalDCache2(void* src, s32 size);
 extern void osWritebackDCache2(void* src, s32 size);
@@ -12,5 +16,9 @@ extern s32 Z_osSendMesg(OSMesgQueue* mq, OSMesg msg, s32 flags);
 extern s32 Z_osRecvMesg(OSMesgQueue* mq, OSMesg* msg, s32 flags);
 extern s32 Z_osEPiStartDma(OSPiHandle* handler, OSIoMesg* msg, s32 dir);
 extern void Z_bcopy(void* src, void* dst, size_t size);
+
+#if defined(__cplusplus) && defined(TARGET_PC)
+}
+#endif
 
 #endif

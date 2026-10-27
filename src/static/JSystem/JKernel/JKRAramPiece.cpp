@@ -41,6 +41,12 @@ JKRAMCommand* JKRAramPiece::orderAsync(int direction, u32 source, u32 destinatio
         JPANIC(108, "illegal address. abort.");
     }
 
+#ifdef TARGET_PC
+    JKRAMCommand* cmd = JKRAramPiece::prepareCommand(direction, source, destination, length, aramBlock, callback);
+
+    /* On PC, execute DMA synchronously (no worker thread) */
+    JKRAramPiece::startDMA(cmd);
+#else
     JKRAramCommand* aramCmd = new (JKRGetSystemHeap(), -4) JKRAramCommand();
     JKRAMCommand* cmd = JKRAramPiece::prepareCommand(direction, source, destination, length, aramBlock, callback);
     aramCmd->setting(TRUE, cmd);
@@ -48,6 +54,7 @@ JKRAMCommand* JKRAramPiece::orderAsync(int direction, u32 source, u32 destinatio
     if (cmd->mCallback != nullptr) {
         JKRAramPiece::sAramPieceCommandList.append(&cmd->mAramPieceCommandLink);
     }
+#endif
 
     JKRAramPiece::unlock();
     return cmd;

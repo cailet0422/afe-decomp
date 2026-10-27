@@ -1,6 +1,10 @@
 #ifndef _STRING_H_
 #define _STRING_H_
 
+#ifdef TARGET_PC
+#include_next <string.h>
+#else
+
 #include <stddef.h>
 
 #ifdef __cplusplus
@@ -28,4 +32,5 @@ char* strcat(char* dst, const char* src);
 }
 #endif
 
+#endif /* TARGET_PC */
 #endif

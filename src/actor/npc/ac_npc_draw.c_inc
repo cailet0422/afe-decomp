@@ -351,7 +351,7 @@ static void aNPC_actor_draw_sub(ACTOR* actorx, GAME* game) {
             } else {
                 NPC_CONTROL_ACTOR* ctrl = (NPC_CONTROL_ACTOR*)aNPC_ctrlActor;
                 aNPC_cloth_c* cloth_p = ctrl->cloth + (int)nactorx->draw.cloth_idx - 1;
-                
+
                 tex_p = (u8*)cloth_p->texture_bank.ram_start;
                 pal_p = (u16*)cloth_p->palette_bank.ram_start;
             }

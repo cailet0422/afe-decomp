@@ -77,6 +77,9 @@ bool JKRDvdFile::close() {
             JPANIC(213, "cannot close DVD file\n");
         }
     }
+#ifdef TARGET_PC
+    return false;
+#endif
 }
 
 int JKRDvdFile::readData(void* data, s32 length, s32 ofs) {

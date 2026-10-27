@@ -3,6 +3,10 @@
 
 #include "types.h"
 
+#if defined(__cplusplus) && defined(TARGET_PC)
+extern "C" {
+#endif
+
 void Jac_FatMemory_Init(u32);
 void FAT_InitSystem(u8*, u32);
 int FAT_AllocateMemory(u32);
@@ -14,5 +18,9 @@ void FAT_ReadWordD(u16, u32); // UNUSED, but these were probably global
 u32 FAT_ReadLong(u16, u32);   // UNUSED, but these were probably global
 void FAT_ReadLongD(u16, u32); // UNUSED, but these were probably global
 int FAT_StoreBlock(u8*, u16, u32, u32);
+
+#if defined(__cplusplus) && defined(TARGET_PC)
+}
+#endif
 
 #endif

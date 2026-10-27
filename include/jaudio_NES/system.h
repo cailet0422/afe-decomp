@@ -18,6 +18,10 @@ typedef enum SET_EXT_POINTER_TYPE {
 typedef s32 (*Na_DmaProc)(OSPiHandle* handle, OSIoMesg* mb, s32 direction);
 typedef s32 (*Na_SyncProc)(u8* param0, s32 param1);
 
+#if defined(__cplusplus) && defined(TARGET_PC)
+extern "C" {
+#endif
+
 extern void* Nas_WaveDmaCallBack(u32 device_addr, u32 size, s32 arg2, u8* waveload_idx, s32 medium);
 extern void Nas_InitAudio(u64* acmdBuf, s32 acmdBufSize);
 extern void Nas_FastCopy(u8* SrcAddr, u8* DestAdd, size_t Length, s32 medium);
@@ -34,6 +38,7 @@ extern s32 Nas_PreLoadBank_BG(s32 bankId, s32 param2, s32 param3, OSMesgQueue* m
 extern s32 Nas_PreLoadSeq_BG(s32 seqId, s32 param2, s32 param3, OSMesgQueue* mq);
 
 extern void Nas_FlushBank(s32 seqId);
+extern u8 Nas_MapHeaderReadByte(s32 byteIndex);
 
 extern void Nas_SetExtPointer(s32 type, s32 idx, s32 set_type, s32 param);
 
@@ -69,8 +74,19 @@ extern BOOL AUDIO_SYSTEM_READY;
 extern volatile BOOL AUDIO_SYSTEM_READY;
 #endif
 extern Na_DmaProc NA_DMA_PROC;
+
+#ifdef TARGET_PC
+struct envdat_;
+void pc_swap_envdat(struct envdat_* env);
+void pc_swap_envdat_seq(struct envdat_* env);
+void pc_reset_envdat_visited(void);
+#endif
 extern OSMesgQueue MK_QUEUE;
 extern OSMesg MK_QBUF[];
 extern u8* MK_RMES[];
+
+#if defined(__cplusplus) && defined(TARGET_PC)
+}
+#endif
 
 #endif

@@ -16,6 +16,9 @@
 #include "m_actor_shadow.h"
 #include "m_event_map_npc.h"
 #include "m_malloc.h"
+#ifdef TARGET_PC
+#include "pc_bswap.h"
+#endif
 
 #define aNPC_UNIT_RIGHT (1 << 0)
 #define aNPC_UNIT_LEFT (1 << 1)

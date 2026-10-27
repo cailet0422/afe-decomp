@@ -71,7 +71,18 @@ static void mSM_setup_view(Submenu* submenu, GRAPH* graph, int init_flag) {
         gDPPipeSync(POLY_OPA_DISP++);
         gDPSetScissor(POLY_OPA_DISP++, G_SC_NON_INTERLACE, view->screen.l, view->screen.top, view->screen.r,
                       view->screen.bottom);
+#ifdef TARGET_PC
+        /* Copy viewport into GRAPH_ALLOC buffer to avoid seg2k0 collision.
+           GAME_PLAY is heap-allocated and its address can land in the N64
+           segment range 0x03-0x0F, causing emu64 to misidentify the pointer. */
+        {
+            Vp* vp_copy = (Vp*)GRAPH_ALLOC_TYPE(graph, Vp, 1);
+            *vp_copy = view->viewport;
+            gSPViewport(POLY_OPA_DISP++, vp_copy);
+        }
+#else
         gSPViewport(POLY_OPA_DISP++, &view->viewport);
+#endif
         gDPSetScissor(POLY_OPA_DISP++, G_SC_NON_INTERLACE, 0, 0, 640, 480);
     }
 

@@ -1,6 +1,10 @@
 #ifndef _STDLIB_H_
 #define _STDLIB_H_
 
+#ifdef TARGET_PC
+#include_next <stdlib.h>
+#else
+
 #include <stddef.h>
 #include <wchar.h>
 
@@ -22,4 +26,5 @@ static inline int abs(int x)
 }
 #endif
 
+#endif /* TARGET_PC */
 #endif

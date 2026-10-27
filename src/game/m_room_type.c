@@ -10,6 +10,9 @@
 #include "dolphin/os/OSCache.h"
 #include "jsyswrap.h"
 #include "m_player_lib.h"
+#ifdef TARGET_PC
+#include "pc_bswap.h"
+#endif
 
 extern int mRmTp_GetPlayerRoomIdx(void) {
     mActor_name_t field_id = mFI_GetFieldId();
@@ -4456,6 +4459,10 @@ extern void mRmTp_CopyWallData(u8* dst, int wall_no) {
             u32 base_addr = JW_GetAramAddress(RESOURCE_PLAYER_ROOM_WALL);
 
             _JW_GetResourceAram(base_addr + wall_no * 0x1020, dst, 0x1020);
+#ifdef TARGET_PC
+            /* Byte-swap palette u16s from big-endian ARAM data */
+            pc_bswap16_array(dst, 16);
+#endif
             DCStoreRangeNoSync(dst, mNW_PALETTE_SIZE + 0x1000);
         }
     }
@@ -4485,6 +4492,10 @@ extern void mRmTp_CopyFloorData(u8* dst, int floor_no) {
             u32 base_addr = JW_GetAramAddress(RESOURCE_PLAYER_ROOM_FLOOR);
 
             _JW_GetResourceAram(base_addr + floor_no * 0x2020, dst, 0x2020);
+#ifdef TARGET_PC
+            /* Byte-swap palette u16s from big-endian ARAM data */
+            pc_bswap16_array(dst, 16);
+#endif
             DCStoreRangeNoSync(dst, mNW_PALETTE_SIZE + 0x2000);
         }
     }

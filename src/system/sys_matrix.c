@@ -530,6 +530,30 @@ void Matrix_softcv3_load(s_xyz* src, f32 x, f32 y, f32 z) {
     }
 }
 
+#ifdef TARGET_PC
+Mtx* _MtxF_to_Mtx(MtxF* src, Mtx* dest) {
+    u16* m1 = (u16*)&dest->m[0][0];
+    const f32 values[16] = {
+        src->xx, src->yx, src->zx, src->wx,
+        src->xy, src->yy, src->zy, src->wy,
+        src->xz, src->yz, src->zz, src->wz,
+        src->xw, src->yw, src->zw, src->ww
+    };
+    int i;
+
+    for (i = 0; i < 16; i += 2) {
+        int fp0 = values[i + 0] * 0x10000;
+        int fp1 = values[i + 1] * 0x10000;
+        /* Preserve N64 packed word ordering on little-endian hosts. */
+        m1[i + 0] = (fp1 >> 0x10);
+        m1[i + 1] = (fp0 >> 0x10);
+        m1[16 + i + 0] = fp1 & 0xFFFF;
+        m1[16 + i + 1] = fp0 & 0xFFFF;
+    }
+
+    return dest;
+}
+#else
 Mtx* _MtxF_to_Mtx(MtxF* src, Mtx* dest) {
     int fp;
     u16* m1 = (u16*)&dest->m[0][0];
@@ -600,6 +624,7 @@ Mtx* _MtxF_to_Mtx(MtxF* src, Mtx* dest) {
     m2[15] = fp & 0xFFFF;
     return dest;
 }
+#endif
 
 Mtx* _Matrix_to_Mtx(Mtx* dest) {
     return _MtxF_to_Mtx(Matrix_now, dest);
@@ -675,6 +700,28 @@ void Matrix_MtxtoMtxF(Mtx* src, MtxF* dest) {
     u16* m1 = (u16*)&src->m[0][0];
     u16* m2 = (u16*)&src->m[2][0];
 
+#ifdef TARGET_PC
+    /* On little-endian, s16 pairs within each int32 are swapped.
+       guMtxF2L packs (val0_hi << 16 | val1_hi) as int32.
+       On LE, u16[0] reads val1_hi (low half), u16[1] reads val0_hi (high half).
+       Swap indices: even<->odd within each pair. */
+    dest->xx = ((m1[1] << 0x10) | m2[1]) * (1 / (f64)0x10000);
+    dest->yx = ((m1[0] << 0x10) | m2[0]) * (1 / (f64)0x10000);
+    dest->zx = ((m1[3] << 0x10) | m2[3]) * (1 / (f64)0x10000);
+    dest->wx = ((m1[2] << 0x10) | m2[2]) * (1 / (f64)0x10000);
+    dest->xy = ((m1[5] << 0x10) | m2[5]) * (1 / (f64)0x10000);
+    dest->yy = ((m1[4] << 0x10) | m2[4]) * (1 / (f64)0x10000);
+    dest->zy = ((m1[7] << 0x10) | m2[7]) * (1 / (f64)0x10000);
+    dest->wy = ((m1[6] << 0x10) | m2[6]) * (1 / (f64)0x10000);
+    dest->xz = ((m1[9] << 0x10) | m2[9]) * (1 / (f64)0x10000);
+    dest->yz = ((m1[8] << 0x10) | m2[8]) * (1 / (f64)0x10000);
+    dest->zz = ((m1[11] << 0x10) | m2[11]) * (1 / (f64)0x10000);
+    dest->wz = ((m1[10] << 0x10) | m2[10]) * (1 / (f64)0x10000);
+    dest->xw = ((m1[13] << 0x10) | m2[13]) * (1 / (f64)0x10000);
+    dest->yw = ((m1[12] << 0x10) | m2[12]) * (1 / (f64)0x10000);
+    dest->zw = ((m1[15] << 0x10) | m2[15]) * (1 / (f64)0x10000);
+    dest->ww = ((m1[14] << 0x10) | m2[14]) * (1 / (f64)0x10000);
+#else
     dest->xx = ((m1[0] << 0x10) | m2[0]) * (1 / (f64)0x10000);
     dest->yx = ((m1[1] << 0x10) | m2[1]) * (1 / (f64)0x10000);
     dest->zx = ((m1[2] << 0x10) | m2[2]) * (1 / (f64)0x10000);
@@ -691,6 +738,7 @@ void Matrix_MtxtoMtxF(Mtx* src, MtxF* dest) {
     dest->yw = ((m1[13] << 0x10) | m2[13]) * (1 / (f64)0x10000);
     dest->zw = ((m1[14] << 0x10) | m2[14]) * (1 / (f64)0x10000);
     dest->ww = ((m1[15] << 0x10) | m2[15]) * (1 / (f64)0x10000);
+#endif
 }
 
 void Matrix_reverse(MtxF* curm) {
@@ -891,6 +939,20 @@ void Matrix_RotateVector(s16 angle, xyz_t* axis, u8 mode) {
 }
 
 void suMtxMakeTS(Mtx* mtx, f32 scaleX, f32 scaleY, f32 scaleZ, f32 translateX, f32 translateY, f32 translateZ) {
+#ifdef TARGET_PC
+    /* The original code uses s16/u16 struct overlay to write directly into the
+       N64 Mtx. This overlay assumes big-endian byte order within each int32,
+       which is incorrect on little-endian. Use guMtxF2L which packs correctly. */
+    float mf[4][4];
+    guMtxIdentF(mf);
+    mf[0][0] = scaleX;
+    mf[1][1] = scaleY;
+    mf[2][2] = scaleZ;
+    mf[3][0] = translateX;
+    mf[3][1] = translateY;
+    mf[3][2] = translateZ;
+    guMtxF2L(mf, mtx);
+#else
     struct {
         s16 intPart[4][4];
         u16 fracPart[4][4];
@@ -929,11 +991,39 @@ void suMtxMakeTS(Mtx* mtx, f32 scaleX, f32 scaleY, f32 scaleZ, f32 translateX, f
     mu->intPart[3][2] = ((u32)fp >> 16) & 0xFFFF;
     mu->intPart[3][3] = 1;
     mtx->m[3][3] = (u32)fp << 16;
+#endif
 }
 
 // S(RxRyRz)T where S is a scale matrix, Rx/Ry/Rz are rotations about the x/y/z axes, and T is a translation
 void suMtxMakeSRT(Mtx* mtx, f32 scaleX, f32 scaleY, f32 scaleZ, s16 rotX, s16 rotY, s16 rotZ, f32 translateX,
                   f32 translateY, f32 translateZ) {
+#ifdef TARGET_PC
+    float mf[4][4];
+    f32 sinX = sin_s(rotX);
+    f32 sinY = sin_s(rotY);
+    f32 sinZ = sin_s(rotZ);
+    f32 cosX = cos_s(rotX);
+    f32 cosY = cos_s(rotY);
+    f32 cosZ = cos_s(rotZ);
+
+    mf[0][0] = cosY * cosZ * scaleX;
+    mf[0][1] = cosY * sinZ * scaleX;
+    mf[0][2] = -sinY * scaleX;
+    mf[0][3] = 0.0f;
+    mf[1][0] = ((sinX * sinY * cosZ) - (cosX * sinZ)) * scaleY;
+    mf[1][1] = ((sinX * sinY * sinZ) + (cosX * cosZ)) * scaleY;
+    mf[1][2] = sinX * cosY * scaleY;
+    mf[1][3] = 0.0f;
+    mf[2][0] = ((cosX * sinY * cosZ) + (sinX * sinZ)) * scaleZ;
+    mf[2][1] = ((cosX * sinY * sinZ) - (sinX * cosZ)) * scaleZ;
+    mf[2][2] = cosX * cosY * scaleZ;
+    mf[2][3] = 0.0f;
+    mf[3][0] = translateX;
+    mf[3][1] = translateY;
+    mf[3][2] = translateZ;
+    mf[3][3] = 1.0f;
+    guMtxF2L(mf, mtx);
+#else
     int fp;
     struct {
         s16 intPart[4][4];
@@ -998,11 +1088,39 @@ void suMtxMakeSRT(Mtx* mtx, f32 scaleX, f32 scaleY, f32 scaleZ, s16 rotX, s16 ro
     mu->fracPart[0][3] = mu->fracPart[1][3] = mu->fracPart[2][3] = 0;
     mu->intPart[3][3] = 1;
     mu->fracPart[3][3] = 0;
+#endif
 }
 
 // S(RzRxRy)T where S is a scale matrix, Rx/Ry/Rz are rotations, and T is a translation
 void suMtxMakeSRT_ZXY(Mtx* mtx, f32 scaleX, f32 scaleY, f32 scaleZ, s16 rotX, s16 rotY, s16 rotZ, f32 translateX,
                       f32 translateY, f32 translateZ) {
+#ifdef TARGET_PC
+    float mf[4][4];
+    f32 sinX = sin_s(rotX);
+    f32 sinY = sin_s(rotY);
+    f32 sinZ = sin_s(rotZ);
+    f32 cosX = cos_s(rotX);
+    f32 cosY = cos_s(rotY);
+    f32 cosZ = cos_s(rotZ);
+
+    mf[0][0] = ((cosY * cosZ) + (sinX * sinY * sinZ)) * scaleX;
+    mf[0][1] = cosX * sinZ * scaleX;
+    mf[0][2] = (-(sinY * cosZ) + (sinX * cosY * sinZ)) * scaleX;
+    mf[0][3] = 0.0f;
+    mf[1][0] = (-(cosY * sinZ) + (sinX * sinY * cosZ)) * scaleY;
+    mf[1][1] = cosX * cosZ * scaleY;
+    mf[1][2] = ((sinY * sinZ) + (sinX * cosY * cosZ)) * scaleY;
+    mf[1][3] = 0.0f;
+    mf[2][0] = cosX * sinY * scaleZ;
+    mf[2][1] = -sinX * scaleZ;
+    mf[2][2] = cosX * cosY * scaleZ;
+    mf[2][3] = 0.0f;
+    mf[3][0] = translateX;
+    mf[3][1] = translateY;
+    mf[3][2] = translateZ;
+    mf[3][3] = 1.0f;
+    guMtxF2L(mf, mtx);
+#else
     int fp;
     struct {
         s16 intPart[4][4];
@@ -1067,4 +1185,5 @@ void suMtxMakeSRT_ZXY(Mtx* mtx, f32 scaleX, f32 scaleY, f32 scaleZ, s16 rotX, s1
     mu->fracPart[0][3] = mu->fracPart[1][3] = mu->fracPart[2][3] = 0;
     mu->intPart[3][3] = 1;
     mu->fracPart[3][3] = 0;
+#endif
 }

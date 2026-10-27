@@ -33,6 +33,15 @@ extern void watch_my_step_ct();
 extern void watch_my_step_move(GAME_PLAY* play);
 extern void watch_my_step_draw(GAME_PLAY* play);
 
+#ifdef TARGET_PC
+static void navigate_camera_ct();
+static void navigate_camera_move(GAME_PLAY* play);
+static void navigate_camera_draw(GAME_PLAY* play);
+
+static void mWt_mybell_confirmation_ct();
+static void mWt_mybell_confirmation_move(GAME_PLAY* play);
+static void mWt_mybell_confirmation_draw(GAME_PLAY* play);
+#else
 extern void navigate_camera_ct();
 extern void navigate_camera_move(GAME_PLAY* play);
 extern void navigate_camera_draw(GAME_PLAY* play);
@@ -40,6 +49,7 @@ extern void navigate_camera_draw(GAME_PLAY* play);
 extern void mWt_mybell_confirmation_ct();
 extern void mWt_mybell_confirmation_move(GAME_PLAY* play);
 extern void mWt_mybell_confirmation_draw(GAME_PLAY* play);
+#endif
 
 #ifdef __cplusplus
 }

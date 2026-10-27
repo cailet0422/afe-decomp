@@ -5,6 +5,10 @@
 #include "jaudio_NES/audiowork.h"
 #include "PR/mbi.h"
 
+#if defined(__cplusplus) && defined(TARGET_PC)
+extern "C" {
+#endif
+
 extern void Nap_AudioPortInit(void);
 extern void Nap_SetF32(u32 cmd, f32 param);
 extern void Nap_SetS32(u32 cmd, s32 param);
@@ -23,5 +27,9 @@ extern void Nap_WaitVsync(void);
 extern u32 Nap_GetRandom(void);
 extern void Nas_InitGAudio(void);
 extern s32 CreateAudioTask(Acmd* cmds, s16* pSamples, u32 nSamples, s32 param_4);
+
+#if defined(__cplusplus) && defined(TARGET_PC)
+}
+#endif
 
 #endif

@@ -427,6 +427,7 @@ static void aFD_DrawBlock(aFD_block_c* block, ACTOR* actorx, GAME* game) {
     Gfx* xlu_gfx;
     GAME_PLAY* play = (GAME_PLAY*)game;
 
+
     if (exist != FALSE) {
         opa_gfx = mFI_GetBGDisplayListRom(block->bx, block->bz);
         xlu_gfx = mFI_GetBGDisplayListRom_XLU(block->bx, block->bz);

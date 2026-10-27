@@ -415,6 +415,7 @@ static void mCD_make_calendar_data(mCD_Ovl_c* calendar, int player_no) {
     mCD_month_entry_c* entry;
     int day_pos;
 
+
     for (i = 0; i < mCD_YEARS_SHOWN; i++) {
         mCD_make_calendar_data_year(rtc_time->year + i - 1, &calendar->month_entries[i * lbRTC_MONTHS_MAX], player_no);
     }
@@ -422,6 +423,8 @@ static void mCD_make_calendar_data(mCD_Ovl_c* calendar, int player_no) {
     calendar->_1056 = rtc_time->month + lbRTC_MONTHS_MAX - 1;
     calendar->_1059 = calendar->_1056;
     day_pos = mDC_get_calendar_day_position(calendar, rtc_time->day);
+
+
     entry = calendar->month_entries + calendar->_1056;
     entry->day_data[day_pos] = (entry->day_data[day_pos] & 0x1F) | (mCD_DAY_CURRENT << 5);
 }

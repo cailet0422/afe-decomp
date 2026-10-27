@@ -44,7 +44,16 @@ static inline void OSInitFastCast() {
 }
 
 // Float to int.
-static inline s16 __OSf32tos16(register f32 inF) {
+static inline s16 __OSf32tos16(
+#ifndef TARGET_PC
+    register
+#endif
+    f32 inF) {
+#ifdef TARGET_PC
+    if (inF > 32767.0f) return 32767;
+    if (inF < -32768.0f) return -32768;
+    return (s16)inF;
+#else
     register s16 out;
     u32 tmp;
     register u32* tmpPtr = &tmp;
@@ -54,15 +63,24 @@ static inline s16 __OSf32tos16(register f32 inF) {
 		lha out, 0(tmpPtr)
 	}
 #endif // clang-format on
-
     return out;
+#endif
 }
 
 static inline void OSf32tos16(f32* f, s16* out) {
     *out = __OSf32tos16(*f);
 }
 
-static inline u8 __OSf32tou8(register f32 inF) {
+static inline u8 __OSf32tou8(
+#ifndef TARGET_PC
+    register
+#endif
+    f32 inF) {
+#ifdef TARGET_PC
+    if (inF > 255.0f) return 255;
+    if (inF < 0.0f) return 0;
+    return (u8)inF;
+#else
     register u8 out;
     u32 tmp;
     register u32* tmpPtr = &tmp;
@@ -72,15 +90,24 @@ static inline u8 __OSf32tou8(register f32 inF) {
 		lbz out, 0(tmpPtr)
 	}
 #endif // clang-format on
-
     return out;
+#endif
 }
 
 static inline void OSf32tou8(f32* f, u8* out) {
     *out = __OSf32tou8(*f);
 }
 
-static inline s8 __OSf32tos8(register f32 inF) {
+static inline s8 __OSf32tos8(
+#ifndef TARGET_PC
+    register
+#endif
+    f32 inF) {
+#ifdef TARGET_PC
+    if (inF > 127.0f) return 127;
+    if (inF < -128.0f) return -128;
+    return (s8)inF;
+#else
     register s8 out;
     u32 tmp;
     register u32* tmpPtr = &tmp;
@@ -91,27 +118,41 @@ static inline s8 __OSf32tos8(register f32 inF) {
 		extsb out, out
 	}
 #endif // clang-format on
-
     return out;
+#endif
 }
 
 static inline void OSf32tos8(f32* f, s8* out) {
     *out = __OSf32tos8(*f);
 }
 
-static inline float __OSs16tof32(register s16* s) {
+static inline float __OSs16tof32(
+#ifndef TARGET_PC
+    register
+#endif
+    s16* s) {
+#ifdef TARGET_PC
+    return (float)(*s);
+#else
     register float f;
-
 #ifdef __MWERKS__ // clang-format off
     asm {
         psq_l f, 0(s), 1, 5
     }
 #endif // clang-format on
-
     return f;
+#endif
 }
 
-static inline void OSs16tof32(register s16* s, volatile register f32* f) {
+static inline void OSs16tof32(
+#ifndef TARGET_PC
+    register
+#endif
+    s16* s,
+#ifndef TARGET_PC
+    volatile register
+#endif
+    f32* f) {
     *f = __OSs16tof32(s);
 }
 

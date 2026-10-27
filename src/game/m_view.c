@@ -60,6 +60,13 @@ extern void initView(View* view, GRAPH* graph) {
   view->up.z = 0.0f;
 
   view->flag = VIEW_UPDATE_LOOKAT | VIEW_UPDATE_SCISSOR | VIEW_UPDATE_PERSPECTIVE;
+
+#ifdef TARGET_PC
+  /* PC: initialize viewport immediately so submenu restore has valid data
+     even before showPerspectiveView runs. On GC, memory was likely zeroed. */
+  set_viewport(&view->viewport, &view->screen);
+#endif
+
   stretchViewInit(view);
 }
 

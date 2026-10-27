@@ -53,7 +53,7 @@ JKRAram::JKRAram(u32 bufSize, u32 graphSize, s32 priority) : JKRThread(0x4000, 0
     if (mUserMemorySize != 0) { // ternary?
         mUserMemoryPtr = ARAlloc(mUserMemorySize);
     } else {
-        mUserMemoryPtr = nullptr;
+        mUserMemoryPtr = (u32)0;
     }
 
     mAramHeap = new (JKRHeap::getSystemHeap(), 0) JKRAramHeap(mGraphMemoryPtr, mGraphMemorySize);

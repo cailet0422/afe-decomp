@@ -38,9 +38,17 @@ typedef enum JSTREAM_STATE_ {
     JSTREAM_STATE_NUM
 } JSTREAM_STATE;
 
+#if defined(__cplusplus) && defined(TARGET_PC)
+extern "C" {
+#endif
+
 extern char J_STREAMNAME[][16];
 extern JSTREAM J_STREAM;
 
 extern void StreamMain(void);
+
+#if defined(__cplusplus) && defined(TARGET_PC)
+}
+#endif
 
 #endif

@@ -11,7 +11,11 @@
 extern "C" {
 #endif
 
+#ifdef TARGET_PC
+#define aSTR_ACTOR_TBL_COUNT 32
+#else
 #define aSTR_ACTOR_TBL_COUNT 9
+#endif
 #define aSTR_OVERLAY_SIZE 0x2400
 
 #define aSTR_HELI_SE_FLAG_SCHEDULED (1 << 0)

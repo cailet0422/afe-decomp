@@ -1,6 +1,12 @@
 #ifndef _MSL_COMMON_ANSI_FILES_H
 #define _MSL_COMMON_ANSI_FILES_H
 
+#ifdef TARGET_PC
+/* On PC, system stdio.h provides FILE, fpos_t, etc. */
+#include <stdio.h>
+#include <stddef.h>
+#else
+
 #include "stddef.h"
 
 #ifdef __cplusplus
@@ -121,5 +127,7 @@ extern files __files;
 #ifdef __cplusplus
 };
 #endif
+
+#endif /* !TARGET_PC */
 
 #endif /* _MSL_COMMON_ANSI_FILES_H */

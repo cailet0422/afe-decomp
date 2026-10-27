@@ -8,6 +8,10 @@ typedef void (*Jac_DVDCallback)(u32);
 typedef s32 (*TaskCallback)(void*);
 typedef void (*ErrorCallback)(char*, u8* addr);
 
+#if defined(__cplusplus) && defined(TARGET_PC)
+extern "C" {
+#endif
+
 extern void DVDT_ExtendPath(char* dst, char* ext);
 extern s32 DVDT_AddTaskHigh(TaskCallback callback, void* stackp, size_t len);
 extern s32 DVDT_AddTask(TaskCallback callback, void* stackp, size_t len);
@@ -26,5 +30,12 @@ extern void Jac_RegisterDVDErrorCallback(ErrorCallback callback);
 extern s32 Jac_RegisterFastOpen(char* file);
 extern BOOL Jac_DVDOpen(char* name, DVDFileInfo* info);
 
+#ifdef TARGET_PC
+void pc_dvd_process_all_tasks(void);
+#endif
+
+#if defined(__cplusplus) && defined(TARGET_PC)
+}
+#endif
 
 #endif

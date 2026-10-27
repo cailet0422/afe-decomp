@@ -22,6 +22,10 @@ struct jaheap_ {
 	jaheap_* nextGroupedHeap;  // _28
 };
 
+#if defined(__cplusplus) && defined(TARGET_PC)
+extern "C" {
+#endif
+
 void Jac_GetUnlockHeap(jaheap_*);
 void Jac_CheckAlloc(jaheap_*);
 void Jac_InitHeap(jaheap_*);
@@ -36,5 +40,9 @@ void Jac_GarbageCollection_St(jaheap_*);
 void Jac_CheckFreeHeap_Total(jaheap_*);
 void Jac_CheckFreeHeap_Linear(jaheap_*);
 void Jac_ShowHeap(jaheap_*, u32);
+
+#if defined(__cplusplus) && defined(TARGET_PC)
+}
+#endif
 
 #endif

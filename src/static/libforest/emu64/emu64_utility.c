@@ -53,6 +53,109 @@ inline float fastcast_float(register short* s) {
     return f;
 }
 
+#ifdef TARGET_PC
+/* Executable image range from pc_main.c — BSS/data can collide with N64 segments */
+extern "C" unsigned int pc_image_base;
+extern "C" unsigned int pc_image_end;
+
+/* Arena range from pc_os.c — heap pointers in arena also bypass segment resolution */
+extern "C" unsigned char* pc_arena_base;
+extern "C" unsigned char* pc_arena_end;
+
+/* Page-granularity cache for VirtualQuery results.
+ * Avoids repeated syscalls for addresses in the same page. */
+#define SEG2K0_PAGE_CACHE_SIZE 32
+static struct { u32 page; u8 committed; } seg2k0_page_cache[SEG2K0_PAGE_CACHE_SIZE];
+static int seg2k0_cache_next = 0;
+
+static int seg2k0_is_committed(u32 addr) {
+    u32 page = addr & ~0xFFF;
+    /* Check cache first */
+    for (int i = 0; i < SEG2K0_PAGE_CACHE_SIZE; i++) {
+        if (seg2k0_page_cache[i].page == page) {
+            return seg2k0_page_cache[i].committed;
+        }
+    }
+    /* Cache miss — query the OS */
+    MEMORY_BASIC_INFORMATION mbi;
+    int committed = 0;
+    if (VirtualQuery((void*)addr, &mbi, sizeof(mbi)) > 0 && mbi.State == MEM_COMMIT) {
+        committed = 1;
+    }
+    seg2k0_page_cache[seg2k0_cache_next].page = page;
+    seg2k0_page_cache[seg2k0_cache_next].committed = committed;
+    seg2k0_cache_next = (seg2k0_cache_next + 1) % SEG2K0_PAGE_CACHE_SIZE;
+    return committed;
+}
+
+u32 emu64::seg2k0(u32 segadr) {
+    /* Addresses above the N64 segment range (upper nibble != 0) or below
+       the minimum segment address are definitely raw PC pointers. */
+    if ((segadr >> 28) != 0 || segadr < 0x03000000) {
+        return segadr;
+    }
+
+    /* Check if address falls within the executable image (BSS/data/code). */
+    if (segadr >= pc_image_base && segadr < pc_image_end) {
+        return segadr;
+    }
+
+    /* Check if address falls within the main memory arena (JKRHeap, Object_Exchange
+       banks, cloth data, etc.).*/
+    if (pc_arena_base && segadr >= (u32)(uintptr_t)pc_arena_base &&
+        segadr < (u32)(uintptr_t)pc_arena_end) {
+        return segadr;
+    }
+
+    u32 seg = (segadr >> 24) & 0xF;
+    u32 offset = segadr & 0xFFFFFF;
+
+    if (this->segments[seg] == 0) {
+        return segadr;
+    }
+
+    /* On PC, raw heap/DLL pointers can fall in the 0x03000000-0x0FFFFFFF range,
+       colliding with N64 segmented addresses (seg<<24|offset). On GC, all real
+       pointers had bit 31 set (k0 space) so they bypassed segment resolution.
+
+       Real N64 segment addresses come from GBI macros like SEGMENT_ADDR(seg, offset)
+       and always have small offsets (textures, matrices that are never > 512KB).
+       PC heap pointers that collide with the segment range have large "offsets"
+       (the low 24 bits of an arbitrary address). Use this to discriminate:
+       large offset + committed raw address = heap pointer, not segment ref. 
+       
+       This might be the last memory fix needed.
+       */
+
+    /* Large offset (> 512KB) with committed raw address = definitely a heap pointer,
+       not a real segment reference. N64 segments never have offsets this large. */
+    if (offset > 0x80000 && seg2k0_is_committed(segadr)) {
+        return segadr;
+    }
+
+    /* Normal segment resolution path */
+    u32 resolved = (u32)this->segments[seg] + offset;
+
+    if (seg2k0_is_committed(resolved)) {
+        /* Segment resolution gave a valid address — use it (normal path) */
+        this->resolved_addresses++;
+        return resolved;
+    }
+
+    /* Resolved address is invalid. Check if the raw address is valid memory. */
+    if (seg2k0_is_committed(segadr)) {
+        /* Raw address IS valid — it's a direct PC pointer misidentified as
+           a segment reference. This happens when heap/stack/DLL pointers
+           fall in the 0x03-0x0F range. Return as-is. */
+        return segadr;
+    }
+
+    /* Neither resolved nor raw is committed. Fall through to segment resolution
+       (may crash, but the VEH crash recovery will handle it). */
+    this->resolved_addresses++;
+    return resolved;
+}
+#else
 u32 emu64::seg2k0(u32 segadr) {
     u32 k0;
 
@@ -77,6 +180,7 @@ u32 emu64::seg2k0(u32 segadr) {
 
     return k0;
 }
+#endif
 
 /* @unused void guMtxXFMWF(MtxP, float, float, float, float, float, float*, float*, float*, float*) */
 
@@ -217,14 +321,27 @@ void N64Mtx_to_DOLMtx(const N64Mtx* n64, MtxP gc) {
     s16* fixed = ((s16*)n64) + 0;
     u16* frac = ((u16*)n64) + 16;
 
+    /* N64Mtx_to_DOLMtx conversion verified correct for LE - no diagnostic needed */
+
     for (i = 0; i < 4; i++) {
+#ifdef TARGET_PC
+        /* On little-endian, s16 pairs within each int32 are swapped.
+           guMtxF2L packs first value in high 16 bits of each int32.
+           s16[0] on BE reads high bits (correct), but on LE reads low bits (wrong).
+           So swap indices 0<->1 and 2<->3 within each group of 4. */
+        gc[0][i] = fastcast_float(&fixed[1]) + fastcast_float(&frac[1]) * (1.0f / 65536.0f);
+        gc[1][i] = fastcast_float(&fixed[0]) + fastcast_float(&frac[0]) * (1.0f / 65536.0f);
+        gc[2][i] = fastcast_float(&fixed[3]) + fastcast_float(&frac[3]) * (1.0f / 65536.0f);
+#else
         gc[0][i] = fastcast_float(&fixed[0]) + fastcast_float(&frac[0]) * (1.0f / 65536.0f);
         gc[1][i] = fastcast_float(&fixed[1]) + fastcast_float(&frac[1]) * (1.0f / 65536.0f);
         gc[2][i] = fastcast_float(&fixed[2]) + fastcast_float(&frac[2]) * (1.0f / 65536.0f);
+#endif
 
         fixed += 4;
         frac += 4;
     }
+
 }
 
 /* @unused my_guMtxL2F(MtxP, const N64Mtx*) */

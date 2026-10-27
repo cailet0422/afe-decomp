@@ -18,6 +18,9 @@
 #include "m_npc.h"
 #include "m_malloc.h"
 #include "m_common_data.h"
+#ifdef TARGET_PC
+#include "pc_platform.h"
+#endif
 
 #ifdef MUST_MATCH
 /* @unused | necessary for proper float ordering*/
@@ -274,7 +277,17 @@ extern int Actor_draw_actor_no_culling_check2(ACTOR* actor, xyz_t* camera_pos, f
 
     if (-actor->cull_radius < camera_pos->z && camera_pos->z < actor->cull_distance + actor->cull_radius) {
         f32 m = camera_w < 1.0f ? 1.0f : 1.0f / camera_w;
+#ifdef PC_ENHANCEMENTS
+        /* Widescreen hor+ widens the rendered frustum.  The projection matrix
+         * used to compute camera_pos is the original 4:3 one, so the NDC X
+         * edge (1.0) is too narrow.  Extend by the aspect ratio correction. */
+        f32 x_edge = (f32)g_pc_window_w / (f32)g_pc_window_h
+                   / ((f32)PC_GC_WIDTH / (f32)PC_GC_HEIGHT);
+        if (x_edge < 1.0f) x_edge = 1.0f;
+        int width_OK = (m * (fabsf(camera_pos->x) - actor->cull_width)) < x_edge;
+#else
         int width_OK = (m * (fabsf(camera_pos->x) - actor->cull_width)) < 1.0f;
+#endif
 
         if (width_OK &&
             (m * (camera_pos->y + actor->cull_height)) > -1.0f && (m * (camera_pos->y - actor->cull_radius) < 1.0f)) {
@@ -628,12 +641,24 @@ static int Actor_malloc_actor_class(ACTOR** actor_pp, ACTOR_PROFILE* profile, AC
     switch (ITEM_NAME_GET_TYPE(id)) {
         case NAME_TYPE_SPNPC:
         case NAME_TYPE_NPC: {
+#ifdef TARGET_PC
+            if (CLIP(npc_clip) == NULL) {
+                *actor_pp = (ACTOR*)zelda_malloc(profile->class_size);
+                break;
+            }
+#endif
             *actor_pp = CLIP(npc_clip)->get_actor_area_proc(profile->class_size, name, 1);
             (*Common_Get(clip).npc_clip->dma_draw_data_proc)(&draw_data, id); // leftover?
             break;
         }
 
         case NAME_TYPE_STRUCT: {
+#ifdef TARGET_PC
+            if (Common_Get(clip).structure_clip == NULL) {
+                *actor_pp = (ACTOR*)zelda_malloc(profile->class_size);
+                break;
+            }
+#endif
             *actor_pp = (ACTOR*)((*Common_Get(clip).structure_clip->get_actor_area_proc)());
             break;
         }
@@ -700,6 +725,12 @@ extern ACTOR* Actor_info_make_actor(Actor_info* actor_info, GAME* game, s16 prof
     }
 
     profile = dlftbl->profile;
+#ifdef TARGET_PC
+    /* Skip actors with NULL or stubbed profiles (stub functions masquerading as struct data) */
+    if (profile == NULL || profile->class_size == 0 || profile->class_size > 0x100000) {
+        return NULL;
+    }
+#endif
     if (Actor_data_bank_regist_check(&data_bank_idx, profile, dlftbl, play, name_id) == FALSE) {
         return NULL;
     }

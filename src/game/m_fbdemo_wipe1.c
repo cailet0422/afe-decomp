@@ -1,17 +1,26 @@
 #include "m_fbdemo_wipe1.h"
 
+#include "gfxalloc.h"
 #include "libultra/gu.h"
 #include "libultra/libultra.h"
 #include "m_common_data.h"
 #include "m_rcp.h"
 
+#ifdef TARGET_PC
+Vtx wipe1_v[0x190 / sizeof(Vtx)];
+#else
 Vtx wipe1_v[] = {
 #include "assets/wipe1_v.inc"
 };
+#endif
 
+#ifdef TARGET_PC
+u8 g_wipe1_txt[0x800];
+#else
 u8 g_wipe1_txt[] = {
 #include "assets/g_wipe1_txt.inc"
 };
+#endif
 
 Gfx wipe1_modelT[] = {
     gsDPPipeSync(),
@@ -87,6 +96,29 @@ void fbdemo_wipe1_draw(fbdemo_wipe1* this, Gfx** gfxP) {
   gDPSetPrimColor(gfx++, 0, 0x80, this->color.r, this->color.g, this->color.b,
                   255);
 
+#ifdef TARGET_PC
+  /* Copy matrices into gfxalloc buffers so their addresses come from the DL
+     buffer instead of the heap (which can collide with N64 segment range
+     0x03-0x0F, causing seg2k0 misidentification). */
+  {
+    Mtx* proj_copy = (Mtx*)gfxalloc(&gfx, sizeof(Mtx));
+    Mtx* look_copy = (Mtx*)gfxalloc(&gfx, sizeof(Mtx));
+    Mtx* mv0_copy = (Mtx*)gfxalloc(&gfx, sizeof(Mtx));
+    Mtx* mv1_copy = (Mtx*)gfxalloc(&gfx, sizeof(Mtx));
+    Mtx* mv2_copy = (Mtx*)gfxalloc(&gfx, sizeof(Mtx));
+    *proj_copy = this->projection;
+    *look_copy = this->lookAt;
+    *mv0_copy = modelView[0];
+    *mv1_copy = modelView[1];
+    *mv2_copy = modelView[2];
+    gSPMatrix(gfx++, proj_copy, G_MTX_LOAD | G_MTX_PROJECTION);
+    gSPPerspNormalize(gfx++, this->normal);
+    gSPMatrix(gfx++, look_copy, G_MTX_MUL | G_MTX_PROJECTION);
+    gSPMatrix(gfx++, mv0_copy, G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
+    gSPMatrix(gfx++, mv1_copy, G_MTX_NOPUSH | G_MTX_MUL | G_MTX_MODELVIEW);
+    gSPMatrix(gfx++, mv2_copy, G_MTX_NOPUSH | G_MTX_MUL | G_MTX_MODELVIEW);
+  }
+#else
   gSPMatrix(gfx++, &this->projection, G_MTX_LOAD | G_MTX_PROJECTION);
   gSPPerspNormalize(gfx++, this->normal);
 
@@ -94,6 +126,7 @@ void fbdemo_wipe1_draw(fbdemo_wipe1* this, Gfx** gfxP) {
   gSPMatrix(gfx++, &modelView[0], G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
   gSPMatrix(gfx++, &modelView[1], G_MTX_NOPUSH | G_MTX_MUL | G_MTX_MODELVIEW);
   gSPMatrix(gfx++, &modelView[2], G_MTX_NOPUSH | G_MTX_MUL | G_MTX_MODELVIEW);
+#endif
 
   gSPDisplayList(gfx++, wipe1_modelT);
   gDPPipeSync(gfx++);

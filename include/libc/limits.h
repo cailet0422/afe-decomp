@@ -1,6 +1,10 @@
 #ifndef _LIMITS_H_
 #define _LIMITS_H_
 
+#ifdef TARGET_PC
+#include_next <limits.h>
+#else
+
 #define CHAR_BIT 8
 
 #define SCHAR_MIN -128
@@ -21,4 +25,5 @@
 
 #define DBL_MANT_DIG 53
 
+#endif /* TARGET_PC */
 #endif

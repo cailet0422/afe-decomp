@@ -59,10 +59,25 @@ void fbdemo_triforce_draw(fbdemo_triforce* this, Gfx** gfxP) {
   gDPPipeSync(gfx++);
   scroll = gfx_tex_scroll2(&gfx, this->txt, 0, 16, 4);
   gSPSegment(gfx++, 0x9, scroll);
+#ifdef TARGET_PC
+  /* Copy matrices into gfxalloc buffers so their addresses come from the DL
+     buffer (above 0x10000000) instead of the heap (which can collide with
+     N64 segment range 0x03-0x0F, causing seg2k0 misidentification). */
+  {
+    Mtx* persp_copy = (Mtx*)gfxalloc(&gfx, sizeof(Mtx));
+    Mtx* lookat_copy = (Mtx*)gfxalloc(&gfx, sizeof(Mtx));
+    *persp_copy = this->perspmtx;
+    *lookat_copy = this->lookatmtx;
+    gSPMatrix(gfx++, persp_copy, G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_PROJECTION);
+    gSPPerspNormalize(gfx++, this->normal);
+    gSPMatrix(gfx++, lookat_copy, G_MTX_MUL | G_MTX_PROJECTION);
+  }
+#else
   gSPMatrix(gfx++, &this->perspmtx,
             G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_PROJECTION);
   gSPPerspNormalize(gfx++, this->normal);
   gSPMatrix(gfx++, &this->lookatmtx, G_MTX_MUL | G_MTX_PROJECTION);
+#endif
   t = gfxalloc(&gfx, 0x40);
   guScale((Mtx*)t, 0.019f, 0.019f, 1.0f);
 

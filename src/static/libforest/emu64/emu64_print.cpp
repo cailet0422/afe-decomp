@@ -6,6 +6,10 @@
 #include "boot.h"
 
 __declspec(weak) void emu64_print::Printf0(const char* fmt, ...) {
+#ifdef TARGET_PC
+    extern int g_pc_verbose;
+    if (!g_pc_verbose) return;
+#endif
     va_list list;
 
     va_start(list, fmt);
@@ -26,6 +30,10 @@ __declspec(weak) void emu64_print::Vprintf(const char* fmt,
 __declspec(weak) void emu64_print::Printf(const char* fmt, ...) {
     va_list list;
 
+#ifdef TARGET_PC
+    extern int g_pc_verbose;
+    if (!g_pc_verbose) return;
+#endif
     if ((this->print_flags & EMU64_PRINTF_ENABLED_FLAG)) {
         va_start(list, fmt);
         this->Vprintf(fmt, list);

@@ -7,6 +7,10 @@ typedef struct jaheap_ jaheap_;
 
 typedef u32 (*ARAMCallback)(char* filename, u32 src, u32 length, u32* status, jaheap_* heap);
 
+#if defined(__cplusplus) && defined(TARGET_PC)
+extern "C" {
+#endif
+
 void Jac_RegisterARAMCallback(ARAMCallback callback);
 u32 LoadAram(char* filepath, u32* status, u32 dst);
 u32 LoadAramSingle(char* filepath, u32 src, u32 length, u32* status, u32 dst);
@@ -18,5 +22,9 @@ void Init_AramMotherHeap(void);
 u32 LoadAram_Default(char* filename, u32 src, u32 length, u32* status, jaheap_* heap);
 u32 LoadAram_All(char* filename, u32* status, jaheap_* heap);
 u32 LoadAram_One(char* filename, u32 src, u32 length, u32* status, jaheap_* heap);
+
+#if defined(__cplusplus) && defined(TARGET_PC)
+}
+#endif
 
 #endif

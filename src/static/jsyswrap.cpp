@@ -325,7 +325,17 @@ extern s16 JW_JUTGamepad_getSubStickAngle() {
 
 bool FrameDrawing = false;
 
+#ifdef TARGET_PC
+extern "C" void pc_gx_begin_frame(void);
+#endif
+
 extern void JW_BeginFrame() {
+#ifdef TARGET_PC
+    /* Clear framebuffer at frame start so we don't see undefined data */
+    pc_gx_begin_frame();
+    FrameDrawing = true;
+    return;
+#endif
     while (FrameCansel) {
         VIWaitForRetrace();
     }
@@ -340,6 +350,12 @@ extern void JW_BeginFrame() {
 }
 
 extern void JW_EndFrame() {
+#ifdef TARGET_PC
+    /* On PC: pump events, swap buffers, vsync via VIWaitForRetrace */
+    VIWaitForRetrace();
+    FrameDrawing = false;
+    return;
+#endif
     JC_JFWDisplay_endRender(JC_JFWDisplay_getManager());
     FrameDrawing = false;
 }
@@ -570,12 +586,25 @@ extern void JW_Init2() {
     ReportDiskID();
 
     if (forest_arc_aram_p == nullptr) {
+#ifdef TARGET_PC
+        OSReport("[PC] JW_Init2: mounting forest_1st.arc...\n");
+#endif
         forest_arc_aram_p = JC_JKRAramArchive_new();
 
         if (forest_arc_aram_p == nullptr ||
             JC__JKRMountFixedAramArchive(forest_arc_aram_p, "forest_1st.arc") == FALSE) {
+#ifdef TARGET_PC
+            OSReport("[PC] JW_Init2: forest_1st.arc mount FAILED (continuing anyway)\n");
+            /* Don't fatal - continue without archive for now */
+#else
             OSDVDFatalError();
+#endif
         }
+#ifdef TARGET_PC
+        else {
+            OSReport("[PC] JW_Init2: forest_1st.arc mounted successfully!\n");
+        }
+#endif
     }
 
     if (forest_arc_aram_script_p == nullptr) {
@@ -595,12 +624,24 @@ extern void JW_Init2() {
 
 extern void JW_Init3() {
     if (forest_arc_aram2_p == nullptr) {
+#ifdef TARGET_PC
+        OSReport("[PC] JW_Init3: mounting forest_2nd.arc...\n");
+#endif
         forest_arc_aram2_p = JC_JKRAramArchive_new();
 
         if (forest_arc_aram2_p == nullptr ||
             JC__JKRMountFixedAramArchive(forest_arc_aram2_p, "forest_2nd.arc") == FALSE) {
+#ifdef TARGET_PC
+            OSReport("[PC] JW_Init3: forest_2nd.arc mount FAILED (continuing anyway)\n");
+#else
             OSDVDFatalError();
+#endif
         }
+#ifdef TARGET_PC
+        else {
+            OSReport("[PC] JW_Init3: forest_2nd.arc mounted successfully!\n");
+        }
+#endif
     }
 }
 

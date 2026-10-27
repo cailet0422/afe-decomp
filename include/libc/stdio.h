@@ -1,6 +1,10 @@
 #ifndef _STDIO_H_
 #define _STDIO_H_
 
+#ifdef TARGET_PC
+#include_next <stdio.h>
+#else
+
 #include <stdarg.h>
 
 #ifdef __cplusplus
@@ -20,4 +24,5 @@ int vsprintf(char *s, const char *format, va_list arg);
 }
 #endif
 
+#endif /* TARGET_PC */
 #endif

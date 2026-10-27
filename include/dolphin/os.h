@@ -114,7 +114,19 @@ typedef struct BI2Debug {
 	/* 0x24 */ u32 padSpec;
 } BI2Debug;
 
-#ifdef __MWERKS__
+#ifdef TARGET_PC
+/* PC port: these are regular variables defined in pc_misc.c / pc_os.c */
+extern u32 __OSPhysicalMemSize;
+extern volatile int __OSTVMode;
+extern void *__gUnkThread1;
+extern void *__gCurrentThread;
+extern u32 __OSSimulatedMemSize;
+extern u32 __OSBusClock;
+extern u32 __OSCoreClock;
+extern s32 __gUnknown800030C0[2];
+extern u8 __gUnknown800030E3;
+extern volatile u16 __OSDeviceCode;
+#elif defined(__MWERKS__)
 u32 __OSPhysicalMemSize   : (OS_BASE_CACHED | 0x0028);
 volatile int __OSTVMode : (OS_BASE_CACHED | 0x00CC);
 OSThread *__gUnkThread1 : (OS_BASE_CACHED | 0x00D8);
@@ -148,7 +160,11 @@ u32 OSCachedToPhysical(void *caddr);
 u32 OSUncachedToPhysical(void *ucaddr);
 void *OSCachedToUncached(void *caddr);
 void *OSUncachedToCached(void *ucaddr);
-#if !DEBUG
+#ifdef TARGET_PC
+/* On PC, address translation goes through functions in pc_os.c
+ * that map physical addresses relative to our simulated 24MB arena. */
+/* Do NOT define macros - let the function declarations above be used */
+#elif !DEBUG
 #define OSPhysicalToCached(paddr)    ((void*) ((u32)(OS_BASE_CACHED   + (u32)(paddr))))
 #define OSPhysicalToUncached(paddr)  ((void*) ((u32)(OS_BASE_UNCACHED + (u32)(paddr))))
 #define OSCachedToPhysical(caddr)    ((u32)   ((u32)(caddr)  - OS_BASE_CACHED))

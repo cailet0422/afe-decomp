@@ -72,7 +72,7 @@ JUTErrorHandler JUTException::sPreUserCallback;
 JUTErrorHandler JUTException::sPostUserCallback;
 static CallbackObject exCallbackObject;
 void* JUTException::sConsoleBuffer;
-u32 JUTException::sConsoleBufferSize;
+size_t JUTException::sConsoleBufferSize;
 JUTConsole* JUTException::sConsole;
 u32 JUTException::msr;
 u32 JUTException::fpscr;
@@ -793,6 +793,7 @@ void JUTException::createFB() {
 
     mFrameMemory = (JUTExternalFB*)object;
 }
+#ifndef TARGET_PC
 // clang-format off
 asm u32 JUTException::getFpscr() { // TODO: figure out if this is possible with asm
     fralloc
@@ -807,6 +808,11 @@ asm u32 JUTException::getFpscr() { // TODO: figure out if this is possible with 
     blr
 }
 // clang-format on
+#else
+u32 JUTException::getFpscr() {
+    return 0;
+}
+#endif
 
 JUTErrorHandler JUTException::setPreUserCallback(JUTErrorHandler callback) {
     JUTErrorHandler previous = sPreUserCallback;

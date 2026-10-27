@@ -6,6 +6,10 @@
 
 /////////// JAUDIO IPL DEC DEFINITIONS ///////////
 // Global functions (all C++, so no extern C wrap).
+#if defined(__cplusplus) && defined(TARGET_PC)
+extern "C" {
+#endif
+
 BOOL DspExtraTaskCheck();
 void Jac_DSPcardDecodeAsync(void*, void*, DSPCallback);
 void Jac_DSPagbDecodeAsync(void* task, void* cmd, DSPCallback callback);
@@ -26,5 +30,9 @@ typedef struct DSPTask {
 } DSPTask;
 
 //////////////////////////////////////////////////
+
+#if defined(__cplusplus) && defined(TARGET_PC)
+}
+#endif
 
 #endif

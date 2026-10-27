@@ -4,6 +4,10 @@
 #include "types.h"
 #include "jaudio_NES/audiowork.h"
 
+#if defined(__cplusplus) && defined(TARGET_PC)
+extern "C" {
+#endif
+
 extern void Nas_ReleaseNoteTrack(note* note);
 extern void Nas_ReleaseSubTrack(sub* subtrack);
 extern void Nas_ReleaseGroup_Force(group* grp);
@@ -15,5 +19,9 @@ extern void Nas_SeqSkip(group* grp);
 extern void Nas_InitMySeq(group* grp);
 extern void Nas_AssignSubTrack(s32 group_idx);
 extern void Nas_InitPlayer(void);
+
+#if defined(__cplusplus) && defined(TARGET_PC)
+}
+#endif
 
 #endif

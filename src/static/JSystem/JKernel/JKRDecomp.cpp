@@ -89,11 +89,20 @@ BOOL JKRDecomp::sendCommand(JKRDecompCommand* cmd) {
 JKRDecompCommand* JKRDecomp::orderAsync(u8* srcBuffer, u8* dstBuffer, u32 srcLength, u32 skipCount,
                                         DecompCallback* callback) {
     JKRDecompCommand* cmd = JKRDecomp::prepareCommand(srcBuffer, dstBuffer, srcLength, skipCount, callback);
+#ifdef TARGET_PC
+    /* Execute decompression synchronously on PC (no worker thread) */
+    JKRDecomp::decode(cmd->mSrcBuffer, cmd->mDstBuffer, cmd->mSrcLength, cmd->mSkipCount);
+#else
     JKRDecomp::sendCommand(cmd);
+#endif
     return cmd;
 }
 
 bool JKRDecomp::sync(JKRDecompCommand* cmd, BOOL noBlock) {
+#ifdef TARGET_PC
+    /* On PC, decompression already happened synchronously */
+    return true;
+#else
     OSMessage msg;
 
     if (!noBlock) {
@@ -102,6 +111,7 @@ bool JKRDecomp::sync(JKRDecompCommand* cmd, BOOL noBlock) {
     } else {
         return OSReceiveMessage(&cmd->mMesgQueue, &msg, OS_MESSAGE_NOBLOCK) != FALSE;
     }
+#endif
 }
 
 bool JKRDecomp::orderSync(u8* srcBuffer, u8* dstBuffer, u32 srcLength, u32 skipCount) {

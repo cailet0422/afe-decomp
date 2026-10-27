@@ -17,6 +17,10 @@ typedef u16 DSPBOOL;
 /////////// JAUDIO DSP INTERFACE DEFINITIONS ///////////
 // Global functions (all C++, so no extern C wrap).
 
+#if defined(__cplusplus) && defined(TARGET_PC)
+extern "C" {
+#endif
+
 DSPchannel_* GetDspHandle(u8 idx);
 FXBuffer* GetFxHandle(u8 idx);
 void DSP_SetPitch(u8 idx, u16 pitch);
@@ -131,5 +135,9 @@ struct FXBuffer {
 	FXDestination dest[2];   // _08
 	s16 filterCoeffs[8];     // _10
 };
+
+#if defined(__cplusplus) && defined(TARGET_PC)
+}
+#endif
 
 #endif

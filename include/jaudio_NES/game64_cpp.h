@@ -4,7 +4,10 @@
 #include "types.h"
 #include "jaudio_NES/game64.h"
 
-/* C++ linkage */
+#if defined(__cplusplus) && defined(TARGET_PC)
+extern "C" {
+#endif
+
 extern void Sou_lev_ongen_data_struct_clear();
 extern void Sou_BgmFadeoutEndCheck();
 extern u8 Sou_BgmTenkiConv(u8 id);
@@ -50,4 +53,9 @@ extern u8 Sou_ChouboinHenkan(u8, u8);
 extern u8 Sou_ConnectCheck(u8, u8, u8);
 extern u8 Sou_BoinShiinCheck(u8);
 extern void Sou_PosTrgStart(u16 num, u16 angle, f32 distance, u8 reverb, f32 optVolume);
+
+#if defined(__cplusplus) && defined(TARGET_PC)
+}
+#endif
+
 #endif
