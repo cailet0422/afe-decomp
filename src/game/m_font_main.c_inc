@@ -87,6 +87,11 @@ extern int mFont_GetCodeWidth(u8 c, int cut) {
 }
 
 extern int mFont_GetCodeWidthB(u8 c, int cut, int font_bank) {
+#ifdef TARGET_PC
+    if (g_pc_ko_mode) {
+        cut = TRUE; /* the Korean patch always uses proportional widths */
+    }
+#endif
     return mFont_TEX_CHAR_WIDTH - (cut ? mFont_Get_FontOffset(c, font_bank) : 0);
 }
 
@@ -95,6 +100,11 @@ extern float mFont_GetCodeWidthF(u8 c, int cut) {
 }
 
 extern float mFont_GetCodeWidthFB(u8 c, int cut, int font_bank) {
+#ifdef TARGET_PC
+    if (g_pc_ko_mode) {
+        cut = TRUE;
+    }
+#endif
     return mFont_TEX_CHAR_WIDTH_F32 - (cut ? (float)mFont_Get_FontOffset(c, font_bank) : 0.0f);
 }
 
@@ -313,6 +323,12 @@ extern int mFont_CodeSize_get(const u8* str) {
     int size = 1;
     int c0 = *str;
     int c1;
+#ifdef TARGET_PC
+
+    if (g_pc_ko_mode && pc_ko_is_pair(str)) {
+        return 2;
+    }
+#endif
 
     if (c0 == CHAR_CONTROL_CODE) {
         c1 = *(str + 1);
@@ -1008,6 +1024,33 @@ static void mFontChar_gppDrawPoly(mFontChar* this, GRAPH* graph, Gfx** gfx_pp) {
 }
 
 static void mFontChar_gppDraw(mFontChar* this, GRAPH* graph, Gfx** gfx_pp) {
+#ifdef TARGET_PC
+    /* Korean patch: draw the syllable from a glyph cached in the second bank */
+    if (g_pc_ko_mode && this->tex_bank == mFont_TEX_TYPE_FONT1) {
+        int g = pc_ko_glyph_index(this->char_p + this->_04);
+
+        if (g >= 0) {
+            u8 code[2];
+            u8* char_p = this->char_p;
+            int idx = this->_04;
+
+            code[0] = (u8)pc_ko_glyph_slot(g);
+            code[1] = CHAR_SPACE;
+            this->char_p = code;
+            this->_04 = 0;
+            this->tex_bank = mFont_TEX_TYPE_FONT2;
+            if (this->flags & mFont_CHAR_FLAG_USE_POLY) {
+                mFontChar_gppDrawPoly(this, graph, gfx_pp);
+            } else {
+                mFontChar_gppDrawRect(this, graph, gfx_pp);
+            }
+            this->char_p = char_p;
+            this->_04 = idx;
+            this->tex_bank = mFont_TEX_TYPE_FONT1;
+            return;
+        }
+    }
+#endif
     if (this->flags & mFont_CHAR_FLAG_USE_POLY) {
         mFontChar_gppDrawPoly(this, graph, gfx_pp);
     } else {

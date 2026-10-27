@@ -16,6 +16,9 @@
 #include "m_common_data.h"
 #include "m_msg.h"
 #include "padmgr.h"
+#ifdef TARGET_PC
+#include "pc_ko.h"
+#endif
 
 #define mFont_CC_FONT 0, 0, 0, PRIMITIVE, PRIMITIVE, 0, TEXEL0, 0
 #define mFont_CC_NOFONT 0, 0, 0, PRIMITIVE, 0, PRIMITIVE, TEXEL0, PRIMITIVE

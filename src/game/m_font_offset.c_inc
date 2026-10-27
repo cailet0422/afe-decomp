@@ -22,6 +22,13 @@ static int mFont_Get_FontOffset(u8 c, int font_bank) {
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     };
 
+#ifdef TARGET_PC
+    /* The Korean patch replaces the monospaced table with its own widths */
+    if (g_pc_ko_mode) {
+        return font_bank == mFont_TEX_TYPE_FONT1 ? pc_ko_font_offset(c) : 0;
+    }
+
+#endif
     if (font_bank == mFont_TEX_TYPE_FONT1) {
         return offset_data[c];
     }

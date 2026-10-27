@@ -36,6 +36,11 @@ static int mFontW_Check_Tag(u16 c) {
 }
 
 extern int mFontW_CodeSize_get(const u16* code_p) {
+#ifdef TARGET_PC
+    if (g_pc_ko_mode && pc_ko_glyph_index_w(code_p) >= 0) {
+        return 2;
+    }
+#endif
     int c = (int)(*code_p);
     int c2;
     u8 upper = mFontW_Upper(c & 0xFFFF); // dunno what's going on here
@@ -180,6 +185,28 @@ static void mFontCharW_gppDrawPoly(mFontCharW* this, GRAPH* graph, Gfx** gfx_pp)
 }
 
 static void mFontCharW_gppDraw(mFontCharW* this, GRAPH* graph, Gfx** gfx_pp) {
+#ifdef TARGET_PC
+    if (g_pc_ko_mode && this->tex_bank == mFont_TEX_TYPE_FONT1) {
+        int g = pc_ko_glyph_index_w(this->char_p + this->_04);
+
+        if (g >= 0) {
+            u16 code[2];
+            u16* char_p = this->char_p;
+            int idx = this->_04;
+
+            code[0] = (u16)pc_ko_glyph_slot(g);
+            code[1] = CHAR_SPACE;
+            this->char_p = code;
+            this->_04 = 0;
+            this->tex_bank = mFont_TEX_TYPE_FONT2;
+            mFontCharW_gppDrawPoly(this, graph, gfx_pp);
+            this->char_p = char_p;
+            this->_04 = idx;
+            this->tex_bank = mFont_TEX_TYPE_FONT1;
+            return;
+        }
+    }
+#endif
     mFontCharW_gppDrawPoly(this, graph, gfx_pp);
 }
 
