@@ -9,6 +9,10 @@
 #include "libultra/libultra.h"
 #endif
 
+#ifdef TARGET_PC
+#include "pc_bswap.h"
+#endif
+
 #define mMsg_BMG_BUF_SIZE 0x740
 
 static u8 L_tmp_buff[mMsg_BMG_BUF_SIZE] ATTRIBUTE_ALIGN(32);
@@ -51,6 +55,12 @@ extern int mMsgLoad_bmg_load(mMsg_bmg_info_c* bmg_info) {
     int last_entry;
     
     mMsgLoad_get_res(bmg_info->address, mMsg_BMG_HEADER_SIZE, sizeof(mMsg_bmg_info_section_c), &inf_section);
+#ifdef TARGET_PC
+    /* BMG headers and offset tables are big-endian */
+    inf_section.size = pc_bswap32(inf_section.size);
+    inf_section.entry_cnt = pc_bswap16(inf_section.entry_cnt);
+    inf_section.entry_size = pc_bswap16(inf_section.entry_size);
+#endif
     if (bmg_info->index == inf_section.entry_cnt - 1) {
         last_entry = TRUE;
     } else {
@@ -63,9 +73,17 @@ extern int mMsgLoad_bmg_load(mMsg_bmg_info_c* bmg_info) {
         mMsgLoad_get_res(bmg_info->address, mMsg_BMG_HEADER_SIZE + sizeof(mMsg_bmg_info_section_c) + (inf_section.entry_size * bmg_info->index), 2 * sizeof(u32), &entry);
     }
 
+#ifdef TARGET_PC
+    entry[0] = pc_bswap32(entry[0]);
+    entry[1] = pc_bswap32(entry[1]);
+#endif
+
     dat_base_offset = ALIGN_NEXT(mMsg_BMG_HEADER_SIZE + sizeof(mMsg_bmg_info_section_c) + (inf_section.entry_size * inf_section.entry_cnt), 32);
     if (last_entry) {
         mMsgLoad_get_res(bmg_info->address, dat_base_offset, sizeof(mMsg_bmg_data_section_c), &dat_section);
+#ifdef TARGET_PC
+        dat_section.size = pc_bswap32(dat_section.size);
+#endif
         entry[1] = dat_section.size;
     }
 
@@ -173,6 +191,9 @@ static void mMsgLoad_bmc_load_sub(mMsg_bmc_info_c* bmc_info) {
     u32 color;
 
     mMsgLoad_get_res(bmc_info->start_addr, mMsg_BMC_HEADER_SIZE + mMsg_BMC_CL1_SECT_SIZE + bmc_info->entry_idx * sizeof(u32), sizeof(u32), &color);
+#ifdef TARGET_PC
+    color = pc_bswap32(color);
+#endif
     bmc_info->color.r = (color >> 24) & 0xFF;
     bmc_info->color.g = (color >> 16) & 0xFF;
     bmc_info->color.b = (color >> 8) & 0xFF;
