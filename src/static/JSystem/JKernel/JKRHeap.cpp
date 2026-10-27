@@ -312,23 +312,47 @@ bool JKRHeap::isSubHeap(JKRHeap* heap) const {
     return false;
 }
 
+#ifdef TARGET_PC
+void* operator new(size_t byteCount) {
+#else
 void* operator new(u32 byteCount) {
+#endif
     return JKRHeap::alloc(byteCount, 4, nullptr);
 }
+#ifdef TARGET_PC
+void* operator new(size_t byteCount, int alignment) {
+#else
 void* operator new(u32 byteCount, int alignment) {
+#endif
     return JKRHeap::alloc(byteCount, alignment, nullptr);
 }
+#ifdef TARGET_PC
+void* operator new(size_t byteCount, JKRHeap* heap, int alignment) {
+#else
 void* operator new(u32 byteCount, JKRHeap* heap, int alignment) {
+#endif
     return JKRHeap::alloc(byteCount, alignment, heap);
 }
 
+#ifdef TARGET_PC
+void* operator new[](size_t byteCount) {
+#else
 void* operator new[](u32 byteCount) {
+#endif
     return JKRHeap::alloc(byteCount, 4, nullptr);
 }
+#ifdef TARGET_PC
+void* operator new[](size_t byteCount, int alignment) {
+#else
 void* operator new[](u32 byteCount, int alignment) {
+#endif
     return JKRHeap::alloc(byteCount, alignment, nullptr);
 }
+#ifdef TARGET_PC
+void* operator new[](size_t byteCount, JKRHeap* heap, int alignment) {
+#else
 void* operator new[](u32 byteCount, JKRHeap* heap, int alignment) {
+#endif
     return JKRHeap::alloc(byteCount, alignment, heap);
 }
 

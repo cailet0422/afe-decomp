@@ -23,6 +23,15 @@ class JSURandomInputStream : public JSUInputStream {
     int align(s32 alignment);
     int peek(void* buf, s32 len);
     int seek(s32 offset, JSUStreamSeekFrom from);
+#ifdef TARGET_PC
+    /* Sources say SEEK_SET etc., which stdio makes ints (JSUStreamEnum.h) */
+    int seekPos(s32 offset, int from) {
+        return this->seekPos(offset, (JSUStreamSeekFrom)from);
+    }
+    int seek(s32 offset, int from) {
+        return this->seek(offset, (JSUStreamSeekFrom)from);
+    }
+#endif
 };
 
 class JSURandomOutputStream : public JSUOutputStream {
@@ -40,6 +49,15 @@ class JSURandomOutputStream : public JSUOutputStream {
     int align(s32 alignment);
     int peek(void* buf, s32 len);
     int seek(s32 offset, JSUStreamSeekFrom from);
+#ifdef TARGET_PC
+    /* Sources say SEEK_SET etc., which stdio makes ints (JSUStreamEnum.h) */
+    int seekPos(s32 offset, int from) {
+        return this->seekPos(offset, (JSUStreamSeekFrom)from);
+    }
+    int seek(s32 offset, int from) {
+        return this->seek(offset, (JSUStreamSeekFrom)from);
+    }
+#endif
 };
 
 #endif

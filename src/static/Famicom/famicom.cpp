@@ -695,7 +695,11 @@ static int SetupResBanner(const ResTIMG*, u8*, size_t, size_t*, u8*);
 static int SetupResIcon(const ResTIMG*, u8*, size_t, size_t*, u16*, u16*);
 
 static void SetupExternCommentImage(u8* embedded_save_comment_img, u8* dst, u8* rom_file_comment_img) {
+#ifdef TARGET_PC
+    size_t size; /* SetupResBanner's size_t* (u32 is unsigned long on PC) */
+#else
     u32 size;
+#endif
 
     switch (famicomCommon.memcard_game_header.flags0.comment_type) {
         case MEMCARD_COMMENT_TYPE_NONE:

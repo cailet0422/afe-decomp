@@ -22,6 +22,15 @@ class JSUIosBase {
     void setState(EIoState ioState) {
         this->mState |= ioState;
     }
+#ifdef TARGET_PC
+    /* Sources say EOF, which stdio makes the int -1 (JSUStreamEnum.h) */
+    void clrState(int ioState) {
+        this->clrState((EIoState)(ioState == -1 ? 1 : ioState));
+    }
+    void setState(int ioState) {
+        this->setState((EIoState)(ioState == -1 ? 1 : ioState));
+    }
+#endif
 
     u8 mState;
 };
