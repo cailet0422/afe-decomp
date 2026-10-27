@@ -9,6 +9,9 @@
 #include "libultra/libultra.h"
 #include "_mem.h"
 #include "sys_matrix.h"
+#ifdef TARGET_PC
+#include "pc_ko.h"
+#endif
 
 static mBD_Ovl_c board_ovl_data;
 
@@ -1371,8 +1374,14 @@ static void mBD_board_ovl_init(Submenu* submenu) {
             mBD_chrCopyOneByteTwoByte(board_ovl->mail.content.text.split.header, header_str, sizeof(header_str));
             mBD_chrCopyOneByteTwoByte(board_ovl->mail.content.text.split.footer,
                                       Common_Get(now_private)->player_ID.player_name, name_len);
+#ifdef TARGET_PC
+            mBD_chrCopyOneByteTwoByte(board_ovl->mail.content.text.split.footer + name_len,
+                                      (u8*)pc_ko_patched_str(PC_KO_S7_BOARD_FOOTER, footer_str),
+                                      g_pc_ko_mode ? 4 : sizeof(footer_str));
+#else
             mBD_chrCopyOneByteTwoByte(board_ovl->mail.content.text.split.footer + name_len, footer_str,
                                       sizeof(footer_str));
+#endif
             board_ovl->mail.content.header_back_start = 0;
         } else {
             mFont_CopyStringsW(board_ovl->mail.content.text.split.header, mail_header->header, MAIL_HEADER_LEN);

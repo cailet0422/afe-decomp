@@ -1,6 +1,9 @@
 #include "m_fishrecord.h"
 
 #include "libultra/libultra.h"
+#ifdef TARGET_PC
+#include "pc_ko.h"
+#endif
 #include "m_lib.h"
 #include "m_event_map_npc.h"
 #include "m_font.h"
@@ -200,7 +203,12 @@ static int mEv_fishRecord_local(PersonalID_c* pid, int* record_size, lbRTC_time_
 
         mem_copy(pid->player_name, name, ANIMAL_NAME_LEN);
         mLd_ClearLandName(pid->land_name);
+#ifdef TARGET_PC
+        mem_copy(pid->land_name, (u8*)pc_ko_patched_str(PC_KO_S7_FISH_LAND, l_name),
+                 g_pc_ko_mode ? 6 : sizeof(l_name));
+#else
         mem_copy(pid->land_name, l_name, sizeof(l_name));
+#endif
 
         return TRUE;
     }

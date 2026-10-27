@@ -8,6 +8,9 @@
 #include "m_inventory_ovl.h"
 #include "m_hand_ovl.h"
 #include "m_font.h"
+#ifdef TARGET_PC
+#include "pc_ko.h"
+#endif
 #include "m_haniwaPortrait_ovl.h"
 
 static mHW_Ovl_c haniwa_ovl_data;
@@ -80,11 +83,29 @@ static void mHW_make_cond_message(Submenu* submenu, int msg_idx) {
 
     mHW_msg_c* msg_p = &mes_data_tbl[msg_idx];
     u8* str_p = submenu->overlay->haniwa_ovl->msg;
+#ifdef TARGET_PC
+    /* Korean patch: messages and lengths from the disc, no "それ" prefix */
+    mHW_msg_c ko_msg;
+    int sore_len = g_pc_ko_mode ? 0 : sizeof(mes_sore);
+
+    if (g_pc_ko_mode) {
+        u32 entry = PC_KO_DATA_HANIWA_MSG_TABLE + msg_idx * 8;
+
+        ko_msg.str = (u8*)pc_ko_data_ptr(entry, msg_p->str);
+        ko_msg.len = pc_ko_data_u32(entry + 4, msg_p->len);
+        msg_p = &ko_msg;
+    }
+#endif
 
     mem_clear(str_p, mHW_OVL_MSG_SIZE, CHAR_SPACE);
     if (msg_idx >= mHW_MSG_TADA) {
+#ifdef TARGET_PC
+        mem_copy(str_p, mes_sore, sore_len);
+        str_p += sore_len;
+#else
         mem_copy(str_p, mes_sore, sizeof(mes_sore));
         str_p += sizeof(mes_sore);
+#endif
         if (msg_idx == mHW_MSG_BERU2) {
             mHW_set_price(submenu, &str_p);
         }

@@ -5,6 +5,9 @@
 #include "m_field_info.h"
 #include "m_event.h"
 #include "m_font.h"
+#ifdef TARGET_PC
+#include "pc_ko.h"
+#endif
 #include "m_player.h"
 #include "m_player_lib.h"
 #include "game.h"
@@ -1072,6 +1075,17 @@ static void mMP_set_label_dl(GAME* game, mMP_LabelInfo_c* label_info, f32 xpos, 
         f32 x = xpos + label->text_ofs_x + 160.0f;
         f32 y = 120.0f - (ypos + label->text_ofs_y);
         if (label->str != NULL) {
+#ifdef TARGET_PC
+            if (g_pc_ko_mode) {
+                /* Korean patch: one-line labels from the disc */
+                u32 entry = PC_KO_DATA_MAP_LABELS + label_no * sizeof(mMP_Label_c);
+
+                mFont_SetLineStrings(game, (u8*)pc_ko_data_ptr(entry + 0x14, label->str),
+                                     pc_ko_data_u32(entry + 0x18, label->str_len), x, y, 120, 95, 205, 255, FALSE,
+                                     FALSE, 0.75f, 0.75f, mFont_MODE_POLY);
+                return;
+            }
+#endif
             mFont_SetLineStrings(game, label->str, label->str_len, x, y, 120, 95, 205, 255, FALSE, FALSE, 0.75f, 0.75f,
                                  mFont_MODE_POLY);
             switch (label_no) {

@@ -6,6 +6,9 @@
 #include "m_event.h"
 #include "m_mail.h"
 #include "m_font.h"
+#ifdef TARGET_PC
+#include "pc_ko.h"
+#endif
 #include "m_string.h"
 #include "m_handbill.h"
 #include "m_field_info.h"
@@ -260,6 +263,13 @@ static int mNtc_set_landname_string(u8* buf) {
 
     mem_copy(buf, Save_Get(land_info.name), LAND_NAME_SIZE);
     len = mMl_strlen(Save_Get(land_info.name), LAND_NAME_SIZE, CHAR_SPACE);
+#ifdef TARGET_PC
+    if (g_pc_ko_mode) {
+        /* Korean patch: "마을" (the patch copies four bytes but counts two) */
+        mem_copy(buf + len, (u8*)pc_ko_patched_str(PC_KO_S7_LAND_SUFFIX, land_name_end), 4);
+        return len + 4;
+    }
+#endif
     mem_copy(buf + len, land_name_end, ARRAY_COUNT(land_name_end));
 
     return len + ARRAY_COUNT(land_name_end);
@@ -268,7 +278,11 @@ static int mNtc_set_landname_string(u8* buf) {
 static void mNtc_set_treasure_string(AnmPersonalID_c* sender_id, mActor_name_t item_no, int block_x, int block_z) {
     int land_name_len;
     u8 b_str;
+#ifdef TARGET_PC
+    u8 land_name[LAND_NAME_SIZE + 4]; /* the name and its suffix */
+#else
     u8 land_name[LAND_NAME_SIZE];
+#endif
     u8 anm_name[ANIMAL_NAME_LEN];
     u8 item_name[mIN_ITEM_NAME_LEN];
 
@@ -431,7 +445,11 @@ static int mNtc_make_auto_nwrite_day_string(u8* str, int month, int day) {
 
 static void mNtc_set_auto_nwrite_common_string() {
     int land_name_len;
+#ifdef TARGET_PC
+    u8 land_name[LAND_NAME_SIZE + 4]; /* the name and its suffix */
+#else
     u8 land_name[LAND_NAME_SIZE];
+#endif
     u8 shop_name[mMsg_FREE_STRING_LEN];
 
     land_name_len = mNtc_set_landname_string(land_name);

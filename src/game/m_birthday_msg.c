@@ -3,6 +3,9 @@
 #include "m_msg.h"
 #include "libultra/libultra.h"
 #include "m_font.h"
+#ifdef TARGET_PC
+#include "pc_ko.h"
+#endif
 
 static u16 mBm_cnv_date(u8 month, u8 day) {
     return (month << 8) | day;
@@ -137,7 +140,13 @@ static void mBm_init_BDMsg_Mail(mPr_birthday_msg_c* msg, PersonalID_c* pid, int 
 
     name_len = mMl_strlen(pid->player_name, sizeof(pid->player_name), CHAR_PP_032);
     mem_copy(msg->footer, pid->player_name, name_len);
+#ifdef TARGET_PC
+    /* Korean patch: a longer closing ("드림") */
+    mem_copy(msg->footer + name_len, (u8*)pc_ko_patched_str(PC_KO_S7_BIRTHDAY_FOOTER, footer_str),
+             g_pc_ko_mode ? 4 : sizeof(footer_str));
+#else
     mem_copy(msg->footer + name_len, footer_str, sizeof(footer_str));
+#endif
 }
 
 static int mBm_check_near_birthday(int player_no) {

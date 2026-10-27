@@ -1,6 +1,9 @@
 #include "m_watch_my_step.h"
 
 #include "libultra/libultra.h"
+#ifdef TARGET_PC
+#include "pc_ko.h"
+#endif
 #include "m_play.h"
 #include "m_actor_type.h"
 #include "m_item_name.h"
@@ -163,7 +166,12 @@ extern void watch_my_step_move(GAME_PLAY* play) {
                     if (IS_ITEM_LOST_ITEM(window_item)) {
                         static u8 str[] = { CHAR_PP_004, CHAR_PP_019, CHAR_PP_011, CHAR_PP_091, CHAR_PP_024 };
 
+#ifdef TARGET_PC
+                        memcpy(S_watch_my_step.item_name, pc_ko_patched_str(PC_KO_S7_LOST_ITEM, str),
+                               g_pc_ko_mode ? 6 : sizeof(str));
+#else
                         memcpy(S_watch_my_step.item_name, str, sizeof(str));
+#endif
                     } else {
                         mIN_copy_name_str(S_watch_my_step.item_name, (mActor_name_t)window_item);
                     }

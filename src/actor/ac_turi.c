@@ -1,4 +1,7 @@
 #include "ac_turi.h"
+#ifdef TARGET_PC
+#include "pc_ko.h"
+#endif
 
 #include "ac_turi_clip.h"
 #include "m_name_table.h"

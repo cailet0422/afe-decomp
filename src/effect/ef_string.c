@@ -3,6 +3,9 @@
 #include "m_common_data.h"
 #include "m_font.h"
 #include "main.h"
+#ifdef TARGET_PC
+#include "pc_ko.h"
+#endif
 
 static void eString_init(xyz_t pos, int prio, s16 angle, GAME* game, u16 item_name, s16 arg0, s16 arg1);
 static void eString_ct(eEC_Effect_c* effect, GAME* game, void* ct_arg);
@@ -66,8 +69,14 @@ static eString_class_c* eString_string_table[2] = {
 static void eString_dw(eEC_Effect_c* effect, GAME* game) {
     if (effect->effect_specific[0] < 2) {
         eString_class_c* string_p = eString_string_table[effect->effect_specific[0]];
+#ifdef TARGET_PC
+        u32 entry = effect->effect_specific[0] == 0 ? PC_KO_DATA_ESTRING_CLASS1 : PC_KO_DATA_ESTRING_CLASS2;
+        u8* str_p = (u8*)pc_ko_data_ptr(entry, string_p->message);
+        int len = pc_ko_data_u32(entry + 4, string_p->message_len);
+#else
         u8* str_p = string_p->message;
         int len = string_p->message_len;
+#endif
         f32 len_f = (f32)len;
         f32 x = (SCREEN_WIDTH_F - len_f) * 0.5f;
         rgba_t color = string_p->color;
