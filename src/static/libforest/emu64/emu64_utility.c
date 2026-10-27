@@ -12,6 +12,9 @@ inline float fastcast_float(register unsigned char* s) {
     asm {
         psq_l f, 0(s), 1, 2
     }
+#elif defined(TARGET_PC)
+    /* GQR2-5 hold unscaled u8/u16/s8/s16 load formats */
+    f = *s;
 #endif // clang-format on
 
     return f;
@@ -24,6 +27,9 @@ inline float fastcast_float(register unsigned short* s) {
     asm {
         psq_l f, 0(s), 1, 3
     }
+#elif defined(TARGET_PC)
+    /* GQR2-5 hold unscaled u8/u16/s8/s16 load formats */
+    f = *s;
 #endif // clang-format on
 
     return f;
@@ -36,6 +42,9 @@ inline float fastcast_float(register signed char* s) {
     asm {
         psq_l f, 0(s), 1, 4
     }
+#elif defined(TARGET_PC)
+    /* GQR2-5 hold unscaled u8/u16/s8/s16 load formats */
+    f = *s;
 #endif // clang-format on
 
     return f;
@@ -48,6 +57,9 @@ inline float fastcast_float(register short* s) {
     asm {
         psq_l f, 0(s), 1, 5
     }
+#elif defined(TARGET_PC)
+    /* GQR2-5 hold unscaled u8/u16/s8/s16 load formats */
+    f = *s;
 #endif // clang-format on
 
     return f;
