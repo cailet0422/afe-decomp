@@ -209,6 +209,10 @@ static int mMsg_request_main_cursol(mMsg_Window_c* msg_p, int wait_flag, int req
 }
 
 extern void mMsg_Set_free_str(mMsg_Window_c* msg_p, int free_str_no, u8* str, int str_len) {
+#ifdef TARGET_PC
+    /* Korean patch: expand dictionary codes (long item names) */
+    str_len = pc_ko_expand(str, str_len, 3, (const u8**)&str);
+#endif
     if (free_str_no >= mMsg_FREE_STR0 && free_str_no < mMsg_FREE_STR_NUM && str != NULL) {
         int i;
         u8* free_str = msg_p->free_str[free_str_no];
@@ -266,6 +270,9 @@ extern void mMsg_Set_free_str_cl_art(mMsg_Window_c* msg_p, int str_no, u8* str_p
 }
 
 extern void mMsg_Set_item_str(mMsg_Window_c* msg_p, int item_str_no, u8* str, int str_len) {
+#ifdef TARGET_PC
+    str_len = pc_ko_expand(str, str_len, 4, (const u8**)&str);
+#endif
     if (item_str_no >= mMsg_ITEM_STR0 && item_str_no < mMsg_ITEM_STR_NUM && str != NULL) {
         int i;
         u8* free_str = msg_p->item_str[item_str_no];

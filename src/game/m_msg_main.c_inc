@@ -617,10 +617,17 @@ extern int mMsg_MoveDataCut(u8* data, int dst_idx, int src_idx, int len, int spa
 
 static void mMsg_CopyString(u8* dst, const u8* src, int len) {
     int i;
+#ifdef TARGET_PC
+    u8* start = dst;
+#endif
 
     for (i = 0; i < len; i++) {
         *dst++ = *src++;
     }
+#ifdef TARGET_PC
+    /* Korean patch: pick the particle after the name (이/가 ...) */
+    pc_ko_fix_josa(start, len);
+#endif
 }
 
 static int mMsg_Set_PlayerNameColor(u8* data, int* start_idx, int len) {
@@ -687,7 +694,13 @@ extern int mMsg_CopyTalkName(ACTOR* actor_p, u8* data, int start_idx, int len, u
 extern int mMsg_CopyTail(ACTOR* actor_p, u8* data, int start_idx, int len, u32 capitalize) {
     int command_len = mFont_CodeSize_idx_get(data, start_idx);
     u8* tail_p = actor_p != NULL ? mNpc_GetWordEnding(actor_p) : NULL;
+#ifdef TARGET_PC
+    int tail_len = actor_p != NULL ? mMsg_Get_Length_String(tail_p, g_pc_ko_mode ? PC_KO_WORD_ENDING_LEN
+                                                                                  : ANIMAL_CATCHPHRASE_LEN)
+                                   : 0;
+#else
     int tail_len = actor_p != NULL ? mMsg_Get_Length_String(tail_p, ANIMAL_CATCHPHRASE_LEN) : 0;
+#endif
     int new_len;
 
     new_len = mMsg_MoveDataCut(data, start_idx + tail_len, start_idx + command_len, len, FALSE);
@@ -703,7 +716,13 @@ extern int mMsg_CopyTail(ACTOR* actor_p, u8* data, int start_idx, int len, u32 c
 extern int mMsg_CopyTruthTail(ACTOR* actor_p, u8* data, int start_idx, int len, u32 capitalize) {
     int command_len = mFont_CodeSize_idx_get(data, start_idx);
     u8* tail_p = actor_p != NULL ? mNpc_GetWordEnding_forTag(actor_p) : NULL;
+#ifdef TARGET_PC
+    int tail_len = tail_p != NULL ? mMsg_Get_Length_String(tail_p, g_pc_ko_mode ? PC_KO_WORD_ENDING_LEN
+                                                                                : ANIMAL_CATCHPHRASE_LEN)
+                                  : 0;
+#else
     int tail_len = tail_p != NULL ? mMsg_Get_Length_String(tail_p, ANIMAL_CATCHPHRASE_LEN) : 0;
+#endif
     int new_len;
 
     new_len = mMsg_MoveDataCut(data, start_idx + tail_len, start_idx + command_len, len, FALSE);

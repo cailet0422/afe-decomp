@@ -5,6 +5,9 @@
 #include "m_string.h"
 #include "m_font.h"
 #include "libultra/libultra.h"
+#ifdef TARGET_PC
+#include "pc_ko.h"
+#endif
 
 static u32 Ps_table_rom_start;
 static u32 Ps_rom_start;
@@ -50,6 +53,9 @@ extern void mHandbill_Set_free_str(int str_num, u8* str, int str_len) {
     int j;
     u8* free_str;
     mHandbill_Data_c* handbill_data;
+#ifdef TARGET_PC
+    str_len = pc_ko_expand(str, str_len, 3, (const u8**)&str);
+#endif
 
     if (str_num >= 0 && str_num < mHandbill_FREE_STR_NUM && str != NULL) {
         handbill_data = &mHandbill_data;

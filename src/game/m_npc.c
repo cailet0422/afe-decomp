@@ -18,6 +18,9 @@
 #include "m_matching.h"
 #include "m_text.h"
 #include "m_msg.h"
+#ifdef TARGET_PC
+#include "pc_ko.h"
+#endif
 
 typedef struct sp_actor_name_data_s {
     mActor_name_t sp_npc_id;
@@ -2383,7 +2386,12 @@ extern u8* mNpc_GetWordEnding(ACTOR* actor) {
         word_ending = l_no_ending_npc_ending;
     }
 
+#ifdef TARGET_PC
+    /* Korean patch: the catchphrase is packed */
+    return pc_ko_word_ending(word_ending);
+#else
     return word_ending;
+#endif
 }
 
 extern u8* mNpc_GetWordEnding_forTag(ACTOR* actorx) {
@@ -2402,7 +2410,11 @@ extern u8* mNpc_GetWordEnding_forTag(ACTOR* actorx) {
         word_ending = l_no_ending_npc_ending;
     }
 
+#ifdef TARGET_PC
+    return pc_ko_word_ending(word_ending);
+#else
     return word_ending;
+#endif
 }
 
 extern void mNpc_ResetWordEnding(ACTOR* actorx) {

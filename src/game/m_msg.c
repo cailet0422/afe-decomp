@@ -28,6 +28,7 @@
 #include "libultra/libultra.h"
 #ifdef TARGET_PC
 #include "pc_bswap.h"
+#include "pc_ko.h"
 #endif
 
 static u32 Msg_rom_start = 0;
