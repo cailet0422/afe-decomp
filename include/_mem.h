@@ -1,6 +1,17 @@
 #ifndef _MEM_H
 #define _MEM_H
 
+#ifdef TARGET_PC
+#include <string.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+void __fill_mem(void* dst, int val, size_t n);
+#ifdef __cplusplus
+}
+#endif
+#else
 #include "stddef.h"
 
 #ifdef __cplusplus
@@ -19,4 +30,5 @@ void __fill_mem(void * dst, int val, unsigned long n);
 #ifdef __cplusplus
 };
 #endif
+#endif /* TARGET_PC */
 #endif

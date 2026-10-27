@@ -77,11 +77,19 @@ static int seg2k0_is_committed(u32 addr) {
         }
     }
     /* Cache miss — query the OS */
-    MEMORY_BASIC_INFORMATION mbi;
     int committed = 0;
+#ifdef _WIN32
+    MEMORY_BASIC_INFORMATION mbi;
     if (VirtualQuery((void*)addr, &mbi, sizeof(mbi)) > 0 && mbi.State == MEM_COMMIT) {
         committed = 1;
     }
+#else
+    {
+        /* mincore() fails with ENOMEM for unmapped pages */
+        unsigned char vec;
+        committed = mincore((void*)(uintptr_t)page, 0x1000, &vec) == 0;
+    }
+#endif
     seg2k0_page_cache[seg2k0_cache_next].page = page;
     seg2k0_page_cache[seg2k0_cache_next].committed = committed;
     seg2k0_cache_next = (seg2k0_cache_next + 1) % SEG2K0_PAGE_CACHE_SIZE;

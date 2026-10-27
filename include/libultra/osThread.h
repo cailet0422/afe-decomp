@@ -8,8 +8,16 @@ typedef s32 OSPri;
 typedef s32 OSId;
 
 
+#if defined(__cplusplus) && defined(TARGET_PC)
+extern "C" {
+#endif
+
 OSId osGetThreadId(OSThread*);
 void osYieldThread(void);
 BOOL osIsTerminatedThread(OSThread*);
+
+#if defined(__cplusplus) && defined(TARGET_PC)
+}
+#endif
 
 #endif

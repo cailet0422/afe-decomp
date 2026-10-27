@@ -1,4 +1,7 @@
 #include "jaudio_NES/driver.h"
+#ifdef TARGET_PC
+#include <stdbool.h>
+#endif
 
 #include "PR/abi.h"
 #include "jaudio_NES/audiocommon.h"

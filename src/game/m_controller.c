@@ -8,12 +8,20 @@
 /**
  * @brief Constructor for MCON.
  **/
+#ifdef TARGET_PC
+extern void mCon_ct(GAME* game) { }
+#else
 extern void mCon_ct() { }
+#endif
 
 /**
  * @brief Destructor for MCON.
  **/
+#ifdef TARGET_PC
+extern void mCon_dt(GAME* game) { }
+#else
 extern void mCon_dt() { }
+#endif
 
 /**
  * @brief Controller input processing function.

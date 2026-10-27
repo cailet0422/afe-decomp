@@ -24,6 +24,8 @@ f32 fatan2(f32, f32);
 f32 fsqrt(f32);
 f32 facos(f32);
 #else
+/* glibc declares a C23 narrowing fsqrt(double); rename ours */
+#define fsqrt afe_fsqrt
 /* PC stubs - these will be implemented in pc_mtx.c */
 s16 sins(u16);
 s16 coss(u16);

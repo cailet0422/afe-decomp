@@ -135,7 +135,12 @@ extern xyz_t rock_pos[2];
 extern xyz_t tonbo_rock_pos[6];
 extern xyz_t tentou_flower_pos[4];
 extern xyz_t hachi_base_pos;
+#ifdef TARGET_PC
+/* Defined static in ac_museum_insect_kabuto.c_inc; GCC rejects static after extern */
+static xyz_t kabuto_base_pos[9];
+#else
 extern xyz_t kabuto_base_pos[9];
+#endif
 extern cKF_Skeleton_R_c* kuwagata_model_tbl[4];
 extern cKF_Animation_R_c* kuwagata_anim_tbl[4];
 extern xyz_t kuwagata_base_pos[4];

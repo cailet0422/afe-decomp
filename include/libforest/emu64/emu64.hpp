@@ -344,10 +344,17 @@ class emu64_print {
     } while (0)
 #endif
 
+#ifdef TARGET_PC
+#define EMU64_PRINT_MEMBER(member)                       \
+    do {                                                 \
+        this->Printf0(#member " = %u\n", this->member); \
+    } while (0)
+#else
 #define EMU64_PRINT_MEMBER(member)                        \
     do {                                                  \
         this->Printf0(#member " = %u\n", this->##member); \
     } while (0)
+#endif
 
 #ifdef EMU64_DEBUG
 #define EMU64_TIMED_SEGMENT_BEGIN()       \

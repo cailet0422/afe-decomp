@@ -1,6 +1,10 @@
 #ifndef _MSL_COMMON_ARITH_H
 #define _MSL_COMMON_ARITH_H
 
+#ifdef TARGET_PC
+#include <stdlib.h>
+#else
+
 #include "PowerPC_EABI_Support/MSL_C/MSL_Common/msl_types.h"
 
 #ifdef __cplusplus
@@ -32,4 +36,5 @@ lldiv_t lldiv(long long __numer, long long __denom);
 };
 #endif // ifdef __cplusplus
 
+#endif /* TARGET_PC */
 #endif

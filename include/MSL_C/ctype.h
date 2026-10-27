@@ -1,9 +1,10 @@
+#ifdef TARGET_PC
+/* glibc's ctype.h uses the same _CTYPE_H guard, so include it before ours is set */
+#include <ctype.h>
+#else
 #ifndef _CTYPE_H
 #define _CTYPE_H
 
-#ifdef TARGET_PC
-#include <ctype.h> // Conflicts can happen otherwise in certain compiler versions
-#else
 
 #include "MSL_C/locale.h"
 #include "MSL_C/ctype_api.h"
@@ -47,5 +48,5 @@ inline int _toupper(int c) {
 #ifdef __cplusplus
 }
 #endif
-#endif /* !TARGET_PC */
 #endif /* _CTYPE_H */
+#endif /* !TARGET_PC */

@@ -13,6 +13,7 @@
  * GCC defines __declspec as a builtin keyword, so we must #undef it first. */
 #undef __declspec
 #define __declspec(x)
+#include "pc_mwcc_compat.h"
 #else
 #include "MSL_C/w_math.h"
 #endif

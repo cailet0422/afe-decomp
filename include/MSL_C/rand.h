@@ -1,6 +1,10 @@
 #ifndef RAND_H
 #define RAND_H
 
+#ifdef TARGET_PC
+#include <stdlib.h>
+#else
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -12,4 +16,5 @@ int rand(void);
 }
 #endif
 
+#endif /* TARGET_PC */
 #endif

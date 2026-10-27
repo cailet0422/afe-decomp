@@ -4,7 +4,12 @@
 #include "m_rcp.h"
 #include "sys_matrix.h"
 
+#ifdef TARGET_PC
+/* GCC does not accept a cast as an assignment target */
+#define aRI_CLIP (*(RESETCENTER_INDOOR_ACTOR**)&CLIP(resetcenter_indoor_clip))
+#else
 #define aRI_CLIP ((RESETCENTER_INDOOR_ACTOR*)CLIP(resetcenter_indoor_clip))
+#endif
 
 static xyz_t l_tv_position = { 100.0f, 60.0f, 220.0f };
 static xyz_t l_light_position = { 140.0f, 200.0f, 140.0f };

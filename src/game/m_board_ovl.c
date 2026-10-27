@@ -710,6 +710,10 @@ static rgba_t letter_color[PAPER_NUM] = {
     { 0, 0, 0, 0 },         { 0, 0, 0, 0 },         { 0, 0, 0, 0 },         { 0, 0, 0, 0 }
 };
 
+#ifdef TARGET_PC
+/* m_mail.h declares an extern mMlW_clear_buf; GCC rejects a static redefinition */
+#define mMlW_clear_buf mBO_mMlW_clear_buf
+#endif
 static void mMlW_clear_buf(u16* buf, int size, u16 clear_char) {
     while (--size >= 0) {
         *buf++ = clear_char;

@@ -26,6 +26,7 @@ inline int __fpclassifyf(f32 x) {
     return FP_NORMAL;
 }
 
+#ifndef TARGET_PC /* PC uses the host sqrtf (pc_mwcc_compat.h) */
 namespace std {
 inline float sqrtf(float x) {
     const double _half = .5;
@@ -46,6 +47,7 @@ inline float sqrtf(float x) {
     return x;
 }
 } // namespace std
+#endif
 
 u32 JUTGamePad::CRumble::sChannelMask[PAD_MAX_CONTROLLERS] = {
     0x80000000 >> 0,

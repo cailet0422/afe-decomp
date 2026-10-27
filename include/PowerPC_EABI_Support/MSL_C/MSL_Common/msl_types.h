@@ -16,9 +16,13 @@ typedef long double f128;
 
 typedef unsigned int uint;
 
+#ifdef TARGET_PC
+#include <stddef.h>
+#else
 #ifndef _SIZE_T_DEF
 #define _SIZE_T_DEF
 typedef unsigned long size_t;
+#endif
 #endif
 
 #ifndef __cplusplus
@@ -36,7 +40,9 @@ typedef int BOOL;
 #ifndef NULL
 #define NULL ((void*)0)
 #endif
+#if !defined(__cplusplus) || !defined(TARGET_PC)
 #define nullptr 0
+#endif
 
 #define WEAKFUNC __declspec(weak)
 

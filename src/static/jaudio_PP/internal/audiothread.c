@@ -23,6 +23,8 @@
  * each game frame to drive audio processing.
  *==========================================================================*/
 
+#include "dolphin/ai.h"
+
 volatile int intcount = 0;
 static BOOL pc_audio_initialized = FALSE;
 

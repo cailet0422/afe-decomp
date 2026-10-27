@@ -1,6 +1,18 @@
 #ifndef _MSL_COMMON_STRING_H
 #define _MSL_COMMON_STRING_H
 
+#ifdef TARGET_PC
+#include <string.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+void __fill_mem(void* dest, int val, size_t count);
+void* __memrchr(const void* ptr, int ch, size_t count);
+#ifdef __cplusplus
+}
+#endif
+#else
 #include "stddef.h"
 
 #ifdef __cplusplus
@@ -39,5 +51,7 @@ char* strstr(char* str, const char* pat) {
 }
 }; // namespace std
 #endif
+
+#endif /* TARGET_PC */
 
 #endif /* _MSL_COMMON_STRING_H */
