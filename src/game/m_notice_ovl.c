@@ -9,6 +9,9 @@
 #include "m_font.h"
 #include "m_quest.h"
 #include "sys_matrix.h"
+#ifdef TARGET_PC
+#include "pc_ko.h"
+#endif
 
 static mNT_Ovl_c notice_ovl_data;
 
@@ -28,7 +31,11 @@ static int mNT_strLineCheck(u16** str_pp, u16* str_end_p, int* width, int* line)
     if (*str_pp >= str_end_p) {
         result = mNT_LINE_CHECK_OVERSTRING;
     } else {
+#ifdef TARGET_PC
+        *width += g_pc_ko_mode ? pc_ko_line_char_width(*str_pp) : 12;
+#else
         *width += 12;
+#endif
         if (*width > mNT_MAX_WIDTH) {
             result = mNT_LINE_CHECK_OVERLINE;
         } else {

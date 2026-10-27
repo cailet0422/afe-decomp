@@ -791,7 +791,11 @@ static int mBD_strLineCheck(u16** str_pp, u16* str_end_p, int* width, int* line)
     if (str_p >= str_end_p) {
         res = mBD_LINE_CHECK_OVERSTRING;
     } else {
+#ifdef TARGET_PC
+        *width += g_pc_ko_mode ? pc_ko_line_char_width(*str_pp) : mFont_GetCodeWidthWF(**str_pp, TRUE);
+#else
         *width += mFont_GetCodeWidthWF(**str_pp, TRUE);
+#endif
         if (*width > mBD_MAX_WIDTH) {
             res = mBD_LINE_CHECK_OVERLINE;
         } else {

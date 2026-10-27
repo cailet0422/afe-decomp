@@ -9,6 +9,9 @@
 #include "m_cpwarning_ovl.h"
 #include "m_malloc.h"
 #include "m_text.h"
+#ifdef TARGET_PC
+#include "pc_ko.h"
+#endif
 
 enum {
     mDI_MOVE_READ,
@@ -765,7 +768,11 @@ static int mDI_strLineCheck(u16** str_pp, u16* str_end_p, int* width, int* line_
         (*line_len)++;
         ret = 1;
     } else {
+#ifdef TARGET_PC
+        (*width) += g_pc_ko_mode ? pc_ko_line_char_width(cur_str_p) : 12;
+#else
         (*width) += 12;
+#endif
         if (*width > 192) {
             ret = 2;
         } else {
