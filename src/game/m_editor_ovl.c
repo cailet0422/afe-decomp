@@ -16,6 +16,10 @@
 #include "m_address_ovl.h"
 #include "sys_matrix.h"
 #include "m_rcp.h"
+#ifdef TARGET_PC
+#include "pc_ko.h"
+#include "pc_typing.h"
+#endif
 #define mED_CHARS_PER_PAGE 5
 
 static u16 mED_ornament_table[256] = {
@@ -109,6 +113,182 @@ static int mED_strlen(mED_Ovl_c* editor_ovl, int count, u16 ignore_char) {
 
     return 0;
 }
+#ifdef TARGET_PC
+
+/* Korean patch (docs/pc_port/korean_patch.md): a Hangul syllable takes two
+ * entries of the buffer and the cursor steps over it at once. Like the
+ * patch's editor, spaces, commas and periods count as half width. While
+ * mED_pc_pair_trail is set, now_code is the first byte of a syllable and
+ * mED_output_code writes this second byte after it. */
+static int mED_pc_pair_trail = -1;
+
+/* Entries before the cursor that hold the syllable being composed on the
+ * keyboard (see pc_typing.h) */
+static int mED_pc_preedit_len = 0;
+
+static int mED_pc_code_size(void) {
+    return mED_pc_pair_trail >= 0 ? 2 : 1;
+}
+
+/* Size of the character that starts at idx */
+static int mED_pc_char_size(mED_Ovl_c* editor_ovl, int idx, int end) {
+    u16 lead;
+    u16 trail;
+    u8 pair[2];
+
+    if (!g_pc_ko_mode || idx < 0 || idx + 1 >= end) {
+        return 1;
+    }
+    lead = mED_get_str_data(editor_ovl, idx);
+    trail = mED_get_str_data(editor_ovl, idx + 1);
+    if (lead > 0xFF || trail > 0xFF) {
+        return 1;
+    }
+    pair[0] = (u8)lead;
+    pair[1] = (u8)trail;
+    return pc_ko_is_pair(pair) ? 2 : 1;
+}
+
+/* Size of the character that ends at idx */
+static int mED_pc_prev_char_size(mED_Ovl_c* editor_ovl, int idx) {
+    return mED_pc_char_size(editor_ovl, idx - 2, idx);
+}
+
+static int mED_pc_char_width(mED_Ovl_c* editor_ovl, int idx, int size) {
+    if (g_pc_ko_mode && size == 1) {
+        switch (mED_get_str_data(editor_ovl, idx)) {
+            case CHAR_SPACE:
+            case CHAR_COMMA:
+            case CHAR_PERIOD:
+                return mFont_TEX_CHAR_WIDTH / 2;
+        }
+    }
+    return mFont_TEX_CHAR_WIDTH;
+}
+
+/* mED_get_col_line_width by characters */
+static int mED_pc_get_col_line_width(mED_Ovl_c* editor_ovl, s16* cursor_col, s16* cursor_row, s16* cursor_line_width,
+                                     int max) {
+    int idx;
+    int size;
+    s16 prev_col = 0;
+    s16 prev_width = 0;
+
+    *cursor_row = 0;
+    *cursor_col = 0;
+    *cursor_line_width = 0;
+    for (idx = 0; idx < max; idx += size) {
+        int line = mED_LINE_OK;
+        int width;
+
+        size = mED_pc_char_size(editor_ovl, idx, max);
+        width = mED_pc_char_width(editor_ovl, idx, size);
+        if (*cursor_line_width + width > editor_ovl->line_width) {
+            prev_col = *cursor_col;
+            prev_width = *cursor_line_width;
+            *cursor_col = 1;
+            *cursor_line_width = width;
+            (*cursor_row)++;
+            line = mED_LINE_WIDTH_OVER;
+        }
+        if (mED_get_str_data(editor_ovl, idx) == CHAR_NEW_LINE) {
+            prev_col = *cursor_col;
+            prev_width = *cursor_line_width;
+            *cursor_col = 0;
+            *cursor_line_width = 0;
+            (*cursor_row)++;
+            line = mED_LINE_NEWLINE;
+        }
+        if (line == mED_LINE_OK) {
+            (*cursor_col)++;
+            *cursor_line_width += width;
+        }
+        if (*cursor_row >= editor_ovl->max_line_no) {
+            *cursor_col = prev_col + 1;
+            *cursor_row = editor_ovl->max_line_no - 1;
+            *cursor_line_width = prev_width;
+            return line == mED_LINE_OK ? mED_LINE_NUM_OVER : line;
+        }
+    }
+    return mED_LINE_OK;
+}
+
+/* mED_set_idxcol_inLineWidth by characters */
+static void mED_pc_set_idxcol_inLineWidth(mED_Ovl_c* editor_ovl) {
+    int i = 0;
+    int size;
+    int cursor_col = 0;
+    int width = 0;
+    int lines = 0;
+    int prev_col = 0;
+    int prev_width = 0;
+    int prev_line = 0;
+    int row = editor_ovl->cursor_row;
+
+    for (; i < editor_ovl->now_str_len; i += size) {
+        int char_width;
+
+        size = mED_pc_char_size(editor_ovl, i, editor_ovl->now_str_len);
+        char_width = mED_pc_char_width(editor_ovl, i, size);
+        if (width + char_width > editor_ovl->line_width) {
+            prev_line = lines + 1;
+            prev_col = 0;
+            prev_width = 0;
+            width = char_width;
+            cursor_col = 1;
+            lines++;
+        } else {
+            width += char_width;
+        }
+        if (mED_get_str_data(editor_ovl, i) == CHAR_NEW_LINE) {
+            width = 0;
+            cursor_col = 0;
+            lines++;
+        }
+        if (lines > row) {
+            if (prev_line == row) {
+                width = prev_width;
+                cursor_col = prev_col;
+            }
+            break;
+        } else if (lines == row) {
+            int desired = editor_ovl->cursor_line_width;
+
+            if (width >= desired) {
+                if (prev_line == row && desired - prev_width < width - desired) {
+                    /* closer to the start of this character */
+                    width = prev_width;
+                    cursor_col = prev_col;
+                } else {
+                    i += size;
+                }
+                cursor_col++;
+                break;
+            }
+        }
+        prev_col = cursor_col;
+        prev_line = lines;
+        prev_width = width;
+        cursor_col++;
+    }
+    editor_ovl->cursor_line_width = width;
+    editor_ovl->cursor_idx = i;
+    editor_ovl->cursor_col = cursor_col;
+}
+
+static void mED_pc_output_pair(mED_Ovl_c* editor_ovl) {
+    int i;
+
+    for (i = editor_ovl->now_str_len + 1; i > editor_ovl->cursor_idx + 1; i--) {
+        mED_set_str_data(editor_ovl, i, mED_get_str_data(editor_ovl, i - 2));
+    }
+    mED_set_str_data(editor_ovl, editor_ovl->cursor_idx, editor_ovl->now_code);
+    mED_set_str_data(editor_ovl, editor_ovl->cursor_idx + 1, mED_pc_pair_trail);
+    editor_ovl->cursor_idx += 2;
+    editor_ovl->now_str_len += 2;
+    editor_ovl->se_flag = TRUE;
+}
+#endif
 
 static void mED_input_multi_line_R_make_forecastW(mED_Ovl_c* editor_ovl, u16* output, int output_length) {
     int i;
@@ -119,6 +299,11 @@ static void mED_input_multi_line_R_make_forecastW(mED_Ovl_c* editor_ovl, u16* ou
     }
 
     *output++ = editor_ovl->now_code;
+#ifdef TARGET_PC
+    if (mED_pc_pair_trail >= 0) {
+        *output++ = mED_pc_pair_trail;
+    }
+#endif
     for (; i < output_length; i++) {
         *output++ = *src++;
     }
@@ -137,6 +322,11 @@ static void mED_input_multi_line_R_make_forecast(mED_Ovl_c* editor_ovl, u8* outp
         }
 
         *output++ = editor_ovl->now_code;
+#ifdef TARGET_PC
+        if (mED_pc_pair_trail >= 0) {
+            *output++ = mED_pc_pair_trail;
+        }
+#endif
         for (; i < output_length; i++) {
             *output++ = *src++;
         }
@@ -153,7 +343,12 @@ static int mED_input_multi_line_R_chk_cond(mED_Ovl_c* editor_ovl, u8* str, u16* 
 
     editor_ovl->input_str = str;
     editor_ovl->input_wstr = wstr;
+#ifdef TARGET_PC
+    res = mED_get_col_line_width(menu_info, editor_ovl, &cols, &rows, &line_width,
+                                 editor_ovl->now_str_len + mED_pc_code_size());
+#else
     res = mED_get_col_line_width(menu_info, editor_ovl, &cols, &rows, &line_width, editor_ovl->now_str_len + 1);
+#endif
     editor_ovl->input_str = src_str;
     editor_ovl->input_wstr = src_wstr;
     return res;
@@ -419,6 +614,17 @@ static int mED_check_now_code(mED_Ovl_c* editor_ovl) {
 
 static int mED_check_output_code(mED_Ovl_c* editor_ovl) {
     int res = mED_COMMAND_NONE;
+#ifdef TARGET_PC
+    if (g_pc_ko_mode) {
+        /* The patch replaced the kana wheel with its own Hangul input, which
+         * the PC port does not reproduce: text comes from the keyboard. */
+        if (chkTrigger(BUTTON_R)) {
+            editor_ovl->now_code = CHAR_SPACE;
+            res = mED_COMMAND_OUTPUT_CODE;
+        }
+        return res;
+    }
+#endif
     if (mED_check_shift_mode(editor_ovl)) {
         sAdo_SysTrgStart(0x37);
     } else if (mED_check_page_mode(editor_ovl)) {
@@ -452,6 +658,11 @@ static int mED_get_col_line_width(mSM_MenuInfo_c* menu_info, mED_Ovl_c* editor_o
     int i;
     s16 prev_col = 0;
     s16 prev_width = 0;
+#ifdef TARGET_PC
+    if (g_pc_ko_mode) {
+        return mED_pc_get_col_line_width(editor_ovl, cursor_col, cursor_row, cursor_line_width, max);
+    }
+#endif
     *cursor_row = 0;
     *cursor_col = 0;
     *cursor_line_width = 0;
@@ -515,6 +726,12 @@ static void mED_set_idxcol_inLineWidth(mED_Ovl_c* editor_ovl) {
     prev_line = 0;
     prev_width = 0;
     row = editor_ovl->cursor_row;
+#ifdef TARGET_PC
+    if (g_pc_ko_mode) {
+        mED_pc_set_idxcol_inLineWidth(editor_ovl);
+        return;
+    }
+#endif
     for (i = 0; i < editor_ovl->now_str_len; i++) {
         if (width + mFont_TEX_CHAR_WIDTH > editor_ovl->line_width) {
             prev_line = lines + 1;
@@ -694,6 +911,12 @@ static void mED_set_se(Submenu* submenu) {
 static void mED_output_code(mED_Ovl_c* editor_ovl) {
     int idx = editor_ovl->now_str_len;
     int i;
+#ifdef TARGET_PC
+    if (mED_pc_pair_trail >= 0) {
+        mED_pc_output_pair(editor_ovl);
+        return;
+    }
+#endif
     for (i = editor_ovl->now_str_len; i > editor_ovl->cursor_idx; idx--) {
         mED_set_str_data(editor_ovl, idx, mED_get_str_data(editor_ovl, idx - 1));
         i--;
@@ -708,6 +931,20 @@ static int mED_get_single_line_width(mED_Ovl_c* editor_ovl) {
     int idx = 0;
     int i;
     int width = 0;
+#ifdef TARGET_PC
+    if (g_pc_ko_mode) {
+        int size;
+
+        for (; idx < editor_ovl->now_str_len; idx += size) {
+            size = mED_pc_char_size(editor_ovl, idx, editor_ovl->now_str_len);
+            width += mED_pc_char_width(editor_ovl, idx, size);
+            if (mED_get_str_data(editor_ovl, idx) == CHAR_NEW_LINE) {
+                break;
+            }
+        }
+        return width;
+    }
+#endif
     for (i = editor_ovl->now_str_len; i > 0; i--) {
         width += mFont_TEX_CHAR_WIDTH;
         if (mED_get_str_data(editor_ovl, idx) == CHAR_NEW_LINE) {
@@ -729,7 +966,11 @@ static void mED_input_single_line(Submenu* submenu, mED_Ovl_c* editor_ovl) {
     }
     if (editor_ovl->now_code != CHAR_NEW_LINE) {
         int width = mED_get_single_line_width(editor_ovl);
+#ifdef TARGET_PC
+        if (editor_ovl->now_str_len + mED_pc_code_size() <= editor_ovl->input_length &&
+#else
         if (editor_ovl->now_str_len < editor_ovl->input_length &&
+#endif
             width + mFont_TEX_CHAR_WIDTH <= editor_ovl->line_width) {
             mED_output_code(editor_ovl);
         }
@@ -739,7 +980,11 @@ static void mED_input_single_line(Submenu* submenu, mED_Ovl_c* editor_ovl) {
 static void mED_input_multi_line_R(Submenu* submenu, mED_Ovl_c* editor_ovl, u8* buf, u16* wbuf) {
     mSM_MenuInfo_c* menu_info = &submenu->overlay->menu_info[mSM_OVL_EDITOR];
     int count = editor_ovl->input_length * editor_ovl->max_line_no;
+#ifdef TARGET_PC
+    if (count >= editor_ovl->now_str_len + mED_pc_code_size()) {
+#else
     if (count > editor_ovl->now_str_len) {
+#endif
         mED_input_multi_line_R_make_forecast(editor_ovl, buf, wbuf, count);
         switch (mED_input_multi_line_R_chk_cond(editor_ovl, buf, wbuf, menu_info)) {
             case mED_LINE_OK:
@@ -813,7 +1058,11 @@ static void mED_move_cursol_right(Submenu* submenu, mED_Ovl_c* editor_ovl, int l
     now_str_len = editor_ovl->now_str_len;
 
     if (cursor_idx < now_str_len && now_str_len > 0) {
+#ifdef TARGET_PC
+        editor_ovl->cursor_idx = cursor_idx + mED_pc_char_size(editor_ovl, cursor_idx, now_str_len);
+#else
         editor_ovl->cursor_idx = cursor_idx + 1;
+#endif
         editor_ovl->se_flag = TRUE;
     } else if (cursor_idx == now_str_len) {
         editor_ovl->now_code = CHAR_SPACE;
@@ -838,7 +1087,11 @@ static void mED_move_cursol_right(Submenu* submenu, mED_Ovl_c* editor_ovl, int l
 
 static void mED_move_cursol_left(mED_Ovl_c* editor_ovl) {
     if (editor_ovl->cursor_idx > 0) {
+#ifdef TARGET_PC
+        editor_ovl->cursor_idx -= mED_pc_prev_char_size(editor_ovl, editor_ovl->cursor_idx);
+#else
         editor_ovl->cursor_idx--;
+#endif
         editor_ovl->se_flag = TRUE;
     }
 }
@@ -878,7 +1131,11 @@ static void mED_end_edit_func(Submenu* submenu, mSM_MenuInfo_c* menu_info) {
     submenu->overlay->editor_ovl->se_flag = TRUE;
 }
 
+#ifdef TARGET_PC
+static void mED_backspace_func_unit(mED_Ovl_c* editor_ovl) {
+#else
 static void mED_backspace_func(mED_Ovl_c* editor_ovl) {
+#endif
     int idx;
     int i;
     if (editor_ovl->cursor_idx != 0) {
@@ -893,6 +1150,16 @@ static void mED_backspace_func(mED_Ovl_c* editor_ovl) {
         editor_ovl->se_flag = TRUE;
     }
 }
+#ifdef TARGET_PC
+
+static void mED_backspace_func(mED_Ovl_c* editor_ovl) {
+    int n = mED_pc_prev_char_size(editor_ovl, editor_ovl->cursor_idx);
+
+    while (n-- > 0) {
+        mED_backspace_func_unit(editor_ovl);
+    }
+}
+#endif
 
 static void mED_backspace_func_pw_chk_sub(int idx, u8* str) {
     mem_copy(str + idx, str + idx + 1, mPC_STR_SIZE - 1 - idx);
@@ -925,6 +1192,11 @@ static void mED_backspace_func_pw_chk(Submenu* submenu, mSM_MenuInfo_c* menu_inf
 
 static int mED_get_exchange_code(mED_Ovl_c* editor_ovl) {
     int exchange = -1;
+#ifdef TARGET_PC
+    if (mED_pc_prev_char_size(editor_ovl, editor_ovl->cursor_idx) == 2) {
+        return -1;
+    }
+#endif
     if (editor_ovl->cursor_idx != 0) {
         int code = mED_get_str_data(editor_ovl, editor_ovl->cursor_idx - 1);
         if (code >= TOTAL_CHARS) {
@@ -1158,11 +1430,16 @@ static void mED_edit_func_letter_header(Submenu* submenu, mSM_MenuInfo_c* menu_i
             mED_edit_func_single_line(submenu, menu_info);
 
             if (board_ovl->header_pos == mBD_HEADER_POS_PRE_NAME) {
+#ifdef TARGET_PC
+                /* a Korean syllable moves the name by two */
+                board_ovl->mail.content.header_back_start += editor_ovl->now_str_len - len;
+#else
                 if (len > editor_ovl->now_str_len) {
                     board_ovl->mail.content.header_back_start--;
                 } else if (len < editor_ovl->now_str_len) {
                     board_ovl->mail.content.header_back_start++;
                 }
+#endif
             }
         }
     }
@@ -1180,6 +1457,11 @@ static void mED_break_space_code(mED_Ovl_c* editor_ovl) {
 
 static void mED_input_footer_line_sub(Submenu* submenu, mSM_MenuInfo_c* menu_info, mED_Ovl_c* editor_ovl) {
     int width = editor_ovl->now_str_len * mFont_TEX_CHAR_WIDTH + mFont_TEX_CHAR_WIDTH;
+#ifdef TARGET_PC
+    if (mED_pc_pair_trail >= 0 && editor_ovl->now_str_len + 2 > editor_ovl->input_length) {
+        return;
+    }
+#endif
     if (editor_ovl->now_str_len + 1 <= editor_ovl->input_length) {
         if (width <= editor_ovl->line_width) {
             mED_output_code(editor_ovl);
@@ -1232,7 +1514,11 @@ static void mED_move_footer_cursol_right(Submenu* submenu, mSM_MenuInfo_c* menu_
             mED_set_str_data(editor_ovl, idx, CHAR_SPACE);
             editor_ovl->se_flag = TRUE;
         } else {
+#ifdef TARGET_PC
+            editor_ovl->cursor_idx += mED_pc_char_size(editor_ovl, cursor_idx, str_len);
+#else
             editor_ovl->cursor_idx++;
+#endif
             editor_ovl->se_flag = TRUE;
         }
     } else if (cursor_idx == str_len) {
@@ -1247,7 +1533,11 @@ static void mED_move_footer_cursol_right(Submenu* submenu, mSM_MenuInfo_c* menu_
 
 static void mED_move_footer_cursol_left(Submenu* submenu, mSM_MenuInfo_c* menu_info, mED_Ovl_c* editor_ovl) {
     if (editor_ovl->cursor_idx > 0) {
+#ifdef TARGET_PC
+        editor_ovl->cursor_idx -= mED_pc_prev_char_size(editor_ovl, editor_ovl->cursor_idx);
+#else
         editor_ovl->cursor_idx--;
+#endif
         editor_ovl->se_flag = TRUE;
     } else if (editor_ovl->now_str_len < editor_ovl->input_length) {
         editor_ovl->now_code = CHAR_SPACE;
@@ -1614,6 +1904,140 @@ static void mED_move_Move(Submenu* submenu, mSM_MenuInfo_c* menu_info) {
 }
 
 typedef void (*mED_EDIT_FUNC)(Submenu*, mSM_MenuInfo_c*);
+#ifdef TARGET_PC
+
+/* Runs one edit command with now_code (and a syllable's second byte) set.
+ * Returns how much the text grew. */
+static int mED_pc_run(Submenu* submenu, mSM_MenuInfo_c* menu_info, mED_EDIT_FUNC edit_func, int command, int code,
+                      int trail) {
+    mED_Ovl_c* editor_ovl = submenu->overlay->editor_ovl;
+    int len = editor_ovl->now_str_len;
+
+    editor_ovl->command = command;
+    editor_ovl->now_code = code;
+    editor_ovl->se_flag = FALSE;
+    mED_pc_pair_trail = trail;
+    (*edit_func)(submenu, menu_info);
+    mED_pc_pair_trail = -1;
+    return editor_ovl->now_str_len - len;
+}
+
+/* Applies the operations typed on the keyboard since the last frame (see
+ * pc_typing.h). Returns FALSE if there were none, so the controller's
+ * command runs as usual. */
+static int mED_pc_typing(Submenu* submenu, mSM_MenuInfo_c* menu_info, mED_EDIT_FUNC edit_func) {
+    mED_Ovl_c* editor_ovl = submenu->overlay->editor_ovl;
+    int type = menu_info->data0;
+    int se_command = mED_COMMAND_NONE;
+    int ran = FALSE;
+    int op;
+
+    if (editor_ovl->command != mED_COMMAND_NONE && editor_ovl->command != mED_COMMAND_9) {
+        /* A controller command: the composing syllable stays as text */
+        mED_pc_preedit_len = 0;
+        pc_typing_commit_composition();
+        return FALSE;
+    }
+
+    while (pc_typing_pop(&op)) {
+        int command = mED_COMMAND_NONE;
+        int code = 0;
+        int trail = -1;
+        u8 pair[2];
+
+        if (type == mED_TYPE_PASSWORDMAKE || type == mED_TYPE_PASSWORDCHK) {
+            continue; /* passwords use their own character set */
+        }
+
+        if (op & PC_TYPING_PREEDIT) {
+            int glyph = op & PC_TYPING_GLYPH_MASK;
+
+            if (mED_pc_preedit_len != 0) {
+                mED_pc_run(submenu, menu_info, edit_func, mED_COMMAND_BACKSPACE, 0, -1);
+                mED_pc_preedit_len = 0;
+                se_command = mED_COMMAND_BACKSPACE;
+                ran = TRUE;
+            }
+            if (op == PC_TYPING_PREEDIT_NONE) {
+                continue;
+            }
+            pc_ko_encode_glyph(glyph, pair);
+            if (mED_pc_run(submenu, menu_info, edit_func, mED_COMMAND_OUTPUT_CODE, pair[0], pair[1]) == 2) {
+                mED_pc_preedit_len = 2;
+                se_command = mED_COMMAND_OUTPUT_CODE;
+            } else {
+                pc_typing_preedit_rejected();
+                sAdo_SysTrgStart(0x1003);
+            }
+            ran = TRUE;
+            continue;
+        }
+
+        if (op & PC_TYPING_PAIR) {
+            pc_ko_encode_glyph(op & PC_TYPING_GLYPH_MASK, pair);
+            command = mED_COMMAND_OUTPUT_CODE;
+            code = pair[0];
+            trail = pair[1];
+        } else if (op < 256) {
+            command = mED_COMMAND_OUTPUT_CODE;
+            code = op;
+        } else {
+            switch (op) {
+                case PC_TYPING_CMD_COMMIT:
+                    mED_pc_preedit_len = 0;
+                    continue;
+                case PC_TYPING_CMD_BACKSPACE:
+                    command = mED_COMMAND_BACKSPACE;
+                    break;
+                case PC_TYPING_CMD_LEFT:
+                    command = mED_COMMAND_CURSOL_LEFT;
+                    break;
+                case PC_TYPING_CMD_RIGHT:
+                    command = mED_COMMAND_CURSOL_RIGHT;
+                    break;
+                case PC_TYPING_CMD_UP:
+                    command = mED_COMMAND_CURSOL_UPPER;
+                    break;
+                case PC_TYPING_CMD_DOWN:
+                    command = mED_COMMAND_CURSOL_LOWER;
+                    break;
+                case PC_TYPING_CMD_ENTER:
+                    if (editor_ovl->max_line_no > 1) {
+                        command = mED_COMMAND_OUTPUT_CODE;
+                        code = CHAR_NEW_LINE;
+                    } else if (type == mED_TYPE_BOARD) {
+                        command = mED_COMMAND_CURSOL_LOWER; /* next part of the letter */
+                    } else {
+                        command = mED_COMMAND_END_EDIT;
+                    }
+                    break;
+                case PC_TYPING_CMD_END:
+                    command = mED_COMMAND_END_EDIT;
+                    break;
+                default:
+                    continue;
+            }
+        }
+
+        mED_pc_run(submenu, menu_info, edit_func, command, code, trail);
+        ran = TRUE;
+        if (editor_ovl->se_flag) {
+            se_command = command;
+        } else if (command == mED_COMMAND_OUTPUT_CODE) {
+            sAdo_SysTrgStart(0x1003);
+        }
+        if (command == mED_COMMAND_END_EDIT && editor_ovl->se_flag) {
+            break;
+        }
+    }
+
+    if (ran) {
+        editor_ovl->command = se_command;
+        editor_ovl->se_flag = se_command != mED_COMMAND_NONE;
+    }
+    return ran;
+}
+#endif
 
 static void mED_move_Play(Submenu* submenu, mSM_MenuInfo_c* menu_info) {
     static mED_EDIT_FUNC mED_edit_func[mED_TYPE_NUM] = { &mED_edit_func_letter,      &mED_edit_func_multi_line,
@@ -1676,6 +2100,9 @@ static void mED_move_Play(Submenu* submenu, mSM_MenuInfo_c* menu_info) {
             }
         }
         mED_set_command(submenu);
+#ifdef TARGET_PC
+        if (!mED_pc_typing(submenu, menu_info, mED_edit_func[menu_info->data0]))
+#endif
         (*mED_edit_func[menu_info->data0])(submenu, menu_info);
 
         if (editor_ovl->consonant_num == -1) {
@@ -2279,6 +2706,14 @@ static void mED_set_dl(Submenu* submenu, mSM_MenuInfo_c* menu_info, GAME* game) 
     mED_Ovl_c* editor_ovl = submenu->overlay->editor_ovl;
     GRAPH* graph = game->graph;
 
+#ifdef TARGET_PC
+    if (g_pc_ko_mode) {
+        /* The patch's input panel is not reproduced (see mED_check_output_code) */
+        (*submenu->overlay->set_char_matrix_proc)(graph);
+        pc_ko_editor_draw(game, menu_info->position[0], menu_info->position[1]);
+        return;
+    }
+#endif
     mED_KeyDraw(editor_ovl, graph, menu_info->position[0], menu_info->position[1]);
     mED_StringsDraw(submenu, editor_ovl, game, menu_info->position[0], menu_info->position[1]);
 }
@@ -2376,10 +2811,17 @@ extern void mED_editor_ovl_construct(Submenu* submenu) {
     mED_editor_ovl_set_proc(submenu);
     submenu->overlay->editor_ovl->end_code_draw = &mED_endCode_draw;
     submenu->overlay->editor_ovl->cursol_draw = &mED_cursol_draw;
+#ifdef TARGET_PC
+    mED_pc_preedit_len = 0;
+    pc_typing_editor_open(menu_info->data0 == mED_TYPE_LEDIT_LATIN);
+#endif
 }
 
 extern void mED_editor_ovl_destruct(Submenu* submenu) {
     Submenu_Overlay_c* overlay = submenu->overlay;
 
     overlay->editor_ovl = NULL;
+#ifdef TARGET_PC
+    pc_typing_editor_close();
+#endif
 }
