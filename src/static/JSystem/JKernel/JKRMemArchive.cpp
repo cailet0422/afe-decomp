@@ -121,6 +121,9 @@ bool JKRMemArchive::open(s32 entryNum, JKRArchive::EMountDirection mountDirectio
     if (!mArcHeader) {
         mMountMode = UNKNOWN_MOUNT_MODE;
     } else {
+#ifdef TARGET_PC
+        pcSwapMemImage(mArcHeader);
+#endif
         JUT_ASSERT(mArcHeader->signature == 'RARC');
         mArcInfoBlock = (SArcDataInfo*)((u8*)mArcHeader + mArcHeader->header_length);
         mDirectories = (SDIDirEntry*)((u8*)&mArcInfoBlock->num_nodes + mArcInfoBlock->node_offset);
@@ -135,6 +138,9 @@ bool JKRMemArchive::open(s32 entryNum, JKRArchive::EMountDirection mountDirectio
 
 bool JKRMemArchive::open(void* buffer, u32 bufferSize, JKRMemBreakFlag flag) {
     mArcHeader = (SArcHeader*)buffer;
+#ifdef TARGET_PC
+    pcSwapMemImage(mArcHeader);
+#endif
     JUT_ASSERT(mArcHeader->signature == 'RARC');
     mArcInfoBlock = (SArcDataInfo*)((u8*)mArcHeader + mArcHeader->header_length);
     mDirectories = (SDIDirEntry*)((u8*)&mArcInfoBlock->num_nodes + mArcInfoBlock->node_offset);

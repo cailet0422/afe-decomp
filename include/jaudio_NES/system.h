@@ -38,7 +38,10 @@ extern s32 Nas_PreLoadBank_BG(s32 bankId, s32 param2, s32 param3, OSMesgQueue* m
 extern s32 Nas_PreLoadSeq_BG(s32 seqId, s32 param2, s32 param3, OSMesgQueue* mq);
 
 extern void Nas_FlushBank(s32 seqId);
+#ifdef TARGET_PC
+extern s32 Nas_MapHeaderReadIndex(s32 seq_id);
 extern u8 Nas_MapHeaderReadByte(s32 byteIndex);
+#endif
 
 extern void Nas_SetExtPointer(s32 type, s32 idx, s32 set_type, s32 param);
 

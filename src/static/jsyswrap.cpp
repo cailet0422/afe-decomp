@@ -521,6 +521,7 @@ extern void JW_Init() {
     void* arenaLo = OSGetArenaLo();
     void* arenaHi = OSGetArenaHi();
 
+#ifndef TARGET_PC /* GameCube memory map; the PC arena lives elsewhere */
     if ((u32)arenaLo <= FIX_ARENA_LO) {
         OSSetArenaLo((void*)FIX_ARENA_LO);
     } else {
@@ -530,6 +531,7 @@ extern void JW_Init() {
     if ((u32)arenaHi != FIX_ARENA_HI && (u32)arenaHi < 0x81800000) {
         OSReport("\x1b[43;30mWARNING: ArenaHi(%x) != %x\x1b[m\n", arenaHi, OSGetArenaHi);
     }
+#endif
 
     SystemHeapSize = (u32)OSGetArenaHi() - (u32)OSGetArenaLo() - 0xD0;
     JC_JFWSystem_setMaxStdHeap(1);
@@ -537,7 +539,14 @@ extern void JW_Init() {
     JC_JFWSystem_setFifoBufSize(0x10001);
 
     u32 soundAramSize = JW_soundAramSize;
+#ifdef TARGET_PC
+    /* GameCube loads famicom.arc into main RAM as a compressed archive; the PC
+     * build mounts it in ARAM instead (see famicom_mount_archive), so give the
+     * graph heap room for it. pc_aram.c provides a larger ARAM to match. */
+    u32 graphAramSize = 0x709960 + 0x400000;
+#else
     u32 graphAramSize = 0x709960;
+#endif
     OSReport("soundAramSize=%08x graphAramSize=%08x totalAramSize=%08x\n", soundAramSize, graphAramSize,
              soundAramSize + graphAramSize);
     JC_JFWSystem_setAramAudioBufSize(soundAramSize);

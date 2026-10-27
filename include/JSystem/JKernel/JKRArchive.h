@@ -234,6 +234,12 @@ class JKRArchive : public JKRFileLoader {
 
     static u32 sCurrentDirID;
 
+#ifdef TARGET_PC
+    // Converts a big-endian RARC image held entirely in memory to native
+    // byte order. Safe to call again on an already converted image.
+    static void pcSwapMemImage(SArcHeader* header);
+#endif
+
   protected:
     // _00     = VTBL
     // _00-_38 = JKRFileLoader

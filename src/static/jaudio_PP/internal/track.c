@@ -1293,7 +1293,7 @@ static void Nas_SubSeq(sub* subtrack) {
                             case SUBTRACK_CMD_INIT_INSTRUMENTS: // Load subtrack bank and set instruments
                                 cmdArgU8 = cmdArgs[0];
                                 if (grp->bank_id != 0xFF) {
-                                    cmdArgU16 = ((u16*)AG.map_header)[grp->seq_id];
+                                    cmdArgU16 = Nas_MapHeaderReadIndex(grp->seq_id);
                                     lo_bits = Nas_MapHeaderReadByte(cmdArgU16);
                                     cmdArgU8 = Nas_MapHeaderReadByte(cmdArgU16 + lo_bits - cmdArgU8);
                                 }
@@ -1401,7 +1401,7 @@ static void Nas_SubSeq(sub* subtrack) {
                             case SUBTRACK_CMD_SET_INSTRUMENT_BANK: // set bank
                                 cmdArgU8 = cmdArgs[0];
                                 if (grp->bank_id != 0xFF) {
-                                    cmdArgU16 = ((u16*)AG.map_header)[grp->seq_id];
+                                    cmdArgU16 = Nas_MapHeaderReadIndex(grp->seq_id);
                                     lo_bits = Nas_MapHeaderReadByte(cmdArgU16);
                                     cmdArgU8 = Nas_MapHeaderReadByte(cmdArgU16 + lo_bits - cmdArgU8);
                                 }

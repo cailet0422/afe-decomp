@@ -279,13 +279,14 @@ static void __Nas_ExCopy(Bgload* bgload, s32 size);
 static void __Nas_BgCopy(Bgload* bgload, s32 size);
 
 #ifdef TARGET_PC
-u8 Nas_MapHeaderReadByte(s32 byteIndex) {
-    u16 word = AG.map_header[(u32)byteIndex >> 1];
+/* e+ stores the sequence->bank map as big-endian bytes: a u16 offset per
+ * sequence followed by byte lists, so only the offsets need byte order care. */
+s32 Nas_MapHeaderReadIndex(s32 seq_id) {
+    return (AG.map_header[seq_id * 2] << 8) | AG.map_header[seq_id * 2 + 1];
+}
 
-    if (byteIndex & 1) {
-        return word & 0xFF;
-    }
-    return word >> 8;
+u8 Nas_MapHeaderReadByte(s32 byteIndex) {
+    return AG.map_header[byteIndex];
 }
 #endif
 
@@ -585,7 +586,7 @@ void* Nas_PreLoadBank(s32 seq_id, s32* bank_id) {
 
     l_bank_id = 0xFF;
 #ifdef TARGET_PC
-    idx = ((u16*)AG.map_header)[seq_id];
+    idx = Nas_MapHeaderReadIndex(seq_id);
     for (i = Nas_MapHeaderReadByte(idx++); i > 0; i--) {
         l_bank_id = Nas_MapHeaderReadByte(idx++);
 #else
@@ -697,7 +698,7 @@ s32 Nas_PreLoadBank_BG(s32 id, s32 param_2, s32 ret_data, OSMesgQueue* ret_queue
 // @unused
 #ifdef TARGET_PC
 u8* Nas_SeqToBank(s32 seq_id, s32* num_banks) {
-    s32 index = ((u16*)AG.map_header)[seq_id];
+    s32 index = Nas_MapHeaderReadIndex(seq_id);
     s32 i;
 
     *num_banks = Nas_MapHeaderReadByte(index++);
@@ -732,7 +733,7 @@ u8* Nas_SeqToBank(s32 seq_id, s32* num_banks) {
 void Nas_FlushBank(s32 seq_id) {
     s32 bank_id;
     s32 bank_count;
-    s32 index = ((u16*)AG.map_header)[seq_id];
+    s32 index = Nas_MapHeaderReadIndex(seq_id);
 
     bank_count = Nas_MapHeaderReadByte(index++);
     while (bank_count > 0) {
@@ -831,7 +832,7 @@ static s32 __Nas_StartSeq(s32 group_idx, s32 seq_id) {
     Nas_ReleaseGroup(group);
     bank_id = 0xFF;
 #ifdef TARGET_PC
-    idx = ((u16*)AG.map_header)[seq_id];
+    idx = Nas_MapHeaderReadIndex(seq_id);
     for (i = Nas_MapHeaderReadByte(idx++); i > 0; i--) {
         bank_id = Nas_MapHeaderReadByte(idx++);
 #else

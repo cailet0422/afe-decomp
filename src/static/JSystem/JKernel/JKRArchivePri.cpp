@@ -203,3 +203,55 @@ u32 JKRArchive::getExpandSize(SDIFileEntry* entry) const {
     }
     return mExpandSizes[index];
 }
+
+#ifdef TARGET_PC
+#include "pc_bswap.h"
+
+void JKRArchive::pcSwapMemImage(SArcHeader* header) {
+    SArcDataInfo* info;
+    SDIDirEntry* dirs;
+    SDIFileEntry* files;
+    u32 i;
+
+    if (header->signature == 'RARC') {
+        return; /* already native */
+    }
+
+    header->signature = pc_bswap32(header->signature);
+    header->file_length = pc_bswap32(header->file_length);
+    header->header_length = pc_bswap32(header->header_length);
+    header->file_data_offset = pc_bswap32(header->file_data_offset);
+    header->file_data_length = pc_bswap32(header->file_data_length);
+    header->_14 = pc_bswap32(header->_14);
+    header->_18 = pc_bswap32(header->_18);
+    header->_1C = pc_bswap32(header->_1C);
+
+    info = (SArcDataInfo*)((u8*)header + header->header_length);
+    info->num_nodes = pc_bswap32(info->num_nodes);
+    info->node_offset = pc_bswap32(info->node_offset);
+    info->num_file_entries = pc_bswap32(info->num_file_entries);
+    info->file_entry_offset = pc_bswap32(info->file_entry_offset);
+    info->string_table_length = pc_bswap32(info->string_table_length);
+    info->string_table_offset = pc_bswap32(info->string_table_offset);
+    info->nextFreeFileID = pc_bswap16(info->nextFreeFileID);
+
+    dirs = (SDIDirEntry*)((u8*)&info->num_nodes + info->node_offset);
+    for (i = 0; i < info->num_nodes; i++) {
+        dirs[i].mType = pc_bswap32(dirs[i].mType);
+        dirs[i].mOffset = pc_bswap32(dirs[i].mOffset);
+        dirs[i]._08 = pc_bswap16(dirs[i]._08);
+        dirs[i].mNum = pc_bswap16(dirs[i].mNum);
+        dirs[i].mFirstIdx = pc_bswap32(dirs[i].mFirstIdx);
+    }
+
+    files = (SDIFileEntry*)((u8*)&info->num_nodes + info->file_entry_offset);
+    for (i = 0; i < info->num_file_entries; i++) {
+        files[i].mFileID = pc_bswap16(files[i].mFileID);
+        files[i].mHash = pc_bswap16(files[i].mHash);
+        files[i].mFlag = pc_bswap32(files[i].mFlag);
+        files[i].mDataOffset = pc_bswap32(files[i].mDataOffset);
+        files[i].mSize = pc_bswap32(files[i].mSize);
+        /* mData is a runtime pointer, zero on disc */
+    }
+}
+#endif

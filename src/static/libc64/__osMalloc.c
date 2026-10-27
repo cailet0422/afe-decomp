@@ -36,7 +36,12 @@ static void arena_unlock(OSArena* arena) {
     osRecvMesg(&arena->lockQueue, NULL, OS_MESG_BLOCK);
 }
 
+#ifdef TARGET_PC
+/* Arenas live in host memory on PC, outside the GameCube address range */
+#define OS_MALLOC_CHK_BLOCK(block) ((block) != NULL)
+#else
 #define OS_MALLOC_CHK_BLOCK(block) ((u32)(block) >= OS_BASE_CACHED && (u32)(block) < (OS_BASE_CACHED + 0x3000000))
+#endif
 
 static int is_block_valid(OSMemBlock* block) {
     if (block != NULL) {

@@ -717,7 +717,13 @@ extern void cKF_SkeletonInfo_R_combine_translation(s16** joint, int* flag, cKF_S
                                                    s8* part_table, int combine_cnt) {
     int i;
     int j;
+#ifdef TARGET_PC
+    /* Callers pass up to 4 animations (see cKF_SkeletonInfo_R_Multi_combine_play_chk);
+     * the original 3-entry table overflows into stack padding on GameCube. */
+    cKF_SkeletonInfo_R_combine_work_c* work_tbl[4];
+#else
     cKF_SkeletonInfo_R_combine_work_c* work_tbl[3];
+#endif
 
     for (i = 0; i < combine_cnt; i++) {
         work_tbl[i] = &combine[i];
@@ -757,7 +763,13 @@ extern void cKF_SkeletonInfo_R_combine_rotation(s16** joint, int* flag, cKF_Skel
     int j;
     int k;
     f32 calc_joint;
+#ifdef TARGET_PC
+    /* Callers pass up to 4 animations (see cKF_SkeletonInfo_R_Multi_combine_play_chk);
+     * the original 3-entry table overflows into stack padding on GameCube. */
+    cKF_SkeletonInfo_R_combine_work_c* work_tbl[4];
+#else
     cKF_SkeletonInfo_R_combine_work_c* work_tbl[3];
+#endif
 
     for (i = 0; i < combine_cnt; i++) {
         work_tbl[i] = &combine[i];

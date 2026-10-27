@@ -1165,6 +1165,13 @@ void emu64::texconv_tile(u8* addr, u8* converted_addr, unsigned int wd, unsigned
 #endif
 
 unsigned int emu64::tmem_swap(unsigned int ofs, unsigned int blk_siz) {
+#ifdef TARGET_PC
+    /* Loads with a dxt value pass line size 0; PowerPC division by zero
+     * doesn't trap but x86 does. */
+    if (blk_siz == 0) {
+        return ofs;
+    }
+#endif
     u16 block = ofs / blk_siz;
     return ofs ^ ((block >> 1) & 4);
 }

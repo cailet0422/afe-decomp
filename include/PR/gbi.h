@@ -1481,28 +1481,54 @@ typedef union {
 /*
  *  Graphics DMA Packet
  */
+#ifdef TARGET_PC
+typedef struct {
+	unsigned int	len:16;
+	unsigned int	par:8;
+	int		cmd:8;
+	unsigned int	addr;
+} Gdma;
+#else
 typedef struct {
 	int		cmd:8;
 	unsigned int	par:8;
 	unsigned int	len:16;
 	unsigned int	addr;
 } Gdma;
+#endif
 
 /*
  * Graphics Immediate Mode Packet types
  */
+#ifdef TARGET_PC
+typedef struct {
+		int		pad:24;
+		int		cmd:8;
+		Tri		tri;
+} Gtri;
+#else
 typedef struct {
 		int		cmd:8;
 		int		pad:24;
 		Tri		tri;
 } Gtri;
+#endif
 
+#ifdef TARGET_PC
+typedef struct {
+		int		pad1:24;
+		int		cmd:8;
+		unsigned int	param:8;
+		int             pad2:24;
+} Gpopmtx;
+#else
 typedef struct {
 		int		cmd:8;
 		int		pad1:24;
 		int             pad2:24;
 		unsigned int	param:8;
 } Gpopmtx;
+#endif
 
 /*
  * typedef struct {
@@ -1513,6 +1539,16 @@ typedef struct {
  * 		int		base:24;
  * } Gsegment;
  */
+#ifdef TARGET_PC
+typedef struct {
+		int		number:8;
+		int		mw_index:8;
+		int		pad0:8;
+		int		cmd:8;
+		int		base:24;
+		int		pad1:8;
+} Gsegment;
+#else
 typedef struct {
 		int		cmd:8;
 		int		pad0:8;
@@ -1521,7 +1557,17 @@ typedef struct {
 		int		pad1:8;
 		int		base:24;
 } Gsegment;
+#endif
 
+#ifdef TARGET_PC
+typedef struct {
+		int		len:8;
+		int		sft:8;
+		int		pad0:8;
+		int		cmd:8;
+		unsigned int	data:32;
+} GsetothermodeL;
+#else
 typedef struct {
 		int		cmd:8;
 		int		pad0:8;
@@ -1529,7 +1575,17 @@ typedef struct {
 		int		len:8;
 		unsigned int	data:32;
 } GsetothermodeL;
+#endif
 
+#ifdef TARGET_PC
+typedef struct {
+		int		len:8;
+		int		sft:8;
+		int		pad0:8;
+		int		cmd:8;
+		unsigned int	data:32;
+} GsetothermodeH;
+#else
 typedef struct {
 		int		cmd:8;
 		int		pad0:8;
@@ -1537,7 +1593,18 @@ typedef struct {
 		int		len:8;
 		unsigned int	data:32;
 } GsetothermodeH;
+#endif
 
+#ifdef TARGET_PC
+typedef struct {
+		unsigned char	on;
+		unsigned char	tile;
+		unsigned char	lodscale;
+		unsigned char	cmd;
+		unsigned short	t;
+		unsigned short	s;
+} Gtexture;
+#else
 typedef struct {
 		unsigned char	cmd;
 		unsigned char	lodscale;
@@ -1546,24 +1613,52 @@ typedef struct {
 		unsigned short	s;
 		unsigned short	t;
 } Gtexture;
+#endif
 
+#ifdef TARGET_PC
+typedef struct {
+		int		pad:24;
+		int		cmd:8;
+		Tri		line;
+} Gline3D;
+#else
 typedef struct {
 		int		cmd:8;
 		int		pad:24;
 		Tri		line;
 } Gline3D;
+#endif
 
+#ifdef TARGET_PC
+typedef struct {
+		int		pad1:24;
+		int		cmd:8;
+		short int       scale;
+		short int	pad2;
+} Gperspnorm;
+#else
 typedef struct {
 		int		cmd:8;
 		int		pad1:24;
 		short int	pad2;
 		short int       scale;
 } Gperspnorm;
+#endif
 
 
 /*
  * RDP Packet types
  */
+#ifdef TARGET_PC
+typedef struct {
+                unsigned int    wd:12;
+                unsigned int    pad:7;
+                unsigned int    siz:2;
+                unsigned int    fmt:3;
+                int             cmd:8;
+                unsigned int    dram;
+} Gsetimg;
+#else
 typedef struct {
                 int             cmd:8;
                 unsigned int    fmt:3;
@@ -1572,13 +1667,31 @@ typedef struct {
                 unsigned int    wd:12;	/* really only 10 bits, extra	*/
                 unsigned int    dram;	/* to account for 1024		*/
 } Gsetimg;
+#endif
 
+#ifdef TARGET_PC
+typedef struct {
+		unsigned int	muxs0:24;
+		int		cmd:8;
+		unsigned int	muxs1:32;
+} Gsetcombine;
+#else
 typedef struct {
 		int		cmd:8;
 		unsigned int	muxs0:24;
 		unsigned int	muxs1:32;
 } Gsetcombine;
+#endif
 
+#ifdef TARGET_PC
+typedef struct {
+		unsigned int	prim_level:8;
+		unsigned int	prim_min_level:8;
+		unsigned int	pad:8;
+		int		cmd:8;
+		unsigned long	color;
+} Gsetcolor;
+#else
 typedef struct {
 		int		cmd:8;
 		unsigned char	pad;
@@ -1586,7 +1699,22 @@ typedef struct {
 		unsigned char	prim_level;
 		unsigned long	color;
 } Gsetcolor;
+#endif
 
+#ifdef TARGET_PC
+typedef struct {
+		int		y0frac:2;
+		int		y0:10;
+		int		x0frac:2;
+		int		x0:10;
+		int		cmd:8;
+		int		y1frac:2;
+		int		y1:10;
+		int		x1frac:2;
+		int		x1:10;
+		unsigned int	pad:8;
+} Gfillrect;
+#else
 typedef struct {
 		int		cmd:8;
 		int		x0:10;
@@ -1599,7 +1727,29 @@ typedef struct {
 		int		y1:10;
 		int		y1frac:2;
 } Gfillrect;
+#endif
 
+#ifdef TARGET_PC
+typedef struct {
+		unsigned int	tmem:9;
+		unsigned int	line:9;
+		unsigned int	pad0:1;
+		unsigned int	siz:2;
+		unsigned int	fmt:3;
+		int		cmd:8;
+		unsigned int	shifts:4;
+		unsigned int	masks:4;
+		unsigned int	ms:1;
+		unsigned int	cs:1;
+		unsigned int	shiftt:4;
+		unsigned int	maskt:4;
+		unsigned int	mt:1;
+		unsigned int	ct:1;
+		unsigned int	palette:4;
+		unsigned int	tile:3;
+		unsigned int	pad1:5;
+} Gsettile;
+#else
 typedef struct {
 		int		cmd:8;
 		unsigned int	fmt:3;
@@ -1619,7 +1769,19 @@ typedef struct {
 		unsigned int	masks:4;
 		unsigned int	shifts:4;
 } Gsettile;
+#endif
 
+#ifdef TARGET_PC
+typedef struct _Gloadtile {
+		unsigned int	tl:12;
+		unsigned int	sl:12;
+		int		cmd:8;
+		unsigned int	th:12;
+		unsigned int	sh:12;
+		unsigned int	tile:3;
+		int		pad:5;
+} Gloadtile;
+#else
 typedef struct _Gloadtile {
 		int		cmd:8;
 		unsigned int	sl:12;
@@ -1629,7 +1791,19 @@ typedef struct _Gloadtile {
 		unsigned int	sh:12;
 		unsigned int	th:12;
 } Gloadtile;
+#endif
 
+#ifdef TARGET_PC
+typedef struct _Gloadblock {
+		unsigned int	tl:12;
+		unsigned int	sl:12;
+		int		cmd:8;
+		unsigned int	th:12;
+		unsigned int	sh:12;
+		unsigned int	tile:3;
+		int		pad:5;
+} Gloadblock;
+#else
 typedef struct _Gloadblock {
     int		cmd:8;
     unsigned int	sl:12;
@@ -1639,11 +1813,27 @@ typedef struct _Gloadblock {
     unsigned int	sh:12;
     unsigned int	th:12;
 } Gloadblock;
+#endif
 
 typedef Gloadtile Gsettilesize;
 
 typedef Gloadtile Gloadtlut;
 
+#ifdef TARGET_PC
+typedef struct {
+		unsigned int	yl:12;
+		unsigned int	xl:12;
+		unsigned int	cmd:8;
+		unsigned int	yh:12;
+		unsigned int	xh:12;
+		unsigned int	tile:3;
+		unsigned int	pad1:5;
+		unsigned int	t:16;
+		unsigned int	s:16;
+		unsigned int	dtdy:16;
+		unsigned int	dsdx:16;
+} Gtexrect;
+#else
 typedef struct {
 		unsigned int	cmd:8;	/* command			*/
 		unsigned int	xl:12;	/* X coordinate of upper left	*/
@@ -1657,6 +1847,7 @@ typedef struct {
 		unsigned int	dsdx:16;/* Change in S per change in X	*/
 		unsigned int	dtdy:16;/* Change in T per change in Y	*/
 } Gtexrect;
+#endif
 
 #define	MakeTexRect(xh,yh,flip,tile,xl,yl,s,t,dsdx,dtdy)		\
 	G_TEXRECT, xh, yh, 0, flip, 0, tile, xl, yl, s, t, dsdx, dtdy
