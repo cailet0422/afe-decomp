@@ -17,7 +17,12 @@ static u8* mCD_set_bti_data(u8* data, int res_fileNo, int tlut_size, int count, 
         
         _JW_GetResourceAram(addr, (u8*)buf, size);
         DCStoreRangeNoSync(buf, size);
+#ifdef TARGET_PC
+        /* the resource is the disc's big-endian BTI */
+        tex_p = (u8*)(buf) + pc_bswap32(buf->mImageDataOffset);
+#else
         tex_p = (u8*)(buf) + buf->mImageDataOffset;
+#endif
         idx = random ? RANDOM(count) : count;
         
         while (TRUE) {
@@ -42,7 +47,11 @@ static u8* mCD_set_bti_data(u8* data, int res_fileNo, int tlut_size, int count, 
             }
         }
 
+#ifdef TARGET_PC
+        pal_p = (u16*)((u8*)(buf) + pc_bswap32(buf->mPaletteOffset));
+#else
         pal_p = (u16*)((u8*)(buf) + buf->mPaletteOffset);
+#endif
         bcopy(pal_p, data, pal_size);
         data += pal_size;
         zelda_free(buf);
