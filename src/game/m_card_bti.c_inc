@@ -8,13 +8,22 @@
 static u8* mCD_set_bti_data(u8* data, int res_fileNo, int tlut_size, int count, int pal_size, int random) {
     u32 addr = JW_GetAramAddress(res_fileNo);
     u32 size = ALIGN_NEXT(JW_GetResSizeFileNo(res_fileNo), 32);
+#ifdef TARGET_PC
+    /* The palette is copied whole (pal_size) even where the resource has
+     * fewer colors, which read past the buffer; give it zeros to read */
+    CResTIMG* buf = (CResTIMG*)mCD_malloc_32(size + pal_size);
+#else
     CResTIMG* buf = (CResTIMG*)mCD_malloc_32(size);
+#endif
     int idx;
 
     if (buf != NULL) {
         u8* tex_p;
         u16* pal_p;
         
+#ifdef TARGET_PC
+        bzero(buf, size + pal_size);
+#endif
         _JW_GetResourceAram(addr, (u8*)buf, size);
         DCStoreRangeNoSync(buf, size);
 #ifdef TARGET_PC
