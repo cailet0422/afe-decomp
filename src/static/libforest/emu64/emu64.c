@@ -220,9 +220,15 @@ static texture_cache_funcs texture_cache_bss_func = {
 
 static texture_cache_t texture_cache_data = {
     &texture_cache_data_func,
+#ifdef TARGET_PC
+    &texture_buffer_data[0],
+    &texture_buffer_data[TEX_BUFFER_DATA_SIZE], /* the GC build relies on the linker placing texture_buffer_bss next */
+    &texture_buffer_data[0],
+#else
     &texture_buffer_data[0],
     &texture_buffer_bss[0], // TODO: I don't know why this is necessary over the old method
     &texture_buffer_data[0],
+#endif
     nullptr,
     nullptr,
     FALSE,
@@ -231,9 +237,15 @@ static texture_cache_t texture_cache_data = {
 
 static texture_cache_t texture_cache_bss = {
     &texture_cache_bss_func,
+#ifdef TARGET_PC
+    &texture_buffer_bss[0],
+    &texture_buffer_bss[TEX_BUFFER_BSS_SIZE],
+    &texture_buffer_bss[0],
+#else
     &texture_buffer_bss[0],
     (u8*)&tmem_map[0], // TODO: I don't know why this is necessary over the old method
     &texture_buffer_bss[0],
+#endif
     nullptr,
     nullptr,
     FALSE,
