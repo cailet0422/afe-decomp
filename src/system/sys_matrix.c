@@ -31,6 +31,14 @@ void new_Matrix(GAME* game) {
     Matrix_now = THA_alloc16(&game->tha, 0x500);
     Matrix_stack = Matrix_now;
 }
+#ifdef TARGET_PC
+
+/* The pause menu draws through the matrix stack, which the boot scenes
+ * before the first new_Matrix don't have */
+int pc_matrix_ready(void) {
+    return Matrix_now != NULL;
+}
+#endif
 
 void Matrix_push() {
     Matrix_copy_MtxF(Matrix_now + 1, Matrix_now);
