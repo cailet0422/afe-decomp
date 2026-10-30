@@ -307,7 +307,11 @@ static void aIAB_setupAction(aINS_INSECT_ACTOR* insect, int action, GAME* game) 
 
 static void aIAB_actor_move(ACTOR* actorx, GAME* game) {
     aINS_INSECT_ACTOR* insect = (aINS_INSECT_ACTOR*)actorx;
+#ifdef TARGET_PC
+    uintptr_t label = mPlib_Get_item_net_catch_label();
+#else
     u32 label = mPlib_Get_item_net_catch_label();
+#endif
 
 #ifdef TARGET_PC
     if (label == (uintptr_t)actorx) {

@@ -55,7 +55,11 @@ extern void RspStart2(u32* task, s32 tasks, s32 mode) {
     if (alltasks > 0) {
         consumes = RspStart(taskp, alltasks);
         alltasks -= consumes;
+#ifdef TARGET_PC
+        taskp += consumes * (sizeof(Acmd) / sizeof(u32));
+#else
         taskp += consumes * 2;
+#endif
     }
 }
 
@@ -66,7 +70,7 @@ extern void RspStart2(u32* task, s32 tasks, s32 mode) {
 extern s32 RspStart(u32* pTaskCmds, s32 allTasks) {
     static BOOL init = TRUE;
     s32 i; // r30
-    u32 cmdLo; // r29
+    uintptr_t cmdLo; /* may be an address */
     u32 cmdHi;
     u16 DMEMCount; // r28
     u16 DMEMIn; // r27
@@ -92,9 +96,10 @@ extern s32 RspStart(u32* pTaskCmds, s32 allTasks) {
     }
 
     for (i = 0; i < allTasks; i++) {
-        cmdLo = pTaskCmds[1];
-        cmdHi = pTaskCmds[0];
-        pTaskCmds += 2;
+        /* an Acmd: w1 is a uintptr_t (16-byte commands in 64-bit builds) */
+        cmdLo = ((Acmd*)pTaskCmds)->words.w1;
+        cmdHi = ((Acmd*)pTaskCmds)->words.w0;
+        pTaskCmds += sizeof(Acmd) / sizeof(u32);
 
         switch (cmdHi >> 24) {
             case A_CMD_LOADCACHE: // A_LOADCACHE (special to GC?)

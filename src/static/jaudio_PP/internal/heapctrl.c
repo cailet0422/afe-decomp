@@ -16,10 +16,18 @@ static u32 global_id = 0;
  * Address:	8000E9C0
  * Size:	000034
  */
+#ifdef TARGET_PC
+static void ARAMFinish(uintptr_t msg)
+#else
 static void ARAMFinish(u32 msg)
+#endif
 {
 	// STACK_PAD_VAR(1);
+#ifdef TARGET_PC
+	uintptr_t* REF_param_1;
+#else
 	u32* REF_param_1;
+#endif
 
 	REF_param_1         = &msg;
 	ARQRequest* request = (ARQRequest*)msg;
@@ -42,9 +50,17 @@ static void ARAM_TO_ARAM_DMA(u32 src, u32 dst, u32 totalSize)
 	while (totalSize != 0) {
 		burstSize = totalSize >= DMABUFFER_SIZE ? DMABUFFER_SIZE : totalSize;
 
+#ifdef TARGET_PC
+		ARQPostRequest(&request, (uintptr_t)&msgQueue, ARQ_TYPE_ARAM_TO_MRAM, ARQ_PRIORITY_LOW, src, (uintptr_t)dmabuffer, burstSize, &ARAMFinish);
+#else
 		ARQPostRequest(&request, (u32)&msgQueue, ARQ_TYPE_ARAM_TO_MRAM, ARQ_PRIORITY_LOW, src, (u32)dmabuffer, burstSize, &ARAMFinish);
+#endif
 		OSReceiveMessage(&msgQueue, NULL, OS_MESSAGE_BLOCK);
+#ifdef TARGET_PC
+		ARQPostRequest(&request, (uintptr_t)&msgQueue, ARQ_TYPE_MRAM_TO_ARAM, ARQ_PRIORITY_LOW, (uintptr_t)dmabuffer, dst, burstSize, &ARAMFinish);
+#else
 		ARQPostRequest(&request, (u32)&msgQueue, ARQ_TYPE_MRAM_TO_ARAM, ARQ_PRIORITY_LOW, (u32)dmabuffer, dst, burstSize, &ARAMFinish);
+#endif
 		OSReceiveMessage(&msgQueue, NULL, OS_MESSAGE_BLOCK);
 
 		totalSize -= burstSize;
@@ -66,16 +82,28 @@ static void DRAM_TO_DRAM_DMA(u32 src, u32 dst, u32 totalSize)
 	u32 dma_buffer_top;
 	u32 burstSize;
 
+#ifdef TARGET_PC
+	dma_buffer_top = (uintptr_t)JAC_ARAM_DMA_BUFFER_TOP;
+#else
 	dma_buffer_top = (u32)JAC_ARAM_DMA_BUFFER_TOP;
+#endif
 	OSInitMessageQueue(&msgQueue, &msg, 1);
 	DCFlushRange((void*)src, totalSize);
 	DCInvalidateRange((void*)dst, totalSize);
 	while (totalSize != 0) {
 		burstSize = totalSize >= DMABUFFER_SIZE ? DMABUFFER_SIZE : totalSize;
 
+#ifdef TARGET_PC
+		ARQPostRequest(&request, (uintptr_t)&msgQueue, ARQ_TYPE_MRAM_TO_ARAM, ARQ_PRIORITY_LOW, src, dma_buffer_top, burstSize, &ARAMFinish);
+#else
 		ARQPostRequest(&request, (u32)&msgQueue, ARQ_TYPE_MRAM_TO_ARAM, ARQ_PRIORITY_LOW, src, dma_buffer_top, burstSize, &ARAMFinish);
+#endif
 		OSReceiveMessage(&msgQueue, NULL, OS_MESSAGE_BLOCK);
+#ifdef TARGET_PC
+		ARQPostRequest(&request, (uintptr_t)&msgQueue, ARQ_TYPE_ARAM_TO_MRAM, ARQ_PRIORITY_LOW, dma_buffer_top, dst, burstSize, &ARAMFinish);
+#else
 		ARQPostRequest(&request, (u32)&msgQueue, ARQ_TYPE_ARAM_TO_MRAM, ARQ_PRIORITY_LOW, dma_buffer_top, dst, burstSize, &ARAMFinish);
+#endif
 		OSReceiveMessage(&msgQueue, NULL, OS_MESSAGE_BLOCK);
 
 		totalSize -= burstSize;

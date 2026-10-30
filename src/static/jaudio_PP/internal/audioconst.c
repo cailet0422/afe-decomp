@@ -29,6 +29,19 @@ na_spec_config NA_SPEC_CONFIG[1] = {
 };
 // clang-format on
 
+#ifdef TARGET_PC
+#if UINTPTR_MAX > 0xFFFFFFFFu
+/* 64-bit builds: the structs and commands in the heap are bigger */
+ALGlobalsConst AGC = {
+    0x18, 0x30, 0x70000 + 0x40000, 0x38000, 0x28000,
+};
+#else
 ALGlobalsConst AGC = {
     0x18, 0x30, 0x70000, 0x38000, 0x28000,
 };
+#endif
+#else
+ALGlobalsConst AGC = {
+    0x18, 0x30, 0x70000, 0x38000, 0x28000,
+};
+#endif

@@ -63,7 +63,11 @@ static void aANT_wait(ANT_ACTOR* ant, GAME* game) {
     if (ant->below_fg_p == NULL || (*ant->below_fg_p != ITM_FOOD_CANDY && *ant->below_fg_p != ITM_KABU_SPOILED)) {
         aANT_setupAction(ant, aANT_ACT_DISAPPEAR);
     } else {
+#ifdef TARGET_PC
+        uintptr_t catch_label = mPlib_Get_item_net_catch_label();
+#else
         u32 catch_label = mPlib_Get_item_net_catch_label();
+#endif
 
 #ifdef TARGET_PC
         if ((uintptr_t)ant == catch_label) {

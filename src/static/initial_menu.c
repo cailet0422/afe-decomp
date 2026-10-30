@@ -335,11 +335,21 @@ static OSMessage commandMsgBuf[2];
 static OSMessage statusMsgBuf[1];
 
 extern void proc(void* arg) {
+#ifdef TARGET_PC
+  u32 msg;
+  int proc_done;
+  OSTimer timer;
+  OSMessage pc_msg; /* pointer-sized */
+
+  osRecvMesg(&commandQ, &pc_msg, OS_MESSAGE_BLOCK);
+  msg = (u32)(uintptr_t)pc_msg;
+#else
   u32 msg;
   int proc_done;
   OSTimer timer;
 
   osRecvMesg(&commandQ, (OSMessage*)&msg, OS_MESSAGE_BLOCK);
+#endif
   progressive_mode = FALSE;
   fadeout_step = 0;
   menu_step = 0;
@@ -360,8 +370,14 @@ extern void proc(void* arg) {
       }
     }
 
+#ifdef TARGET_PC
+    if (!osRecvMesg(&commandQ, &pc_msg, OS_MESSAGE_NOBLOCK)) {
+      msg = (u32)(uintptr_t)pc_msg;
+      if (msg == INITIAL_MENU_OSMESG_FADEOUT_STEP) {
+#else
     if (!osRecvMesg(&commandQ, (OSMessage*)&msg, OS_MESSAGE_NOBLOCK)) {
       if (msg == INITIAL_MENU_OSMESG_FADEOUT_STEP) {
+#endif
         fadeout_step = 2;
       }
 
@@ -427,12 +443,21 @@ extern void initial_menu_init() {
 }
 
 extern void initial_menu_cleanup() {
+#ifdef TARGET_PC
+  OSMessage msg; /* pointer-sized */
+
+  if (Thread_p != NULL) {
+    if (!osRecvMesg(&commandQ, &msg, OS_MESSAGE_NOBLOCK)) {
+      osSendMesg(&commandQ, (OSMessage)INITIAL_MENU_OSMESG_LOAD_GAME_DONE, OS_MESSAGE_NOBLOCK);
+      osRecvMesg(&statusQ, &msg, OS_MESSAGE_BLOCK);
+#else
   int msg;
 
   if (Thread_p != NULL) {
     if (!osRecvMesg(&commandQ, (OSMessage*)&msg, OS_MESSAGE_NOBLOCK)) {
       osSendMesg(&commandQ, (OSMessage)INITIAL_MENU_OSMESG_LOAD_GAME_DONE, OS_MESSAGE_NOBLOCK);
       osRecvMesg(&statusQ, (OSMessage*)&msg, OS_MESSAGE_BLOCK);
+#endif
     }
 
     osDestroyThread(Thread_p);

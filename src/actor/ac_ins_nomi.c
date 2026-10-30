@@ -169,7 +169,11 @@ static void aINM_setupAction(aINS_INSECT_ACTOR* insect, int action, GAME* game) 
 static void aINM_actor_move(ACTOR* actorx, GAME* game) {
     aINS_INSECT_ACTOR* insect = (aINS_INSECT_ACTOR*)actorx;
     ACTOR* parent;
+#ifdef TARGET_PC
+    uintptr_t catch_label = mPlib_Get_item_net_catch_label();
+#else
     u32 catch_label = mPlib_Get_item_net_catch_label();
+#endif
 
 #ifdef TARGET_PC
     if (catch_label == (uintptr_t)actorx) {

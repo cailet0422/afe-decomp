@@ -31,17 +31,33 @@ static Acmd* Nas_SaveAuxBufferCH(Acmd* cmd, delay* del_p, s16 update_idx) {
     aDMEMMove(cmd++, 0xC40, 0x3A0, size);
     aSetBuffer(cmd++, 0, 0x3A0, 0x6E0, param->save_resample_num_samples * SAMPLE_SIZE);
     aResample(cmd++, del_p->resample_flags, param->save_resample_pitch, del_p->left_save_resample_buf);
+#ifdef TARGET_PC
+    cmd = Nas_SaveBufferAuto(cmd, 0x6E0, param->size, (intptr_t)&del_p->left_reverb_buf[param->start_pos]);
+#else
     cmd = Nas_SaveBufferAuto(cmd, 0x6E0, param->size, (s32)&del_p->left_reverb_buf[param->start_pos]);
+#endif
     if (param->wrapped_size != 0) {
+#ifdef TARGET_PC
+        cmd = Nas_SaveBufferAuto(cmd, 0x6E0 + param->size, param->wrapped_size, (intptr_t)&del_p->left_reverb_buf[0]);
+#else
         cmd = Nas_SaveBufferAuto(cmd, 0x6E0 + param->size, param->wrapped_size, (s32)&del_p->left_reverb_buf[0]);
+#endif
     }
 
     aDMEMMove(cmd++, 0xDE0, 0x3A0, size);
     aSetBuffer(cmd++, 0, 0x3A0, 0x6E0, param->save_resample_num_samples * SAMPLE_SIZE);
     aResample(cmd++, del_p->resample_flags, param->save_resample_pitch, del_p->right_save_resample_buf);
+#ifdef TARGET_PC
+    cmd = Nas_SaveBufferAuto(cmd, 0x6E0, param->size, (intptr_t)&del_p->right_reverb_buf[param->start_pos]);
+#else
     cmd = Nas_SaveBufferAuto(cmd, 0x6E0, param->size, (s32)&del_p->right_reverb_buf[param->start_pos]);
+#endif
     if (param->wrapped_size != 0) {
+#ifdef TARGET_PC
+        cmd = Nas_SaveBufferAuto(cmd, 0x6E0 + param->size, param->wrapped_size, (intptr_t)&del_p->right_reverb_buf[0]);
+#else
         cmd = Nas_SaveBufferAuto(cmd, 0x6E0 + param->size, param->wrapped_size, (s32)&del_p->right_reverb_buf[0]);
+#endif
     }
 
     return cmd;

@@ -236,7 +236,11 @@ struct actor_structure_s {
     /* 0x2BC */ int arg1;
 #endif
     /* 0x2C0 */ int arg2;
+#ifdef TARGET_PC
+    intptr_t arg3; /* may hold a pointer (train engineer) */
+#else
     /* 0x2C4 */ int arg3;
+#endif
 
     /* general purpose float members with unique usage between structure actors*/
     /* 0x2C8 */ f32 arg0_f;

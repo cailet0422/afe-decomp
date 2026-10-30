@@ -12,6 +12,20 @@ void HS_Event_Update() {
     } tempBuf;
     tempBuf message;
 
+#ifdef TARGET_PC
+    OSMessage pc_msg;
+
+    /* The message is (reg << 24 | value << 16); the original reads its first
+     * two bytes, which is only right on big-endian 32-bit hosts. */
+    while (1) {
+        if (!OSReceiveMessage(&SoundQ, &pc_msg, 0)) {
+            break;
+        }
+        message.a = (u8)((u32)(uintptr_t)pc_msg >> 24);
+        message.b = (u8)((u32)(uintptr_t)pc_msg >> 16);
+        __Sound_Write_HVC(message.a, message.b);
+    }
+#else
     while (1) {
         // this should take a void** for message, and it fills out the OSMessage(which is a void*)
         if (!OSReceiveMessage(&SoundQ, (OSMessage*)&message, 0)) {
@@ -19,6 +33,7 @@ void HS_Event_Update() {
         }
         __Sound_Write_HVC(message.a, message.b);
     }
+#endif
 }
 
 void HS_Event_Write(u16 a, u8 b) {

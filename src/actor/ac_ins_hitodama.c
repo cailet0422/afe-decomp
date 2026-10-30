@@ -298,7 +298,11 @@ static void aIHD_setupAction(aINS_INSECT_ACTOR* insect, int action, GAME* game) 
 
 static void aIHD_actor_move(ACTOR* actorx, GAME* game) {
     aINS_INSECT_ACTOR* insect = (aINS_INSECT_ACTOR*)actorx;
+#ifdef TARGET_PC
+    uintptr_t label;
+#else
     u32 label;
+#endif
 
     aIHD_light_proc(actorx, game);
     if (mPlib_get_player_actor_main_index(game) != mPlayer_INDEX_PUTAWAY_NET) {
