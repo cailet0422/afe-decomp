@@ -21,6 +21,14 @@ Supported versions:
 - `GAEJ01_00`: Rev 0 (JP)
 - `GAEJ01_01`: Rev 1 (JP)
 
+PC/Android port
+===============
+
+A port of this decompilation to Windows, Linux and Android (with support for the Korean fan translation) lives in
+[cailet0422/afe-port](https://github.com/cailet0422/afe-port), which builds against this repository as a submodule.
+Its changes to the game code are the `#ifdef TARGET_PC` blocks in `src/` and `include/`; they leave the matching build
+unchanged.
+
 <!--
 Quick Guides
 ============

@@ -37,6 +37,9 @@
 #include "_mem.h"
 #include "m_sdcard.h"
 #include "m_plus_data.h"
+#ifdef TARGET_PC
+#include "pc_bswap.h"
+#endif
 
 typedef struct card_bg_info {
     CARDFileInfo fileInfo;
