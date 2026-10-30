@@ -22,11 +22,19 @@ static void Nas_SetEnvParam(Acmd* cmd, s32 reverbVol, s32 rampReverb, s32 rampL,
     aSetEnvParam(cmd, reverbVol, rampReverb, rampL, rampR);
 }
 
+#ifdef TARGET_PC
+static void Nas_LoadBuffer2(Acmd* cmd, s32 dst, s32 len, intptr_t src) {
+#else
 static void Nas_LoadBuffer2(Acmd* cmd, s32 dst, s32 len, s32 src) {
+#endif
     aLoadBuffer2(cmd, src, dst, len);
 }
 
+#ifdef TARGET_PC
+static void Nas_SaveBuffer2(Acmd* cmd, s32 src, s32 len, intptr_t dst) {
+#else
 static void Nas_SaveBuffer2(Acmd* cmd, s32 src, s32 len, s32 dst) {
+#endif
     aSaveBuffer2(cmd, dst, src, len);
 }
 
@@ -34,7 +42,11 @@ static void Nas_SetEnvParam2(Acmd* cmd, s32 volL, s32 volR) {
     aSetEnvParam2(cmd, volL, volR);
 }
 
+#ifdef TARGET_PC
+static void Nas_PCM8dec(Acmd* cmd, s32 flags, intptr_t state) {
+#else
 static void Nas_PCM8dec(Acmd* cmd, s32 flags, s32 state) {
+#endif
     aPCM8dec(cmd, flags, state);
 }
 

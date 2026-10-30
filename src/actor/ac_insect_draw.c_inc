@@ -205,7 +205,11 @@ static void aINS_actor_draw(ACTOR* actorx, GAME* game) {
                     }
                     break;
                 default: {
+#ifdef TARGET_PC
+                    uintptr_t label;
+#else
                     u32 label;
+#endif
 
                     alpha = insect->alpha0;
                     label = mPlib_Get_item_net_catch_label();

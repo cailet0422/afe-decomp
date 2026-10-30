@@ -1888,11 +1888,9 @@ void emu64::combine_manual() {
         combine_mode_cmd_fixed.cmd = G_SETCOMBINE;
     }
 
-    u64 combine_mode = *(u64*)&combine_mode_cmd_fixed;
-    /* On LE, the struct's two 32-bit words are in opposite order from the
-       gsDPSetCombineLERPInline macro (which uses BE word order: w0<<32|w1).
-       Swap words so the switch cases match. */
-    combine_mode = (combine_mode >> 32) | (combine_mode << 32);
+    /* gsDPSetCombineLERPInline gives w0 << 32 | w1 */
+    u64 combine_mode = ((u64)((Gfx*)&combine_mode_cmd_fixed)->words.w0 << 32) |
+                       (u32)((Gfx*)&combine_mode_cmd_fixed)->words.w1;
     switch (combine_mode) {
         case gsDPSetCombineLERPInline(TEXEL0, 0, SHADE, TEXEL0, 0, 0, 0, TEXEL0, SHADE, ENVIRONMENT, PRIMITIVE,
                                       COMBINED, 0, 0, 0, COMBINED): {
@@ -4932,12 +4930,21 @@ void emu64::dl_G_SETCOMBINE_NOTEV() {
         this->print_combine(*combine);
     }
 
+#ifdef TARGET_PC
+    /* Update combiner settings only if it changed (a Gfx is 16 bytes in 64-bit builds) */
+    ((Gsetcombine_new*)combine)->cmd = G_SETCOMBINE;
+    if (memcmp(&this->combine_gfx, &this->gfx, sizeof(Gfx)) != 0) {
+        this->combine_gfx = this->gfx;
+        this->dirty_flags[EMU64_DIRTY_FLAG_COMBINE] = true;
+    }
+#else
     /* Update combiner settings only if it changed */
     ((Gsetcombine_new*)combine)->cmd = G_SETCOMBINE;
     if (*(u64*)&this->combine_gfx != *combine) {
         *(u64*)&this->combine_gfx = *combine;
         this->dirty_flags[EMU64_DIRTY_FLAG_COMBINE] = true;
     }
+#endif
 }
 
 void emu64::dl_G_SETCOMBINE() {
@@ -4948,11 +4955,19 @@ void emu64::dl_G_SETCOMBINE() {
         this->print_combine(*combine);
     }
 
+#ifdef TARGET_PC
+    /* Update combiner settings only if it changed (a Gfx is 16 bytes in 64-bit builds) */
+    if (memcmp(&this->combine_gfx, &this->gfx, sizeof(Gfx)) != 0) {
+        this->combine_gfx = this->gfx;
+        this->dirty_flags[EMU64_DIRTY_FLAG_COMBINE] = true;
+    }
+#else
     /* Update combiner settings only if it changed */
     if (*(u64*)&this->combine_gfx != *combine) {
         *(u64*)&this->combine_gfx = *combine;
         this->dirty_flags[EMU64_DIRTY_FLAG_COMBINE] = true;
     }
+#endif
 
     /* N64 Combiner -> GC TEV */
     if (this->gfx_cmd != G_SETCOMBINE_NOTEV && aflags[AFLAGS_SKIP_COMBINE_TEV] == 0) {
@@ -4975,11 +4990,19 @@ void emu64::dl_G_SETCOMBINE_TEV() {
         this->print_combine_tev(*combine_tev);
     }
 
+#ifdef TARGET_PC
+    /* Update combiner settings only if it changed (a Gfx is 16 bytes in 64-bit builds) */
+    if (memcmp(&this->combine_gfx, &this->gfx, sizeof(Gfx)) != 0) {
+        this->combine_gfx = this->gfx;
+        this->dirty_flags[EMU64_DIRTY_FLAG_COMBINE] = true;
+    }
+#else
     /* Update combiner settings only if it changed */
     if (*(u64*)&this->combine_gfx != *combine_tev) {
         *(u64*)&this->combine_gfx = *combine_tev;
         this->dirty_flags[EMU64_DIRTY_FLAG_COMBINE] = true;
     }
+#endif
 }
 
 void emu64::dl_G_SETOTHERMODE_H() {
@@ -6328,9 +6351,14 @@ void emu64::dl_G_TRI2() {
         }
 
         this->dirty_check(this->texture_gfx.tile, this->texture_gfx.level, TRUE);
+#ifdef TARGET_PC
+        Gfx t_g = *this->gfx_p; /* the whole command (16 bytes in 64-bit builds) */
+        Gtri2* tri2 = (Gtri2*)&t_g;
+#else
         u64 t_g;
         t_g = *(u64*)&this->gfx_p->words;
         Gtri2* tri2 = (Gtri2*)&t_g;
+#endif
         this->setup_1tri_2tri_1quad(tri2->t0v0 / 2);
 
 #ifdef EMU64_DEBUG
@@ -6657,8 +6685,13 @@ void emu64::dl_G_TEXTURE() {
 #endif
 
     Gfx* t = (Gfx*)&this->texture_gfx;
+#ifdef TARGET_PC
+    if (memcmp(t, &this->gfx, sizeof(this->texture_gfx)) != 0) {
+        memcpy(&this->texture_gfx, texture, sizeof(this->texture_gfx));
+#else
     if ((*(u64*)t) != (*(u64*)&this->gfx)) {
         *(u64*)&this->texture_gfx = *(u64*)texture;
+#endif
         this->dirty_flags[EMU64_DIRTY_FLAG_TEX] = true;
 
         if (this->texture_gfx.s == 0) {

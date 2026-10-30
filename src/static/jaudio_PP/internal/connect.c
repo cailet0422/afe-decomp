@@ -174,7 +174,11 @@ WaveID_* __GetSoundHandle(CtrlGroup_* group, u32 id, u32 id2)
 	ctrl = scene->cdf;
 	if (ctrl) {
 		WaveID_* wave = SearchWave(ctrl, wId);
+#ifdef TARGET_PC
+		if (wave && wave->data && (intptr_t)wave->data != 0xffffffff) {
+#else
 		if (wave && wave->data && (int)wave->data != 0xffffffff) {
+#endif
 			return wave;
 		}
 	}
@@ -182,14 +186,22 @@ WaveID_* __GetSoundHandle(CtrlGroup_* group, u32 id, u32 id2)
 	ctrl = scene->cex;
 	if (ctrl) {
 		WaveID_* wave = SearchWave(ctrl, wId);
+#ifdef TARGET_PC
+		if (wave && wave->data && (intptr_t)wave->data != 0xffffffff) {
+#else
 		if (wave && wave->data && (int)wave->data != 0xffffffff) {
+#endif
 			return wave;
 		}
 	}
 
 	for (u32 i = 0; i < scene->_08; i++) {
 		WaveID_* wave = __GetSoundHandle(group, id, scene->_18[i]);
+#ifdef TARGET_PC
+		if (wave && wave->data && (intptr_t)wave->data != 0xffffffff) {
+#else
 		if (wave && wave->data && (int)wave->data != 0xffffffff) {
+#endif
 			return wave;
 		}
 	}

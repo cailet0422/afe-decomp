@@ -42,7 +42,11 @@ static u32 Env_Data_L3 = 0x90AAC4DE;
 
 static Acmd* __LoadAuxBuf(Acmd* cmd, u16 ofs, u16 startPos, s32 size, delay* del_p);
 static Acmd* __SaveAuxBuf(Acmd* cmd, u16 ofs, u16 startPos, s32 size, delay* del_p);
+#ifdef TARGET_PC
+static Acmd* Nas_SaveBufferAuto(Acmd* cmd, u16 ofs, u16 size, intptr_t startAddr);
+#else
 static Acmd* Nas_SaveBufferAuto(Acmd* cmd, u16 ofs, u16 size, s32 startAddr);
+#endif
 
 #include "../src/static/jaudio_PP/internal/driver_cpufx.c_inc"
 #include "../src/static/jaudio_PP/internal/driver_synth.c_inc"

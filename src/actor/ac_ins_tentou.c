@@ -71,7 +71,16 @@ extern void aITT_actor_init(ACTOR* actorx, GAME* game) {
         xyz_t_move(&actorx->home.position, &actorx->world.position);
 // Aus stores the spawn unit in work variables
 #if VERSION >= VER_GAFU01_00
+#ifdef TARGET_PC
+        {
+            int ut_z; /* s32_work3 is pointer-sized */
+
+            mFI_Wpos2UtNum(&insect->s32_work0, &ut_z, actorx->world.position);
+            insect->s32_work3 = ut_z;
+        }
+#else
         mFI_Wpos2UtNum(&insect->s32_work0, &insect->s32_work3, actorx->world.position);
+#endif
 #endif
         action = aITT_ACT_WAIT;
     } else {
@@ -133,7 +142,11 @@ static int aITT_check_player_net(ACTOR* actorx) {
     int ret = FALSE;
 
     if (mPlib_Check_StopNet(&net_pos) == TRUE) {
+#ifdef TARGET_PC
+        uintptr_t catch_label = mPlib_Get_item_net_catch_label();
+#else
         u32 catch_label = mPlib_Get_item_net_catch_label();
+#endif
 
 #ifdef TARGET_PC
         if (catch_label != (uintptr_t)actorx) {
@@ -503,7 +516,11 @@ static void aITT_setupAction(aINS_INSECT_ACTOR* insect, int action, GAME* game) 
  */
 static void aITT_actor_move(ACTOR* actorx, GAME* game) {
     aINS_INSECT_ACTOR* insect = (aINS_INSECT_ACTOR*)actorx;
+#ifdef TARGET_PC
+    uintptr_t catch_label = mPlib_Get_item_net_catch_label();
+#else
     u32 catch_label = mPlib_Get_item_net_catch_label();
+#endif
 
 #ifdef TARGET_PC
     if (catch_label == (uintptr_t)actorx) {

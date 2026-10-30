@@ -2522,7 +2522,11 @@ static void Player_actor_Reset_Item_net_catch_request_table(ACTOR* actorx) {
     player->item_net_catch_label_request_force = 0;
 }
 
+#ifdef TARGET_PC
+static int Player_actor_Set_Item_net_catch_request_table(ACTOR* actorx, GAME* game, uintptr_t label, s8 type,
+#else
 static int Player_actor_Set_Item_net_catch_request_table(ACTOR* actorx, GAME* game, u32 label, s8 type,
+#endif
                                                          const xyz_t* pos_p, f32 radius) {
     PLAYER_ACTOR* player = (PLAYER_ACTOR*)actorx;
 
@@ -2543,7 +2547,11 @@ static int Player_actor_Set_Item_net_catch_request_table(ACTOR* actorx, GAME* ga
     return FALSE;
 }
 
+#ifdef TARGET_PC
+static int Player_actor_Set_Item_net_catch_request_force(ACTOR* actorx, GAME* game, uintptr_t label, s8 type) {
+#else
 static int Player_actor_Set_Item_net_catch_request_force(ACTOR* actorx, GAME* game, u32 label, s8 type) {
+#endif
     PLAYER_ACTOR* player = (PLAYER_ACTOR*)actorx;
 
     if (mPlib_get_player_actor_main_index(game) == mPlayer_INDEX_SWING_NET &&
@@ -4590,7 +4598,11 @@ static void Player_actor_cancel_request_change_proc_index_by_A_btn(ACTOR* actorx
     }
 }
 
+#ifdef TARGET_PC
+static uintptr_t Player_actor_Get_item_net_catch_label(ACTOR* actorx) {
+#else
 static u32 Player_actor_Get_item_net_catch_label(ACTOR* actorx) {
+#endif
     PLAYER_ACTOR* player = (PLAYER_ACTOR*)actorx;
 
     switch (player->now_main_index) {
@@ -4604,7 +4616,11 @@ static u32 Player_actor_Get_item_net_catch_label(ACTOR* actorx) {
     }
 }
 
+#ifdef TARGET_PC
+static int Player_actor_Change_item_net_catch_label(ACTOR* actorx, uintptr_t label, s8 insect_type) {
+#else
 static int Player_actor_Change_item_net_catch_label(ACTOR* actorx, u32 label, s8 insect_type) {
+#endif
     PLAYER_ACTOR* player = (PLAYER_ACTOR*)actorx;
     aINS_INSECT_ACTOR* insect_actor = (aINS_INSECT_ACTOR*)label;
 
@@ -8003,7 +8019,11 @@ static int Player_actor_Check_stung_mosquito(GAME* game, void* label) {
 
     switch (main_index) {
         case mPlayer_INDEX_STUNG_MOSQUITO: {
+#ifdef TARGET_PC
+            uintptr_t stung_label = GET_PLAYER_ACTOR_GAME(game)->requested_main_index_data.stung_mosquito.label;
+#else
             u32 stung_label = GET_PLAYER_ACTOR_GAME(game)->requested_main_index_data.stung_mosquito.label;
+#endif
 
 #ifdef TARGET_PC
             if (stung_label == (uintptr_t)label) {
@@ -8015,7 +8035,11 @@ static int Player_actor_Check_stung_mosquito(GAME* game, void* label) {
             break;
         }
         case mPlayer_INDEX_NOTICE_MOSQUITO: {
+#ifdef TARGET_PC
+            uintptr_t notice_label = GET_PLAYER_ACTOR_GAME(game)->requested_main_index_data.notice_mosquito.label;
+#else
             u32 notice_label = GET_PLAYER_ACTOR_GAME(game)->requested_main_index_data.notice_mosquito.label;
+#endif
 
 #ifdef TARGET_PC
             if (notice_label == (uintptr_t)label) {

@@ -144,7 +144,11 @@ static int aISM_check_player_net(ACTOR* actorx) {
     int ret = FALSE;
 
     if (mPlib_Check_StopNet(&net_pos) == TRUE) {
+#ifdef TARGET_PC
+        uintptr_t catch_label = mPlib_Get_item_net_catch_label();
+#else
         u32 catch_label = mPlib_Get_item_net_catch_label();
+#endif
 
 #ifdef TARGET_PC
         if (catch_label == (uintptr_t)actorx) {
@@ -388,7 +392,11 @@ static void aISM_setupAction(aINS_INSECT_ACTOR* insect, int action, GAME* game) 
  */
 static void aISM_actor_move(ACTOR* actorx, GAME* game) {
     aINS_INSECT_ACTOR* ins = (aINS_INSECT_ACTOR*)actorx;
+#ifdef TARGET_PC
+    uintptr_t catch_label = mPlib_Get_item_net_catch_label();
+#else
     u32 catch_label = (u32)mPlib_Get_item_net_catch_label();
+#endif
 
 #ifdef TARGET_PC
     if (catch_label == (uintptr_t)ins) {

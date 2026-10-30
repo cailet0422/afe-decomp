@@ -276,7 +276,11 @@ struct my_room_actor_s {
     int _5A4;
     int throw_item_lock_flag;
     void* bank0_p;
+#ifdef TARGET_PC
+    size_t agb_game_size; /* famicom_gba_getImage writes a size_t */
+#else
     u32 agb_game_size;
+#endif
     void* famicom_agb_image_p;
     s16 agb_connect_tries;
     mActor_name_t playing_md_item;

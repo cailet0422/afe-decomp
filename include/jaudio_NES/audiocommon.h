@@ -977,6 +977,61 @@ typedef enum NASubtrack {
     Nap_SetS32(NA_MAKE_COMMAND(AUDIOCMD_OP_SUB_SET_FILTER, group, subtrack, filterCutoff), (s32)pFilter)
 #endif
 
+#ifdef TARGET_PC
+/* The commands that carry an address keep all of it in w1 */
+#undef aLoadCache
+#define	aLoadCache(pkt, dst, src, len)						\
+{									\
+	Acmd *_a = (Acmd *)pkt;						\
+									\
+	_a->words.w0 = _SHIFTL(A_CMD_LOADCACHE, 24, 8) | _SHIFTL((len) >> 4, 16, 8) | _SHIFTL(src, 0, 16);    		\
+	_a->words.w1 = (uintptr_t)(dst);		\
+}
+#undef aLoadBuffer2
+#define	aLoadBuffer2(pkt, dst, src, len)						\
+{									\
+	Acmd *_a = (Acmd *)pkt;						\
+									\
+	_a->words.w0 = _SHIFTL(A_CMD_LOADBUFFER2, 24, 8) | _SHIFTL((len) >> 4, 16, 8) | _SHIFTL(src, 0, 16);    		\
+	_a->words.w1 = (uintptr_t)(dst);		\
+}
+#undef aSaveBuffer2
+#define	aSaveBuffer2(pkt, dst, src, len)						\
+{									\
+	Acmd *_a = (Acmd *)pkt;						\
+									\
+	_a->words.w0 = _SHIFTL(A_CMD_SAVEBUFFER2, 24, 8) | _SHIFTL((len) >> 4, 16, 8) | _SHIFTL(src, 0, 16);    		\
+	_a->words.w1 = (uintptr_t)(dst);		\
+}
+#undef aFirFilter
+#define aFirFilter(pkt, f, bufSize, addr)                               \
+{                                                                       \
+        Acmd *_a = (Acmd *)pkt;                                         \
+                                                                        \
+        _a->words.w0 = _SHIFTL(A_CMD_FIRFILTER, 24, 8) | _SHIFTL(f, 16, 8) |   \
+                    _SHIFTL(bufSize, 0, 16);                         \
+        _a->words.w1 = (uintptr_t)(addr);                            \
+}
+#undef aEnvMixer2
+#define aEnvMixer2(pkt, dmemi, count, swapLR, x0, x1, x2, x3, m, bits)   \
+{                                                                       \
+        Acmd *_a = (Acmd *)pkt;                                         \
+                                                                        \
+        _a->words.w0 = (bits | _SHIFTL(dmemi >> 4, 16, 8) |             \
+                _SHIFTL(count, 8, 8) | _SHIFTL(swapLR, 4, 1) |          \
+                _SHIFTL(x0, 3, 1) | _SHIFTL(x1, 2, 1) |                 \
+                _SHIFTL(x2, 1, 1) | _SHIFTL(x3, 0, 1));                 \
+        _a->words.w1 = (uintptr_t)(m);                               \
+}
+#undef aPCM8dec
+#define aPCM8dec(pkt, flags, state)						\
+{									\
+	Acmd *_a = (Acmd *)pkt;						\
+									\
+	_a->words.w0 = _SHIFTL(A_CMD_PCM8DEC, 24, 8) | _SHIFTL(flags, 16, 8);    		\
+	_a->words.w1 = (uintptr_t)(state);		\
+}
+#endif
 #ifdef __cplusplus
 }
 #endif

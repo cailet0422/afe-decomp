@@ -3193,11 +3193,19 @@ extern int mPlib_Check_StopNet(xyz_t* pos_p) {
     return GET_PLAYER_ACTOR_NOW()->Check_StopNet_proc(GET_PLAYER_ACTOR_NOW_ACTOR(), pos_p);
 }
 
+#ifdef TARGET_PC
+extern uintptr_t mPlib_Get_item_net_catch_label(void) {
+#else
 extern u32 mPlib_Get_item_net_catch_label(void) {
+#endif
     return GET_PLAYER_ACTOR_NOW()->Get_item_net_catch_label_proc(GET_PLAYER_ACTOR_NOW_ACTOR());
 }
 
+#ifdef TARGET_PC
+extern int mPlib_Change_item_net_catch_label(uintptr_t label, s8 type) {
+#else
 extern int mPlib_Change_item_net_catch_label(u32 label, s8 type) {
+#endif
     return GET_PLAYER_ACTOR_NOW()->Change_item_net_catch_label_proc(GET_PLAYER_ACTOR_NOW_ACTOR(), label, type);
 }
 

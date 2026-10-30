@@ -155,11 +155,19 @@ static void aIBT_set_fly_se(aINS_INSECT_ACTOR* insect) {
 
 static int aIBT_check_player_net_sub(xyz_t* net_pos, aINS_INSECT_ACTOR* insect) {
     int ret;
+#ifdef TARGET_PC
+    uintptr_t label;
+#else
     u32 label;
+#endif
 
     ret = FALSE;
     if (mPlib_Check_StopNet(net_pos) == TRUE) {
+#ifdef TARGET_PC
+        uintptr_t label = mPlib_Get_item_net_catch_label();
+#else
         u32 label = mPlib_Get_item_net_catch_label();
+#endif
 #ifdef TARGET_PC
         if (label == (uintptr_t)insect) {
 #else
@@ -196,7 +204,11 @@ static int aIBT_check_player_net2(aINS_INSECT_ACTOR* insect) {
 
     ret = FALSE;
     if (mPlib_Check_StopNet(&pos) == TRUE) {
+#ifdef TARGET_PC
+        uintptr_t label = mPlib_Get_item_net_catch_label();
+#else
         u32 label = mPlib_Get_item_net_catch_label();
+#endif
 #ifdef TARGET_PC
         if (label == (uintptr_t)insect) {
 #else
@@ -587,7 +599,11 @@ void aIBT_actor_move(ACTOR* actor, GAME* game) {
     aINS_INSECT_ACTOR* insect = (aINS_INSECT_ACTOR*)actor;
     GAME_PLAY* play = (GAME_PLAY*)game;
 
+#ifdef TARGET_PC
+    uintptr_t label = mPlib_Get_item_net_catch_label();
+#else
     u32 label = mPlib_Get_item_net_catch_label();
+#endif
 
 #ifdef TARGET_PC
     if (label == (uintptr_t)actor) {

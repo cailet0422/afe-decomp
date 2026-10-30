@@ -689,12 +689,27 @@ static void aNPC_free_overlay_area_proc(ACTOR_DLFTBL* dlftbl) {
     }
 }
 
+#ifdef TARGET_PC
+/* NPC actors hold pointers; the largest one that fits 0xBA0 in 32-bit builds takes 0xDC0 in 64-bit ones */
+#if UINTPTR_MAX > 0xFFFFFFFFu
+#define aNPC_KEEP_ACTOR_SIZE 0xE00
+#else
+#define aNPC_KEEP_ACTOR_SIZE 0xBA0
+#endif
+
 static ACTOR* aNPC_get_actor_area_proc(size_t size, const char* actor_name, int line) {
+#else
+static ACTOR* aNPC_get_actor_area_proc(size_t size, const char* actor_name, int line) {
+#endif
     NPC_ACTOR** actor = CLIP(npc_clip)->keep_actors;
     int* used = CLIP(npc_clip)->keep_actor_used;
     int i;
 
+#ifdef TARGET_PC
+    if (size > aNPC_KEEP_ACTOR_SIZE) {
+#else
     if (size > 0xBA0) {
+#endif
         return NULL;
     }
 
@@ -782,8 +797,13 @@ static void aNPC_dma_draw_data_proc(aNPC_draw_data_c* draw_data_p, mActor_name_t
 #ifndef aNPC_NPC2
 typedef struct {
     u64 align;
+#ifdef TARGET_PC
+    u8 buf[aNPC_KEEP_ACTOR_SIZE];
+} aNPC_actor_class_overlay_c;
+#else
     u8 buf[0xBA0];
 } aNPC_actor_class_overlay_c;
+#endif
 
 typedef struct {
     u64 align;

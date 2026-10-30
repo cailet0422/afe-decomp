@@ -412,9 +412,15 @@ extern void play_init(GAME* game) {
     int type;
     fbdemo_fade* fade;
     int freebytes;
+#ifdef TARGET_PC
+    uintptr_t alloc;
+    uintptr_t aligned;
+    u32 size;
+#else
     u32 alloc;
     u32 aligned;
     u32 size;
+#endif
 
     game_resize_hyral(game, -Game_play_HYRAL_SIZE); // reserve bytes from gamealloc
     Common_Set(rhythym_updated, 0);

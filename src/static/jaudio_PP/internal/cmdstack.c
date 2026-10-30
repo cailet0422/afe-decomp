@@ -54,14 +54,30 @@ BOOL Add_Portcmd(JPorthead_* port, u32* a2)
 	}
 
 	if (port->_04) {
+#ifdef TARGET_PC
+		((int*)port->_04)[4] = (intptr_t)a2;
+#else
 		((int*)port->_04)[4] = (int)a2;
+#endif
 	} else {
+#ifdef TARGET_PC
+		port->_00 = (intptr_t)a2;
+#else
 		port->_00 = (int)a2;
+#endif
 	}
 
+#ifdef TARGET_PC
+	port->_04 = (intptr_t)a2;
+#else
 	port->_04 = (int)a2;
+#endif
 	a2[4]     = 0;
+#ifdef TARGET_PC
+	a2[3]     = (intptr_t)port;
+#else
 	a2[3]     = (int)port;
+#endif
 	OSRestoreInterrupts(interrupt);
 	return TRUE;
 }

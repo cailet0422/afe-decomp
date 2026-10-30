@@ -459,7 +459,11 @@ static u32 DSPRES_FILTER[] ATTRIBUTE_ALIGN(32) = {
  */
 void DSP_SetupBuffer()
 {
+#ifdef TARGET_PC
+	DsetupTable((u32)CH_BUF_LENGTH, (uintptr_t)CH_BUF, (uintptr_t)DSPRES_FILTER, (uintptr_t)DSPADPCM_FILTER, (uintptr_t)FX_BUF);
+#else
 	DsetupTable((u32)CH_BUF_LENGTH, (u32)CH_BUF, (u32)DSPRES_FILTER, (u32)DSPADPCM_FILTER, (u32)FX_BUF);
+#endif
 }
 
 /*

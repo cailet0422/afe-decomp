@@ -336,7 +336,11 @@ static int aICH_check_player_net(aINS_INSECT_ACTOR* insect) {
 
     ret = FALSE;
     if (mPlib_Check_StopNet(&pos) == TRUE) {
+#ifdef TARGET_PC
+        uintptr_t label = mPlib_Get_item_net_catch_label();
+#else
         u32 label = mPlib_Get_item_net_catch_label();
+#endif
 #ifdef TARGET_PC
         if ((label != (uintptr_t)insect)) {
 #else
@@ -658,7 +662,11 @@ static void aICH_actor_move(ACTOR* actor, GAME* game) {
     aINS_INSECT_ACTOR* insect = (aINS_INSECT_ACTOR*)actor;
     GAME_PLAY* play = (GAME_PLAY*)game;
  
+#ifdef TARGET_PC
+    uintptr_t label = mPlib_Get_item_net_catch_label();
+#else
     u32 label = mPlib_Get_item_net_catch_label();
+#endif
 
 #ifdef TARGET_PC
     if (label == (uintptr_t)actor) {

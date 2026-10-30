@@ -711,7 +711,11 @@ extern void Nas_DeAllocAllVoices(chnode* node) {
 
         while (TRUE) {
             cur = src->next;
+#ifdef TARGET_PC
+            if ((intptr_t)cur == (intptr_t)src || cur == NULL) {
+#else
             if ((s32)cur == (s32)src || cur == NULL) {
+#endif
                 break;
             }
 

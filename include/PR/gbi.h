@@ -1132,7 +1132,11 @@ typedef struct {
  * First 8 words are integer portion of the 4x4 matrix
  * Last 8 words are the fraction portion of the 4x4 matrix
  */
+#ifdef TARGET_PC
+typedef s32	Mtx_t[4][4]; /* 32-bit words, also in LP64 builds */
+#else
 typedef long	Mtx_t[4][4];
+#endif
 
 typedef union {
     Mtx_t		m;
@@ -1420,7 +1424,11 @@ typedef struct {
 
 typedef union {
     Hilite_t	h;
+#ifdef TARGET_PC
+    s32	force_structure_alignment[4];
+#else
     long int	force_structure_alignment[4];
+#endif
 } Hilite;
 
 #define gdSPDefLights0(ar,ag,ab)					\

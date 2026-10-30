@@ -914,7 +914,15 @@ f32 SOU_ONGEN_AREA1 = 540.f;
 f32 SOU_ONGEN_AREA2 = 533.f;
 f32 sou_md_bgm_boost_pasent = 1.f;
 
+#ifdef TARGET_PC
+#if UINTPTR_MAX > 0xFFFFFFFFu
+u8 audiomemory[0x90000 + 0x40000] ATTRIBUTE_ALIGN(32); /* see AGC (audioconst.c) */
+#else
 u8 audiomemory[0x90000] ATTRIBUTE_ALIGN(32);
+#endif
+#else
+u8 audiomemory[0x90000] ATTRIBUTE_ALIGN(32);
+#endif
 s16* SOU_FIR_STATE;
 s16 SOU_FIR_STATE_COPY[12];
 

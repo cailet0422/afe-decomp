@@ -128,6 +128,21 @@ static void Nap_AudioSysProcess(AudioPort* port) {
             AG.main_group.subtracks[0]->volume_scale = port->param.asF32;
             AG.main_group.subtracks[0]->changes.flags.volume = TRUE;
             break;
+#ifdef TARGET_PC
+        /* callbacks are sent whole with Nap_SetPtr */
+        case AUDIOCMD_SET_VFRAME_CALLBACK:
+            NA_VFRAME_CALLBACK = (VFRAME_CALLBACK)port->param.asVoidPtr;
+            break;
+        case AUDIOCMD_SET_CALLBACK:
+            if (port->command.arg2 == AUDIO_CALLBACK_SOUND) {
+                NA_SOUND_CALLBACK = (SOUND_CALLBACK)port->param.asVoidPtr;
+            } else if (port->command.arg2 == AUDIO_CALLBACK_DACOUT) {
+                NA_DACOUT_CALLBACK = (DACOUT_CALLBACK)port->param.asVoidPtr;
+            } else {
+                AG.seq_callbacks[port->command.arg2] = (SequenceCallback)port->param.asVoidPtr;
+            }
+            break;
+#else
         case AUDIOCMD_SET_VFRAME_CALLBACK:
             NA_VFRAME_CALLBACK = (VFRAME_CALLBACK)port->param.asU32;
             break;
@@ -140,6 +155,7 @@ static void Nap_AudioSysProcess(AudioPort* port) {
                 AG.seq_callbacks[port->command.arg2] = (SequenceCallback)port->param.asU32;
             }
             break;
+#endif
         case AUDIOCMD_SET_PERC_BANK:
         case AUDIOCMD_SET_EFFECT_BANK:
         case AUDIOCMD_SET_VOICE_BANK:
@@ -381,9 +397,21 @@ extern s32 Nap_CheckSpecChange(void) {
         return 0;
     }
 
+#ifdef TARGET_PC
+    {
+        /* an OSMesg is pointer-sized; msg is 4 bytes */
+        OSMesg pc_msg;
+
+        res = Z_osRecvMesg(AG.spec_change_mq_p, &pc_msg, OS_MESG_NOBLOCK);
+        msg = (s32)(intptr_t)pc_msg;
+    }
+
+    if (res == -1) {
+#else
     res = Z_osRecvMesg(AG.spec_change_mq_p, (OSMesg*)&msg, OS_MESG_NOBLOCK);
 
     if (res == -1) {
+#endif
         return 0;
     } else if (msg != AG.spec_id) {
         return -1;
@@ -407,11 +435,19 @@ extern s32 Nap_CheckSpecChange(void) {
 #endif
 
 static void __ClearSpecChangeQ(void) {
+#ifdef TARGET_PC
+    OSMesg msg; /* pointer-sized */
+#else
     s32 msg;
+#endif
     s32 res;
 
     do {
+#ifdef TARGET_PC
+        res = Z_osRecvMesg(AG.spec_change_mq_p, &msg, OS_MESG_NOBLOCK);
+#else
         res = Z_osRecvMesg(AG.spec_change_mq_p, (OSMesg*)&msg, OS_MESG_NOBLOCK);
+#endif
     } while (res != -1);
 }
 
@@ -759,7 +795,14 @@ extern s32 CreateAudioTask(Acmd* cmds, s16* pSamples, u32 nSamples, s32 param_4)
         if (AG.reset_status == 0) {
             u32 msg;
 
+#ifdef TARGET_PC
+            OSMesg pc_msg;
+
+            while (Z_osRecvMesg(AG.thread_cmd_proc_mq_p, &pc_msg, OS_MESG_NOBLOCK) != -1) {
+                msg = (u32)(uintptr_t)pc_msg;
+#else
             while (Z_osRecvMesg(AG.thread_cmd_proc_mq_p, (OSMesg*)&msg, OS_MESG_NOBLOCK) != -1) {
+#endif
                 Nap_AudioPortProcess(msg);
                 port_cmds++;
             }

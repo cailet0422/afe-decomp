@@ -201,7 +201,11 @@ u8 NIN_WAVE[] ATTRIBUTE_ALIGN(32) = {
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00
 };
 #endif
+#ifdef TARGET_PC
+void __OK(uintptr_t a) {
+#else
 void __OK(u32 a) {
+#endif
     (void)a;
     int r31 = Jaq_SetSeqData(0, NIN_SEQ, 0x60, 0);
     int unused1 = Jaq_StartSeq((u8)r31);
@@ -236,9 +240,23 @@ extern int Bank_Regist(void*, u32);
 }
 #endif
 
+#ifdef TARGET_PC
+void BootSound(u32 a, u32 b) {
+#if UINTPTR_MAX > 0xFFFFFFFFu
+    /* The JAudio boot jingle plays on the GC DSP, which the PC port does
+     * not run (its mix is silent), and its WSYS/IBNK tables relocate
+     * 32-bit pointers in place. Skip it in 64-bit builds. */
+    (void)a;
+    (void)b;
+    return;
+#endif
+    bootsound_ptr = a;
+    bootsound_size = b;
+#else
 void BootSound(u32 a, u32 b) {
     bootsound_ptr = a;
     bootsound_size = b;
+#endif
     Bank_Init();
     Wavegroup_Init();
     int unused1 = Wavegroup_Regist(NIN_WAVE, 0);
