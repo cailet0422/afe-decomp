@@ -18,6 +18,7 @@
 #include "pc_platform.h"
 
 static jmp_buf pc_dl_crash_jmpbuf;
+extern "C" void* pc_raw_dl_host(void* p); /* pc_boot_fixups.c */
 #endif
 
 class aflags_c {
@@ -4340,6 +4341,10 @@ void emu64::dl_G_DL(void) {
 #ifdef TARGET_PC
     if (this->work_ptr == NULL) {
         return;
+    }
+    if (gfx->dma.par != G_DL_GXDL) {
+        /* a display list kept as the disc's raw bytes (pc_boot_fixups.c) */
+        this->work_ptr = pc_raw_dl_host(this->work_ptr);
     }
     {
         /* Validate only regular F3DEX display lists.
