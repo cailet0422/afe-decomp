@@ -1157,6 +1157,14 @@ static void mBD_set_cursol(Submenu* submenu, GAME* game, f32 x, f32 y) {
 
 static void mBD_set_writing_footer(Submenu* submenu, GAME* game, f32 x, f32 y, rgba_t* color) {
     int footer_len = submenu->overlay->board_ovl->lengths[mBD_FIELD_FOOTER];
+#ifdef TARGET_PC
+    /* right aligned where mBD_set_cursol expects it: a Korean syllable takes
+     * two entries but is one character wide */
+    if (g_pc_ko_mode) {
+        x += MAIL_FOOTER_LEN * 12.0f -
+             mFont_GetStringWidthW(submenu->overlay->board_ovl->mail.content.text.split.footer, footer_len, TRUE);
+    } else
+#endif
     x += (MAIL_FOOTER_LEN - footer_len) * 12.0f;
     mFont_SetLineStringsW(game, submenu->overlay->board_ovl->mail.content.text.split.footer, footer_len, x, y, color->r,
                           color->g, color->b, 255, FALSE, FALSE, 1.0f, 1.0f, mFont_MODE_POLY);
