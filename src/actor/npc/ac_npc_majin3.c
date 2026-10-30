@@ -8,6 +8,9 @@
 #include "m_bgm.h"
 #include "m_house.h"
 #include "m_ledit_ovl.h"
+#ifdef TARGET_PC
+#include "pc_ko.h"
+#endif
 
 enum {
     aMJN3_THINK_START_WAIT,
