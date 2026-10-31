@@ -225,7 +225,11 @@ gsSPEndDisplayList(),
 
 Gfx ctl_win1_ue2T_model[] ATTRIBUTE_ALIGN(8) = {
 gsDPPipeSync(),
+#ifdef TARGET_PC
+gsSPDisplayList(anime_1_txt + PC_GFX_OFS(0x18)),
+#else
 gsSPDisplayList(anime_1_txt + 0x18),
+#endif
 gsDPSetTextureImage_Dolphin(G_IM_FMT_IA, G_IM_SIZ_8b, 32, 32, ctl_win_aw7_tex),
 gsDPSetTile_Dolphin(G_DOLPHIN_TLUT_DEFAULT_MODE, 0, 0, GX_MIRROR, GX_MIRROR, 0, 0),
 gsSPVertex(&ctl_win1_v[8], 4, 0),
@@ -278,7 +282,11 @@ gsSPEndDisplayList(),
 
 Gfx ctl_win1_nameT_model[] ATTRIBUTE_ALIGN(8) = {
 gsDPPipeSync(),
+#ifdef TARGET_PC
+gsSPDisplayList(anime_1_txt + PC_GFX_OFS(0x30)),
+#else
 gsSPDisplayList(anime_1_txt + 0x30),
+#endif
 gsDPSetTextureImage_Dolphin(G_IM_FMT_IA, G_IM_SIZ_8b, 64, 32, ctl_win_waku4_tex),
 gsDPSetTile_Dolphin(G_DOLPHIN_TLUT_DEFAULT_MODE, 0, 0, GX_MIRROR, GX_MIRROR, 0, 0),
 gsSPVertex(&ctl_win1_v[70], 4, 0),

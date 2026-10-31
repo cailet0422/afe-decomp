@@ -13,7 +13,11 @@ Vtx ctl_sentaku_v[] ATTRIBUTE_ALIGN(8) = {
 Gfx ctl_sentaku_taguT_model[] ATTRIBUTE_ALIGN(8) = {
 gsDPPipeSync(),
 gsDPSetCombineLERP(PRIMITIVE, ENVIRONMENT, TEXEL0, ENVIRONMENT, 0, 0, 0, TEXEL0, PRIMITIVE, ENVIRONMENT, TEXEL0, ENVIRONMENT, 0, 0, 0, TEXEL0),
+#ifdef TARGET_PC
+gsSPDisplayList(anime_1_txt + PC_GFX_OFS(0x30)),
+#else
 gsSPDisplayList(anime_1_txt + 0x30),
+#endif
 gsDPSetRenderMode(G_RM_XLU_SURF, G_RM_XLU_SURF2),
 gsDPSetTextureImage_Dolphin(G_IM_FMT_IA, G_IM_SIZ_8b, 32, 16, ctl_win_tagu3_tex),
 gsDPSetTile_Dolphin(G_DOLPHIN_TLUT_DEFAULT_MODE, 0, 0, GX_MIRROR, GX_MIRROR, 0, 0),

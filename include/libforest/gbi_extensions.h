@@ -31,6 +31,13 @@ extern "C" {
 #define ANIME_6_MODEL_SIZE 0x408
 
 #define SEG_EQUALS(seg_addr, seg) (seg_addr == SEGMENT_ADDR(seg, 0))
+#ifdef TARGET_PC
+
+/* A display list called at a byte offset into the Gfx list a segment points
+ * to (gsSPDisplayList(anime_4_txt + 0x18)): the offset counts the
+ * GameCube's 8-byte commands, and a Gfx is 16 bytes on 64-bit */
+#define PC_GFX_OFS(ofs) ((ofs) / 8 * sizeof(Gfx))
+#endif
 
 #define softsprite_mtx SEGMENT_ADDR(SOFTSPRITE_MTX_SEG, 0)
 #define anime_1_txt SEGMENT_ADDR(ANIME_1_TXT_SEG, 0)

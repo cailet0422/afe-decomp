@@ -13,7 +13,11 @@ Vtx kan_mura_v[] ATTRIBUTE_ALIGN(8) = {
 Gfx kan_win_muraT_model[] ATTRIBUTE_ALIGN(8) = {
 gsSPTexture(0, 0, 0, G_TX_RENDERTILE, G_ON),
 gsDPSetCombineLERP(0, 0, 0, PRIMITIVE, 0, 0, 0, TEXEL0, 0, 0, 0, PRIMITIVE, 0, 0, 0, TEXEL0),
+#ifdef TARGET_PC
+gsSPDisplayList(anime_4_txt + PC_GFX_OFS(0x80)),
+#else
 gsSPDisplayList(anime_4_txt + 0x80),
+#endif
 gsDPSetTextureImage_Dolphin(G_IM_FMT_I, G_IM_SIZ_4b, 32, 16, kan_win_moji1_tex),
 gsDPSetTile_Dolphin(G_DOLPHIN_TLUT_DEFAULT_MODE, 0, 15, GX_MIRROR, GX_MIRROR, 0, 0),
 gsSPVertex(kan_mura_v, 4, 0),
