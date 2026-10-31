@@ -7,6 +7,10 @@
 #include "m_font.h"
 #include "m_common_data.h"
 #include "m_debug.h"
+#ifdef TARGET_PC
+#include "pc_ko.h"
+#include "ko_charset.h"
+#endif
 
 static u8 mLE_player_title[] = { CHAR_PP_020, CHAR_PP_030, CHAR_PP_003, CHAR_PP_194,
                                  CHAR_PP_006, CHAR_PP_036, CHAR_PP_018, CHAR_PP_023 };
@@ -96,7 +100,14 @@ static void mLE_move_Wait(Submenu* submenu, mSM_MenuInfo_c* menu_info) {
 
             if (editor_ovl != NULL) {
                 for (i = 0; i < MINIDISK_AIRCHECK_NUM; i++) {
+#ifdef TARGET_PC
+                    /* Korean patch: the request was typed into its longer buffer */
+                    if (g_pc_ko_mode ? pc_ko_ledit_match(md_name_p, mIN_ITEM_NAME_LEN, editor_ovl->input_str,
+                                                         editor_ovl->input_length)
+                                     : mem_cmp(md_name_p, editor_ovl->input_str, mIN_ITEM_NAME_LEN)) {
+#else
                     if (mem_cmp(md_name_p, editor_ovl->input_str, mIN_ITEM_NAME_LEN)) {
+#endif
                         item_p->item = ITM_MINIDISK_START + i;
                         break;
                     }
@@ -111,6 +122,14 @@ static void mLE_move_Wait(Submenu* submenu, mSM_MenuInfo_c* menu_info) {
                 item_p->item = ITM_MINIDISK_END; // @BUG - this is an invalid minidisk id!
             }
         } else if (menu_info->data0 == mLE_TYPE_EPHRASE) {
+#ifdef TARGET_PC
+            /* Korean patch: up to four characters packed into the field and the
+             * three bytes of padding after it (see pc_ko_word_ending) */
+            if (g_pc_ko_mode) {
+                ko_charset_pack_ending(pc_ko_ledit_buf(mLE_TYPE_EPHRASE), (u8*)menu_info->data2);
+                return;
+            }
+#endif
             mem_copy((u8*)menu_info->data2, mLE_npc_end_word_edit, ANIMAL_CATCHPHRASE_LEN);
         }
     }
@@ -179,8 +198,16 @@ static void mLE_set_dl(Submenu* submenu, GAME* game, mSM_MenuInfo_c* menu_info) 
                 int width = mFont_GetStringWidth(editor_ovl->input_str, i, TRUE);
 
                 Matrix_push();
+#ifdef TARGET_PC
+                /* a space is half as wide on a Korean patch disc: keep the mark off the next character */
+                f32 space_w = g_pc_ko_mode ? 0.5f : 1.0f;
+
+                Matrix_translate(6.0f * space_w + (edit_pos_x - 160.0f) + (f32)width, -(8.0f + (edit_pos_y - 120.0f)), 0.0f, MTX_MULT);
+                Matrix_scale(0.625f * space_w, 1.0f, 1.0f, MTX_MULT);
+#else
                 Matrix_translate(6.0f + (edit_pos_x - 160.0f) + (f32)width, -(8.0f + (edit_pos_y - 120.0f)), 0.0f, MTX_MULT);
                 Matrix_scale(0.625f, 1.0f, 1.0f, MTX_MULT);
+#endif
                 
                 gSPMatrix(POLY_OPA_DISP++, _Matrix_to_Mtx_new(graph), G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
                 gSPDisplayList(POLY_OPA_DISP++, lat_sousa_spT_model);
@@ -285,6 +312,14 @@ static void mLE_ledit_ovl_init(Submenu* submenu) {
     }
 
     max = mLE_win_data[menu_info->data0].edit_max;
+#ifdef TARGET_PC
+    /* Korean patch: a catchphrase, a reply to Resetti and a song request are
+     * typed into longer buffers, with the lengths of the disc's table */
+    if (pc_ko_ledit_buf(menu_info->data0) != NULL) {
+        str = pc_ko_ledit_buf(menu_info->data0);
+        max = pc_ko_data_u32(PC_KO_DATA_LEDIT_WIN + menu_info->data0 * 52 + 0x20, max);
+    }
+#endif
     mem_clear(str, max, CHAR_SPACE);
     menu_info->proc_status = mSM_OVL_PROC_MOVE;
     menu_info->next_proc_status = mSM_OVL_PROC_WAIT;

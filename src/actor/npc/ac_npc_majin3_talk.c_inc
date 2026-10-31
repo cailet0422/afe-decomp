@@ -48,6 +48,23 @@ static int aMJN3_check_ng_word(NPC_MAJIN3_ACTOR* actor) {
 
 static int aMJN3_check_word(NPC_MAJIN3_ACTOR* actor) {
     int ret = aMJN3_WORD_WRONG;
+#ifdef TARGET_PC
+    /* Korean patch: the reply was typed into a longer buffer; the phrase is
+     * matched without spaces and the "ng" words are looked for in the first
+     * ten bytes */
+    u8* text = pc_ko_ledit_buf(mLE_TYPE_RESET);
+
+    if (text != NULL) {
+        u8 word[mIN_ITEM_NAME_LEN];
+
+        mString_Load_StringFromRom(word, sizeof(word), mString_RESETTI_GOOD_WORD_START + actor->reply_idx);
+        if (pc_ko_ledit_match(word, sizeof(word), text, PC_KO_LEDIT_LEN)) {
+            return aMJN3_WORD_GOOD;
+        }
+        mem_copy(actor->reply, text, sizeof(actor->reply));
+        return aMJN3_check_ng_word(actor) == TRUE ? aMJN3_WORD_NG : aMJN3_WORD_WRONG;
+    }
+#endif
 
     if (aMJN3_check_good_word(actor) == TRUE) {
         ret = aMJN3_WORD_GOOD;
