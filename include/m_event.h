@@ -655,8 +655,17 @@ typedef struct event_common_save_data {
     u16 bridge_day; // last date suspension bridge event was active
     union {
         struct {
+#ifdef TARGET_PC
+            /* GCC on little-endian fills bit-fields from the lowest bit, the
+             * GameCube from the highest. The game also uses `raw` (raw++
+             * counts locations_used up, bit 7 is used_all_locations), so the
+             * fields are declared the other way round to stay on those bits. */
+            u8 locations_used : 7;
+            u8 used_all_locations : 1;
+#else
             u8 used_all_locations : 1; // set to true when tortimer has cycled through all possible bridge locations?
             u8 locations_used : 7;     // index of river acre w/ possible bridge location currently at
+#endif
         };
 
         u8 raw;
