@@ -73,7 +73,11 @@ s32 NoteON(seqp_* track, s32 channel, s32 flag1, s32 flag2, s32 playFlag)
     u32 flag;
     u32 i;
 
+#ifdef TARGET_PC
+	id.value = SOUNDID_PC_SWAP(a);
+#else
 	id.value = a;
+#endif
 	if (r >= 0xf0) {
 		sound = Play_1shot_Osc(jcs, id, playFlag);
 	} else if (r >= 0xe4) {

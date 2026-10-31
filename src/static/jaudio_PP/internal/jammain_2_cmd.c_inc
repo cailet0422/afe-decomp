@@ -771,7 +771,11 @@ static u32 Cmd_CheckWave()
 	SOUNDID_ soundID;
 	u32 uVar2;
 
+#ifdef TARGET_PC
+	soundID.value = SOUNDID_PC_SWAP(SEQ_ARG[0] | (Jam_ReadRegDirect(SEQ_P, 6) << 16));
+#else
 	soundID.value = SEQ_ARG[0] | (Jam_ReadRegDirect(SEQ_P, 6) << 16);
+#endif
 	uVar2         = One_CheckInstWave(soundID);
 	Jam_WriteRegDirect(SEQ_P, 3, (u8)uVar2);
 	return 0;

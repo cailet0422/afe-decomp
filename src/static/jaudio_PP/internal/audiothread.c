@@ -49,6 +49,8 @@ extern void NeosSync(void) {
 extern void pc_audio_mq_init(void);
 /* Defined in pc_audio.c — starts the audio producer thread */
 extern void pc_audio_start_producer_thread(void);
+/* Defined in pc_dsp.c — the DSP's mixing of a subframe */
+extern void pc_dsp_render_subframe(void);
 
 extern void StartAudioThread(void* pHeap, s32 heapSize, u32 aramSize, u32 flags) {
     u32 neos_flag;
@@ -94,9 +96,15 @@ extern void StartAudioThread(void* pHeap, s32 heapSize, u32 aramSize, u32 flags)
 void pc_audio_process_frame(void) {
     if (!pc_audio_initialized) return;
 
-    /* Process DSP subframes from previous frame's setup */
+    /* the DVD thread's queue: loads to ARAM and their callbacks (the boot
+     * jingle starts from one) */
+    pc_dvd_process_all_tasks();
+
+    /* The DSP's subframes of the frame DsyncFrame asked for: each is made,
+     * then interrupts the CPU (DspSync), which updates the voices */
     if (intcount > 0) {
         while (intcount > 0) {
+            pc_dsp_render_subframe();
             intcount--;
             if (intcount == 0) {
                 DspFrameEnd();

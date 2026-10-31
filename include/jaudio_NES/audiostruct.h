@@ -1097,9 +1097,17 @@ struct jcs_ {
 typedef union MixConfig {
     u16 whole;
     struct {
+#ifdef TARGET_PC
+        /* the same bits of whole on a little-endian host: upper is the high
+         * byte, lower0 and lower1 the nibbles of the low byte, high first */
+        u8 lower1 : 4;
+        u8 lower0 : 4;
+        u8 upper;
+#else
         u8 upper;
         u8 lower0 : 4;
         u8 lower1 : 4;
+#endif
     } parts;
 } MixConfig;
 
