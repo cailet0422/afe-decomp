@@ -19,6 +19,15 @@ CtrlGroup_* CGRP_ARRAY[16];
 
 static void PTconvert(void** pointer, u32 base_address)
 {
+#ifdef TARGET_PC
+	/* 64-bit: the tables are host copies whose pointers are already
+	 * addresses (pc_jaudio_host_wsys/ibnk). Comparing them with a base cut to
+	 * 32 bits only held while the copies lay above 4 GB (Linux); on 64-bit
+	 * Windows they lie below it and got the base added again. */
+	if (sizeof(void*) > 4) {
+		return;
+	}
+#endif
 	if (*pointer == NULL) {
 		*pointer = NULL;
 		return;
