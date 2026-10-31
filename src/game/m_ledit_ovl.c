@@ -198,8 +198,16 @@ static void mLE_set_dl(Submenu* submenu, GAME* game, mSM_MenuInfo_c* menu_info) 
                 int width = mFont_GetStringWidth(editor_ovl->input_str, i, TRUE);
 
                 Matrix_push();
+#ifdef TARGET_PC
+                /* a space is half as wide on a Korean patch disc: keep the mark off the next character */
+                f32 space_w = g_pc_ko_mode ? 0.5f : 1.0f;
+
+                Matrix_translate(6.0f * space_w + (edit_pos_x - 160.0f) + (f32)width, -(8.0f + (edit_pos_y - 120.0f)), 0.0f, MTX_MULT);
+                Matrix_scale(0.625f * space_w, 1.0f, 1.0f, MTX_MULT);
+#else
                 Matrix_translate(6.0f + (edit_pos_x - 160.0f) + (f32)width, -(8.0f + (edit_pos_y - 120.0f)), 0.0f, MTX_MULT);
                 Matrix_scale(0.625f, 1.0f, 1.0f, MTX_MULT);
+#endif
                 
                 gSPMatrix(POLY_OPA_DISP++, _Matrix_to_Mtx_new(graph), G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
                 gSPDisplayList(POLY_OPA_DISP++, lat_sousa_spT_model);
