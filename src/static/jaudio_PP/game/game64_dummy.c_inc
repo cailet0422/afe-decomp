@@ -211,7 +211,11 @@ void __OK(u32 a) {
     int unused1 = Jaq_StartSeq((u8)r31);
 }
 
+#ifdef TARGET_PC
+uintptr_t bootsound_ptr; /* main memory: the whole pointer (Na_InitAudio sets it) */
+#else
 u32 bootsound_ptr;
+#endif
 u32 bootsound_size;
 
 u32 dummy_callback(char* a, u32 b, u32 c, u32* d, jaheap_* e) {
@@ -246,32 +250,32 @@ extern "C" {
 #endif
 extern void pc_jaudio_bswap_wsys(void* data, u32 size);
 extern void pc_jaudio_bswap_ibnk(void* data, u32 size);
+extern void* pc_jaudio_host_wsys(void* data, u32 size);
+extern void* pc_jaudio_host_ibnk(void* data, u32 size);
 #if defined(__cplusplus)
 }
 #endif
 
 void BootSound(u32 a, u32 b) {
-#if UINTPTR_MAX > 0xFFFFFFFFu
-    /* The WSYS/IBNK tables relocate 32-bit pointers in place: no boot
-     * jingle in 64-bit builds. */
-    (void)a;
-    (void)b;
-    return;
-#endif
-    bootsound_ptr = a;
+    (void)a; /* the address may not fit: Na_InitAudio set bootsound_ptr */
     bootsound_size = b;
-    /* the tables are big-endian blobs read as structures (pc_dsp.c mixes) */
+    /* the tables are big-endian blobs read as structures (pc_dsp.c mixes);
+     * a 64-bit build reads host copies with 8-byte pointers */
     pc_jaudio_bswap_wsys(NIN_WAVE, sizeof(NIN_WAVE));
     pc_jaudio_bswap_ibnk(NIN_BANK, sizeof(NIN_BANK));
+    Bank_Init();
+    Wavegroup_Init();
+    int unused1 = Wavegroup_Regist(pc_jaudio_host_wsys(NIN_WAVE, sizeof(NIN_WAVE)), 0);
+    int unused2 = Bank_Regist(pc_jaudio_host_ibnk(NIN_BANK, sizeof(NIN_BANK)), 0);
 #else
 void BootSound(u32 a, u32 b) {
     bootsound_ptr = a;
     bootsound_size = b;
-#endif
     Bank_Init();
     Wavegroup_Init();
     int unused1 = Wavegroup_Regist(NIN_WAVE, 0);
     int unused2 = Bank_Regist(NIN_BANK, 0);
+#endif
     Jac_RegisterARAMCallback(dummy_callback);
     int unused3 = WaveScene_Set(0, 0);
     int unused4 = DVDT_CheckPass(0, 0, __OK);

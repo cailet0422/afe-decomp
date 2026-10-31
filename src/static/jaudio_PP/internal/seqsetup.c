@@ -167,7 +167,12 @@ seqp_* Jaq_HandleToSeq(u32 handle)
  * Address:	80014040
  * Size:	000368
  */
+#ifdef TARGET_PC
+/* a root track's data address is a whole pointer (a child's is an offset) */
+static void Init_Track(seqp_* track, uintptr_t dataAddress, seqp_* parent)
+#else
 static void Init_Track(seqp_* track, u32 dataAddress, seqp_* parent)
+#endif
 {
 	int i;
 
