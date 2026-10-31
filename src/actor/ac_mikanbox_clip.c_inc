@@ -345,6 +345,15 @@ static void aMKBC_clip_set_itemstr3() {
     aNTT_event_save_c* kk_save = (aNTT_event_save_c*)mEv_get_save_area(mEv_EVENT_KK_SLIDER, 10);
     mMsg_Window_c* msg_p = mMsg_Get_base_window_p();
 
+#ifdef TARGET_PC
+    /* The Korean patch has the request typed into a longer buffer of its own */
+    u8* request = pc_ko_ledit_buf(mLE_TYPE_REQUEST);
+
+    if (request != NULL) {
+        mMsg_Set_item_str(msg_p, mMsg_FREE_STR0, request, PC_KO_LEDIT_LEN);
+        return;
+    }
+#endif
     mMsg_Set_item_str(msg_p, mMsg_FREE_STR0, kk_save->request_str, mIN_ITEM_NAME_LEN);
 }
 

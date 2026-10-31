@@ -630,6 +630,26 @@ static void mMsg_CopyString(u8* dst, const u8* src, int len) {
 #endif
 }
 
+#ifdef TARGET_PC
+/* The Korean patch colours a name for as many characters as it has, a
+ * syllable being one (its two bytes draw as one character) */
+static int mMsg_pc_color_len(u8* str, int max_len) {
+    int len = mMsg_Get_Length_String(str, max_len);
+    int count = 0;
+    int i;
+
+    if (!g_pc_ko_mode) {
+        return len;
+    }
+    for (i = 0; i < len; count++) {
+        int size = mFont_CodeSize_get(str + i);
+
+        i += size > 1 ? size : 1;
+    }
+    return count;
+}
+
+#endif
 static int mMsg_Set_PlayerNameColor(u8* data, int* start_idx, int len) {
     static u8 add_string[] = { CHAR_CONTROL_CODE, mFont_CONT_CODE_SET_COLOR_CHAR, 75, 95, 155, 0 };
 
@@ -642,7 +662,11 @@ static int mMsg_Set_PlayerNameColor(u8* data, int* start_idx, int len) {
 
     if (name_len > 0) {
         hypen_count = mMsg_Count_SameCode(data, (*start_idx) + command_len, len);
+#ifdef TARGET_PC
+        add_string[5] = mMsg_pc_color_len(name, PLAYER_NAME_LEN) + hypen_count;
+#else
         add_string[5] = name_len + hypen_count;
+#endif
         new_len = mMsg_MoveDataCut(data, initial_start_idx + sizeof(add_string), initial_start_idx, len, FALSE);
         mMsg_CopyString(data + initial_start_idx, add_string, sizeof(add_string));
         *start_idx += sizeof(add_string);
@@ -873,7 +897,11 @@ static int mMsg_Set_PfColor(u8* data, int* start_idx, int len, u8* free_str, int
     //     article_len = mMsg_Get_Length_String(article_str, mIN_ITEM_NAME_LEN) + 1;
     // }
 
+#ifdef TARGET_PC
+    add_string[5] = mMsg_pc_color_len(free_str, mMsg_FREE_STRING_LEN) + article_len;
+#else
     add_string[5] = free_str_len + article_len;
+#endif
     new_len = mMsg_MoveDataCut(data, src_idx + sizeof(add_string), src_idx, len, FALSE);
     mMsg_CopyString(data + src_idx, add_string, sizeof(add_string));
     (*start_idx) += sizeof(add_string);

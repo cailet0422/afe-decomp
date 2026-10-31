@@ -17,6 +17,7 @@
 #include "m_font.h"
 #ifdef TARGET_PC
 #include "pc_bswap.h"
+#include "pc_ko.h"
 #endif
 
 extern aNPC_draw_data_c npc_draw_data_tbl[];

@@ -494,6 +494,20 @@ static void mNT_set_num_strings_dl(GAME* game, int page_no, f32 x, f32 y) {
 static void mNT_set_day_strings_dl(GAME* game, lbRTC_time_c* time_p, f32 x, f32 y) {
     static u8 day_str[] = { CHAR_PP_032, CHAR_PP_032, CHAR_PP_032, CHAR_PP_032, CHAR_PP_032,
                             CHAR_PP_032, CHAR_PP_032, CHAR_PP_032, CHAR_PP_032, CHAR_PP_032 };
+#ifdef TARGET_PC
+    /* The Korean patch spaces the date wider ("2026  11  01", 12 bytes) */
+    if (g_pc_ko_mode) {
+        static u8 ko_day_str[12];
+
+        mem_clear(ko_day_str, sizeof(ko_day_str), CHAR_SPACE);
+        mFont_UnintToString(ko_day_str, 4, time_p->year, 4, FALSE, TRUE, FALSE);
+        mFont_UnintToString(ko_day_str + 6, 2, time_p->month, 2, FALSE, TRUE, FALSE);
+        mFont_UnintToString(ko_day_str + 10, 2, time_p->day, 2, FALSE, TRUE, FALSE);
+        mFont_SetLineStrings(game, ko_day_str, sizeof(ko_day_str), (x + 126.0f) - 17.0f, y, 0, 0, 255, 255, FALSE,
+                             FALSE, 0.75f, 0.75f, mFont_MODE_POLY);
+        return;
+    }
+#endif
     mFont_UnintToString(day_str, 4, time_p->year, 4, FALSE, TRUE, FALSE);
     mFont_UnintToString(day_str + 5, 2, time_p->month, 2, FALSE, TRUE, FALSE);
     mFont_UnintToString(day_str + 8, 2, time_p->day, 2, FALSE, TRUE, FALSE);

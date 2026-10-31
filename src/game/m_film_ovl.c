@@ -9,6 +9,9 @@
 #include "audio.h"
 #include "sys_matrix.h"
 #include "m_sdcard.h"
+#ifdef TARGET_PC
+#include "pc_ko.h"
+#endif
 #include "m_choice.h"
 #include "m_card.h"
 #include "dolphin/os.h"
@@ -1189,6 +1192,21 @@ static void mFL_film_ovl_init(Submenu* submenu) {
 
 extern void mFL_film_ovl_construct(Submenu* submenu) {
     Submenu_Overlay_c* overlay = submenu->overlay;
+#ifdef TARGET_PC
+    int i;
+
+    /* The Korean patch moved most lines into its code section with new lengths */
+    for (i = 0; i < (int)ARRAY_COUNT(fl_strb_str_data); i++) {
+        pc_ko_redirect_strings(&fl_strb_str_data[i].lines[0].text, &fl_strb_str_data[i].lines[0].length,
+                               sizeof(mFL_Line_c), fl_strb_str_data[i].line_count,
+                               pc_ko_data_target(PC_KO_DATA_FILM_STRB + i * 28), 8);
+    }
+    for (i = 0; i < (int)ARRAY_COUNT(fl_selb_str_data); i++) {
+        pc_ko_redirect_strings(&fl_selb_str_data[i].lines[0].text, &fl_selb_str_data[i].lines[0].length,
+                               sizeof(mFL_Line_c), fl_selb_str_data[i].line_count,
+                               pc_ko_data_target(PC_KO_DATA_FILM_SELB + i * 8), 8);
+    }
+#endif
 
     if (overlay->film_ovl == NULL) {
         mem_clear((u8*)&fl_ovl_data, sizeof(mFL_Ovl_c), 0);

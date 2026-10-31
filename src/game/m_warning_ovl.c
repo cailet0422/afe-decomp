@@ -3,6 +3,9 @@
 #include "audio.h"
 #include "sys_matrix.h"
 #include "m_font.h"
+#ifdef TARGET_PC
+#include "pc_ko.h"
+#endif
 
 typedef struct warning_ovl_line_s {
   f32 pos_x;
@@ -542,6 +545,17 @@ static mWR_Ovl_c wr_ovl_data;
 
 extern void mWR_warning_ovl_construct(Submenu* submenu) {
   Submenu_Overlay_c* overlay = submenu->overlay;
+#ifdef TARGET_PC
+  int i;
+
+  /* The Korean patch moved most lines into its code section with new lengths */
+  for (i = 0; i < (int)ARRAY_COUNT(wr_win_data); i++) {
+    u32 lines = pc_ko_data_target(PC_KO_DATA_WARNING_WIN + i * 16);
+
+    pc_ko_redirect_strings(&wr_win_data[i].lines[0].str, &wr_win_data[i].lines[0].str_len, sizeof(mWR_line_c),
+                           wr_win_data[i].num_lines, lines == PC_KO_NO_TARGET ? lines : lines + 8, 16);
+  }
+#endif
 
   if (overlay->warning_ovl == NULL) {
     mem_clear((u8*)&wr_ovl_data, sizeof(mWR_Ovl_c), 0);

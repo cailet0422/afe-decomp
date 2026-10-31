@@ -3,6 +3,9 @@
 #include "m_common_data.h"
 #include "m_font.h"
 #include "sys_matrix.h"
+#ifdef TARGET_PC
+#include "pc_ko.h"
+#endif
 
 static mTI_Ovl_c ti_ovl_data;
 
@@ -322,8 +325,15 @@ static void mTI_set_character(Submenu* submenu, GAME* game, f32 x, f32 y) {
     int i;
     mTI_Ovl_c* timeIn_ovl = submenu->overlay->timeIn_ovl;
     f32* set_pos_p = &set_pos[0][0];
+#ifdef TARGET_PC
+    /* The Korean patch's title is longer than chr_table */
+    mFont_SetLineStrings(game, (u8*)pc_ko_patched_str(PC_KO_S7_TI_TITLE, chr_table),
+                         g_pc_ko_mode ? 15 : sizeof(chr_table), (x + 133.0f) + 2.0f, (83.0f - y) - 4.0f, 255, 255,
+                         255, 255, FALSE, FALSE, 0.875f, 0.875f, mFont_MODE_POLY);
+#else
     mFont_SetLineStrings(game, chr_table, sizeof(chr_table), (x + 133.0f) + 2.0f, (83.0f - y) - 4.0f, 255, 255, 255,
                          255, FALSE, FALSE, 0.875f, 0.875f, mFont_MODE_POLY);
+#endif
     for (i = 0; i < mTI_IDX_NUM; i++, set_pos_p += 2) {
         mFont_UnintToString(str, 2, timeIn_ovl->values[i], 2, FALSE, TRUE, FALSE);
         col = col_type1;

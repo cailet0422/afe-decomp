@@ -6,6 +6,9 @@
 #include "m_text.h"
 #include "m_haniwaPortrait_ovl.h"
 #include "sys_matrix.h"
+#ifdef TARGET_PC
+#include "pc_ko.h"
+#endif
 
 static void mHB_move_Move(Submenu* submenu, mSM_MenuInfo_c* menu_info) {
   (*submenu->overlay->move_Move_proc)(submenu, menu_info);
@@ -73,6 +76,45 @@ static void mHB_set_frame_dl(GRAPH* graph, mSM_MenuInfo_c* menu_info, f32 x, f32
   CLOSE_DISP(graph);
 }
 
+#ifdef TARGET_PC
+/* The Korean patch breaks the lines by the width of their characters (a
+ * syllable's second byte takes none, a space, comma or period half) and
+ * puts the end mark after the line's width. Returns the characters in the
+ * line; *newline is set if it ends with a new line or is full. */
+static int mHB_pc_ko_line(u16* str, int remaining, int first, int* newline, int* width) {
+    int len = 0;
+    int w = 0;
+    int next = 0;
+
+    *newline = FALSE;
+    while (len < remaining) {
+        int char_w;
+
+        if (str[len] == CHAR_NEW_LINE) {
+            *newline = TRUE;
+            len++;
+            *width = w;
+            return len;
+        }
+        /* like the patch, the first character's width looks at the one before it */
+        char_w = (first && len == 0 && str[0] <= 0xFF) ? (str[0] == CHAR_SPACE || str[0] == CHAR_COMMA ||
+                                                          str[0] == CHAR_PERIOD ? 6 : 12)
+                                                       : pc_ko_line_char_width(&str[len]);
+        next = w + char_w;
+        if (next > mHB_LINE_WIDTH_MAX) {
+            *newline = TRUE;
+            *width = w;
+            return len;
+        }
+        w = next;
+        len++;
+    }
+    *newline = w > mHB_LINE_WIDTH_MAX - 12;
+    *width = w;
+    return len;
+}
+
+#endif
 static void mHB_set_character(mED_Ovl_c* editor_ovl, GAME* game, f32 x, f32 y, f32* endCode_x, f32* endCode_y) {
     u16* str = editor_ovl->input_wstr;
     int i;
@@ -81,6 +123,30 @@ static void mHB_set_character(mED_Ovl_c* editor_ovl, GAME* game, f32 x, f32 y, f
         int len;
         int newline = FALSE;
         len = 0;
+#ifdef TARGET_PC
+        if (g_pc_ko_mode) {
+            int width;
+
+            len = mHB_pc_ko_line(str, remaining, str == editor_ovl->input_wstr, &newline, &width);
+            if (len != 0) {
+                mFont_SetLineStringsW(game, str, len, x, y, 90, 10, 130, 255, FALSE, FALSE, 1.0f, 1.0f,
+                                      mFont_MODE_POLY);
+                remaining -= len;
+                str += len;
+                if (remaining == 0) {
+                    if (i != mHB_LINE_NUM - 1 && newline) {
+                        *endCode_x = x - 160.0f;
+                        *endCode_y = 120.0f - (y + 16.0f);
+                    } else {
+                        *endCode_x = (x + width) - 160.0f;
+                        *endCode_y = 120.0f - y;
+                    }
+                }
+            }
+            y += 16.0f;
+            continue;
+        }
+#endif
         while (len < mHB_LINE_WIDTH_MAX / 12 && len < remaining) {
             if (str[len] == CHAR_NEW_LINE) {
                 newline = TRUE;
