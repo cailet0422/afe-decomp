@@ -772,11 +772,26 @@ static void mChoice_Change_ControlCode(u8* data, int max_size, ACTOR* actor) {
 
 extern void mChoice_Load_ChoseStringFromRom(mChoice_c* choice, u8* str, int str_no, ACTOR* actor) {
     mMsg_bmg_info_c bmg_info;
+#ifdef TARGET_PC
+    u8 buf[72];
+#endif
 
+#ifdef TARGET_PC
+    /* The original loads and pads 72 bytes into a choice of 66, which runs
+     * past the end of the caller's array for its last choice (the sixth of
+     * Nook's shop menu smashed the stack). Load into a buffer of 72 and keep
+     * what fits. */
+    mMsgLoad_bmg_init(&bmg_info, Choice_rom_start, str_no, buf, 72);
+    if (mMsgLoad_bmg_load(&bmg_info)) {
+        mem_clear(buf + bmg_info.load_size, 72 - bmg_info.load_size, CHAR_SPACE);
+        mem_copy(str, buf, mChoice_CHOICE_STRING_LEN);
+    }
+#else
     mMsgLoad_bmg_init(&bmg_info, Choice_rom_start, str_no, str, 72);
     if (mMsgLoad_bmg_load(&bmg_info)) {
         mem_clear(str + bmg_info.load_size, 72 - bmg_info.load_size, CHAR_SPACE);
     }
+#endif
 
     mChoice_Change_ControlCode(str, mChoice_CHOICE_STRING_LEN, actor);
 }
