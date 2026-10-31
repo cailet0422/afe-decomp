@@ -619,6 +619,12 @@ static void mNtc_set_auto_nwrite(int write_count, u8* nwrite_nums, lbRTC_year_t*
     lbRTC_month_t month;
     lbRTC_day_t day;
 
+#ifdef TARGET_PC
+    /* The handbill fills only the first mHandbill_BODY_LEN bytes of the
+     * message; the rest went into the save as whatever was on the stack,
+     * which made the save files of two builds differ */
+    bzero(&post, sizeof(post));
+#endif
     post.post_time.sec = 0;
     post.post_time.min = 0;
     post.post_time.hour = 6;
