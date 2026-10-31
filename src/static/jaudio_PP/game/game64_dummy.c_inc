@@ -241,17 +241,28 @@ extern int Bank_Regist(void*, u32);
 #endif
 
 #ifdef TARGET_PC
+#if defined(__cplusplus)
+extern "C" {
+#endif
+extern void pc_jaudio_bswap_wsys(void* data, u32 size);
+extern void pc_jaudio_bswap_ibnk(void* data, u32 size);
+#if defined(__cplusplus)
+}
+#endif
+
 void BootSound(u32 a, u32 b) {
 #if UINTPTR_MAX > 0xFFFFFFFFu
-    /* The JAudio boot jingle plays on the GC DSP, which the PC port does
-     * not run (its mix is silent), and its WSYS/IBNK tables relocate
-     * 32-bit pointers in place. Skip it in 64-bit builds. */
+    /* The WSYS/IBNK tables relocate 32-bit pointers in place: no boot
+     * jingle in 64-bit builds. */
     (void)a;
     (void)b;
     return;
 #endif
     bootsound_ptr = a;
     bootsound_size = b;
+    /* the tables are big-endian blobs read as structures (pc_dsp.c mixes) */
+    pc_jaudio_bswap_wsys(NIN_WAVE, sizeof(NIN_WAVE));
+    pc_jaudio_bswap_ibnk(NIN_BANK, sizeof(NIN_BANK));
 #else
 void BootSound(u32 a, u32 b) {
     bootsound_ptr = a;

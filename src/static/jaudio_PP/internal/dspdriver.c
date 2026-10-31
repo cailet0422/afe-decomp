@@ -324,9 +324,16 @@ void UpdateDSPchannelAll()
 	int id      = JAC_SUBFRAMES - DspSyncCountCheck();
 	history[id] = old;
 
+#ifdef TARGET_PC
+	/* A subframe that took about as long as a frame means the DSP is behind.
+	 * On PC it renders each subframe when asked (pc_dsp.c) and is never
+	 * behind; the clock between those calls says nothing (--deterministic
+	 * advances it 64 ticks a call), so no voice is cut for it. */
+#else
 	if (id != 0 && (f32)history[0] / (f32)old < 1.1f) {
 		BreakLowerActiveDSPchannel(0x7e);
 	}
+#endif
 
     dspch_* chan;
 	for (u32 i = 0; i < DSPCH_LENGTH; i++) {

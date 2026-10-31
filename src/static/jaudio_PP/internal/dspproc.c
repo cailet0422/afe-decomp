@@ -2,10 +2,13 @@
 
 #ifdef TARGET_PC
 /*==========================================================================
- * PC: No hardware DSP — rspsim.c does all audio processing in software.
- * These functions become no-ops or simple state tracking.
+ * PC: No hardware DSP — pc_dsp.c mixes JAudio's voices in software, a
+ * subframe at a time from the sound thread (pc_audio_process_frame).
  *==========================================================================*/
 static u16 DSP_MIXERLEVEL = 0x4000;
+
+extern void pc_dsp_setup_table(uintptr_t channels, uintptr_t res_filter, uintptr_t afc_filter);
+extern void pc_dsp_sync_frame(u32 subframes, uintptr_t out, u16 mixer_level);
 
 extern s32 DSPSendCommands(u32* commands, u32 count) {
     /* No hardware DSP on PC */
@@ -14,24 +17,24 @@ extern s32 DSPSendCommands(u32* commands, u32 count) {
 }
 
 extern u32 DSPReleaseHalt(void) {
-    /* No hardware DSP — rspsim processes synchronously */
+    /* No hardware DSP */
     return 0x88881357;
 }
 
 extern void DSPWaitFinish(void) {
-    /* No hardware DSP — already done synchronously */
+    /* No hardware DSP */
 }
 
-extern void DsetupTable(u32 arg0, u32 arg1, u32 arg2, u32 arg3, u32 arg4) {
-    /* Channel table setup — no-op on PC, rspsim uses DSPchannel_ structs directly */
-    (void)arg0; (void)arg1; (void)arg2; (void)arg3; (void)arg4;
+extern void DsetupTable(u32 arg0, uintptr_t arg1, uintptr_t arg2, uintptr_t arg3, uintptr_t arg4) {
+    /* the channel table and the resampling and AFC coefficients */
+    (void)arg0; (void)arg4;
+    pc_dsp_setup_table(arg1, arg2, arg3);
 }
 
-extern void DsyncFrame(u32 subframes, u32 dspbuf_start, u32 dspbuf_end) {
-    /* On GC this sends commands to DSP to process subframes.
-     * On PC, rspsim is called directly from UpdateDSP path.
-     * Store buffer pointers for rspsim if needed. */
-    (void)subframes; (void)dspbuf_start; (void)dspbuf_end;
+extern void DsyncFrame(u32 subframes, uintptr_t dspbuf_start, uintptr_t dspbuf_end) {
+    /* the frame is made interleaved at dspbuf_start (Jac_VframeWork) */
+    (void)dspbuf_end;
+    pc_dsp_sync_frame(subframes, dspbuf_start, DSP_MIXERLEVEL);
 }
 
 extern void DwaitFrame(void) {

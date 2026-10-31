@@ -122,9 +122,6 @@ extern void famicom_emu_main(GAME* famicom) {
     famicom->disable_display = 1;
 
     if (!famicom_done) {
-#ifdef TARGET_PC
-        sAdo_GameFrame(); /* Pump audio engine each NES frame */
-#endif
         famicom_1frame();
     } else {
         static GXColor black_color = { 0, 0, 0, 0 };
@@ -168,8 +165,9 @@ extern void famicom_emu_init(GAME* game) {
     game->cleanup = famicom_emu_cleanup;
 
 #ifdef TARGET_PC
-    /* Pump audio system until it transitions to sub-game (NES) mode */
-    for (int i = 0; i < 120 && sAdo_SubGameOK() == FALSE; i++) {
+    /* as below, but give up after ten seconds rather than hang */
+    for (int i = 0; i < 600 && sAdo_SubGameOK() == FALSE; i++) {
+        VIWaitForRetrace();
         sAdo_GameFrame();
     }
 #else

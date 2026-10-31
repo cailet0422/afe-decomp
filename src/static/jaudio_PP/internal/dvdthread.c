@@ -80,6 +80,8 @@ extern void DVDT_ExtendPath(char* dst, char* ext) {
 extern s32 DVDT_AddTaskHigh(TaskCallback callback, void* stackp, size_t len) {
     if (mq_init == 0) return 0;
 
+    /* the sound thread runs the queue (pc_audio_process_frame) */
+    BOOL enable = OSDisableInterrupts();
     TaskCallback* stack = (TaskCallback*)GetCallStack();
     Jac_bcopy(stackp, stack + 1, len);
     *stack = callback;
@@ -87,12 +89,15 @@ extern s32 DVDT_AddTaskHigh(TaskCallback callback, void* stackp, size_t len) {
     /* Queue the task for deferred execution */
     pc_task_queue[pc_task_write % PC_TASK_QUEUE_SIZE] = stack;
     pc_task_write++;
+    OSRestoreInterrupts(enable);
     return 1;
 }
 
 extern s32 DVDT_AddTask(TaskCallback callback, void* stackp, size_t len) {
     if (mq_init == 0) return 0;
 
+    /* the sound thread runs the queue (pc_audio_process_frame) */
+    BOOL enable = OSDisableInterrupts();
     TaskCallback* stack = (TaskCallback*)GetCallStack();
     Jac_bcopy(stackp, stack + 1, len);
     *stack = callback;
@@ -100,6 +105,7 @@ extern s32 DVDT_AddTask(TaskCallback callback, void* stackp, size_t len) {
     /* Queue the task for deferred execution */
     pc_task_queue[pc_task_write % PC_TASK_QUEUE_SIZE] = stack;
     pc_task_write++;
+    OSRestoreInterrupts(enable);
     return 1;
 }
 

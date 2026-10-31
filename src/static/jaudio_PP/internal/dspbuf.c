@@ -50,20 +50,36 @@ extern s16* DspbufProcess(DSPBUF_EVENTS event) {
                 write_buffer = write;
                 DspSyncCountClear(JAC_SUBFRAMES);
                 Probe_Start(7, "DSP-MAIN");
-                DsyncFrame(JAC_SUBFRAMES, (u32)dsp_buf[write_buffer], (u32)&dsp_buf[write_buffer][JAC_FRAMESAMPLES]);
+                DsyncFrame(JAC_SUBFRAMES, (uintptr_t)dsp_buf[write_buffer],
+                           (uintptr_t)&dsp_buf[write_buffer][JAC_FRAMESAMPLES]);
                 dspstatus = 1;
                 UpdateDSP();
             }
             break;
         }
         case DSPBUF_EVENT_MIX: {
-            /* DSP hardware doesn't run on PC — just return a zeroed buffer.
-             * The original code fills with the last sample when buffers haven't
-             * advanced, creating a per-frame DC offset that causes audible pops
-             * when mixed with the CPU pipeline output. */
-            for (i = 0; i < (JAC_FRAMESAMPLES << 1); i++) {
-                dsp_buf[read_buffer][i] = 0;
+            /* as below; pc_dsp.c makes the frames interleaved, and a frame
+             * not made yet holds the last sample of each side */
+            u8 read = read_buffer + 1;
+            if (read == DSPBUF_NUM) {
+                read = 0;
             }
+
+            if (read == write_buffer) {
+                s16 left = dsp_buf[read_buffer][(JAC_FRAMESAMPLES << 1) - 2];
+                s16 right = dsp_buf[read_buffer][(JAC_FRAMESAMPLES << 1) - 1];
+
+                for (i = 0; i < (JAC_FRAMESAMPLES << 1); i += 2) {
+                    dsp_buf[read_buffer][i] = left;
+                    dsp_buf[read_buffer][i + 1] = right;
+                }
+            } else {
+                read_buffer = read;
+            }
+            if (dspstatus == 0) {
+                DspbufProcess(DSPBUF_EVENT_FRAME_END);
+            }
+
             return dsp_buf[read_buffer];
         }
     }

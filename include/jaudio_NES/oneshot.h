@@ -30,6 +30,11 @@ union SOUNDID_ {
 	u32 value; // _00
 	u8 bytes[4];
 };
+#ifdef TARGET_PC
+/* bytes[0] is the bank, the most significant byte on the GameCube: on PC the
+ * value is kept in that byte order, and converted where it is used as a number */
+#define SOUNDID_PC_SWAP(v) __builtin_bswap32(v)
+#endif
 
 #if defined(__cplusplus) && defined(TARGET_PC)
 extern "C" {

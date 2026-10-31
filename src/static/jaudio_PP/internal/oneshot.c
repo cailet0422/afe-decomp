@@ -462,7 +462,11 @@ jc_* Play_1shot(jcs_* jcs, SOUNDID_ sound, u32 id)
 	chan->panMatrices[3].values[0] = 0.0f;
 	EffecterInit(chan, inst);
 
+#ifdef TARGET_PC
+	int flag = inst->mFlag << 0x18 | SOUNDID_PC_SWAP(sound.value) >> 0x10;
+#else
 	int flag = inst->mFlag << 0x18 | sound.value >> 0x10;
+#endif
 	switch (inst->mFlag & 0xc0) {
 	case 0xc0:
 		flag |= 0xffffff;
