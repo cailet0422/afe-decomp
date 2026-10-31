@@ -53,8 +53,15 @@ CtrlGroup_* Wave_Test(u8* data)
 
 	PTconvert((void**)&((Wsys_*)data)->waveArcBank, base_addr);
 	PTconvert((void**)&((Wsys_*)data)->ctrlGroup, base_addr);
+#ifdef TARGET_PC
+	/* the fields, not their GameCube offsets (a 64-bit Wsys_ is laid out
+	 * with 8-byte pointers: pc_jaudio_host_wsys) */
+	arcBank       = ((Wsys_*)data)->waveArcBank;
+	group         = ((Wsys_*)data)->ctrlGroup;
+#else
 	arcBank       = *(WaveArchiveBank_**)(data + 0x10);
 	group         = *(CtrlGroup_**)(data + 0x14);
+#endif
 	CGRP_ARRAY[0] = group;
 
 	if (arcBank->magic != 'WINF') {

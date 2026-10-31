@@ -2286,7 +2286,8 @@ void Na_InitAudio(Na_FatalCallback fatal_callback, u8* bootsound, size_t bootsou
     Jac_RegisterDVDErrorCallback(Sou_DVD_Error);
     Jac_Start(audiomemory, sizeof(audiomemory), aram_size);
 #ifdef TARGET_PC
-    BootSound((u32)(uintptr_t)bootsound, bootsound_size); /* unused (game64_dummy) */
+    bootsound_ptr = (uintptr_t)bootsound; /* the jingle's waves, copied to ARAM (dummy_callback) */
+    BootSound((u32)(uintptr_t)bootsound, bootsound_size);
 #else
     BootSound((u32)bootsound, bootsound_size);
 #endif

@@ -2955,7 +2955,8 @@ extern int famicom_internal_data_load() {
     famicomCommon.nesrom_memcard = FALSE;
     strncpy((char*)famicomCommon.mura_save_name, "DobutsunomoriP_MURA", 32);
     strncpy((char*)famicomCommon.famicom_save_name, "DobutsunomoriP_F_SAVE", 32);
-    famicomCommon.save_data_name = (u8*)"GAFEFSC\x1A";
+    /* the identifier famicom_init and famicom_cleanup check the data with */
+    famicomCommon.save_data_name = (u8*)"GAEJFSC\x1A";
     famicomCommon.save_data_single_size = 0x660;
     famicomCommon.save_data_total_size = sizeof(FamicomSaveDataHeader) + 0x660 * PLAYER_NUM;
     famicomCommon.save_data_header = (FamicomSaveDataHeader*)famicomCommonSave;
@@ -2967,6 +2968,13 @@ extern int famicom_internal_data_load() {
         if (f) {
             fread(famicomCommonSave, 1, sizeof(famicomCommonSave), f);
             fclose(f);
+        }
+        /* as famicom_common_save_initial: no file yet, or not a valid one
+         * (older PC builds wrote it all zeros), starts the data afresh;
+         * otherwise famicom_cleanup finds it damaged and saves no high score */
+        if (famicom_save_data_check(famicomCommon.save_data_header, -1, famicomCommon.save_data_name) != 0) {
+            famicom_save_data_init(famicomCommon.save_data_header, famicomCommon.save_data_single_size,
+                                   famicomCommon.save_data_name);
         }
     }
     return 0;
@@ -3015,6 +3023,14 @@ extern int famicom_internal_data_save() {
     /* PC: Write NES save data to local file */
     {
         char nes_path[300];
+        FamicomSaveDataHeader* header = (FamicomSaveDataHeader*)famicomCommonSave;
+        u8* name = (u8*)"GAEJFSC\x1A";
+        /* as on the memory card: only valid data, marked as saved */
+        if (famicom_save_data_check(header, -1, name) != 0) {
+            return 0;
+        }
+        header->no_save = FALSE;
+        famicom_save_data_setup(header, 0x660, name);
         snprintf(nes_path, sizeof(nes_path), "%s/DobutsunomoriP_F_SAVE.sav", pc_nes_save_dir());
         FILE* f = fopen(nes_path, "wb");
         if (f) {

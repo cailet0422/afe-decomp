@@ -390,7 +390,11 @@ try_interrupt:
             noteMode >>= 5;
             if (noteMode & 2) {
                 keyTarget = (u8)pitch;
+#ifdef TARGET_PC
+                pitch = *(s8*)&track->_D5 & 0xff; /* the field: 64-bit seqp_ is laid out differently */
+#else
                 pitch = *(s8*)((u8*)track + 0xD5) & 0xff;
+#endif
             }
 
             velocity = __ByteRead(track);
@@ -606,6 +610,24 @@ LAB_800136e0:
     int i;
     i = 0;
     childOffset = 0;
+#ifdef TARGET_PC
+    /* the children by field: their GameCube offset does not hold in a
+     * 64-bit build (8-byte pointers before them) */
+    for (; i < 16; i++, childOffset += 4) {
+        seqp_** child = &track->children[i];
+
+        if (*child && (*child)->trackState != 0) {
+            if (track != (*child)->parent) {
+                OSReport("##########Error:: Track %d の共有違反です\n", i);
+            }
+            BOOL childIsMuted = track->isMuted | ((track->childMuteMask & (1 << i)) >> i);
+            if (Jam_SeqmainNote(*child, childIsMuted) == -1) {
+                Jaq_CloseTrack(*child);
+                *child = NULL;
+            }
+        }
+    }
+#else
     for (; i < 16; i++, childOffset += 4) {
         if ((*(seqp_**)((u8*)track + 0x44 + childOffset)) &&
             (*(seqp_**)((u8*)track + 0x44 + childOffset))->trackState != 0) {
@@ -620,6 +642,7 @@ LAB_800136e0:
         }
     }
 
+#endif
     return 0;
 }
 #pragma opt_dead_assignments reset

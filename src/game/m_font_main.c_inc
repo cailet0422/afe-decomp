@@ -111,6 +111,11 @@ extern float mFont_GetCodeWidthFB(u8 c, int cut, int font_bank) {
 extern int mFont_GetStringWidth(u8* str, int len, int cut) {
     int width = 0;
     int i;
+#ifdef TARGET_PC
+
+    /* The Korean patch expands its dictionary codes first (s7+0x188) */
+    len = pc_ko_expand(str, len, 1, (const u8**)&str);
+#endif
 
     for (i = 0; i < len; i++) {
         width += mFont_GetCodeWidth(str[i], cut);
@@ -136,6 +141,11 @@ extern float mFont_GetStringWidth2F(const u8* str, int len, int cut) {
     int j;
     int ofs;
     int size;
+#ifdef TARGET_PC
+
+    /* The Korean patch expands its dictionary codes first (s7+0x244) */
+    len = pc_ko_expand(str, len, 2, &str);
+#endif
 
     for (i = 0; i < len; i += skip_size) {
         pb = str + i;
@@ -628,6 +638,12 @@ static f32 mFont_SetLineStrings_AndSpace_new(GAME* game, u8* str, int len, f32 x
     if (fabsf(scale_x) < 0.001f || fabsf(scale_y) < 0.001f) {
         return 0.0f;
     }
+#ifdef TARGET_PC
+
+    /* The Korean patch draws its dictionary codes expanded (s7+0xcc): long
+     * item names, e.g. in the pocket menu's name tag */
+    len = pc_ko_expand(str, len, 0, (const u8**)&str);
+#endif
 
     if (len <= 0) {
         return 0.0f;
