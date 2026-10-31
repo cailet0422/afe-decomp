@@ -36,6 +36,16 @@ static void aNPC_act_say_hello_voice(NPC_ACTOR* nactorx, GAME_PLAY* play) {
         { takabi_girl_voice, ARRAY_COUNT(takabi_girl_voice) },
         // clang-format on
     };
+#ifdef TARGET_PC
+    static int pc_ko_voice_set = FALSE;
+
+    /* The Korean patch moved two of these into its code section, one byte longer */
+    if (!pc_ko_voice_set) {
+        pc_ko_redirect_strings(&voice[0].voice_se_tbl, &voice[0].len, sizeof(aNPC_voice_c), ARRAY_COUNT(voice),
+                               g_pc_ko_mode ? PC_KO_DATA_HELLO_VOICE : PC_KO_NO_TARGET, 8);
+        pc_ko_voice_set = TRUE;
+    }
+#endif
     
     if (nactorx->hello_talk_flag == TRUE) {
         int timer = nactorx->act_react_tool_timer;

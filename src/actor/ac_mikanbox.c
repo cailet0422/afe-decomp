@@ -10,6 +10,10 @@
 #include "m_rcp.h"
 #include "m_birthday_msg.h"
 #include "m_text.h"
+#ifdef TARGET_PC
+#include "pc_ko.h"
+#include "m_ledit_ovl.h"
+#endif
 
 #define aMIK_STRING_NUM 10
 #define aMIK_STRING_LEN 71

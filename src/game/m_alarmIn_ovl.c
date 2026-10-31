@@ -5,6 +5,9 @@
 #include "m_common_data.h"
 #include "m_haniwaPortrait_ovl.h"
 #include "m_font.h"
+#ifdef TARGET_PC
+#include "pc_ko.h"
+#endif
 
 static mAL_Ovl_c al_ovl_data;
 
@@ -231,11 +234,23 @@ static void mAL_set_character(Submenu* submenu, mSM_MenuInfo_c* menu_info, GAME*
                              FALSE, FALSE, 0.75f, 0.75f, mFont_MODE_POLY);
         mes_x2 = mes_x + 12.0f;
         mes_y2 = mes_y + 19.0f;
+#ifdef TARGET_PC
+        mFont_SetLineStrings(game, (u8*)pc_ko_patched_str(PC_KO_S7_AL_TIMER2, mes2_timer),
+                             g_pc_ko_mode ? 4 : sizeof(mes2_timer), mes_x2, mes_y2, 75, 40, 75, 255, FALSE, FALSE,
+                             0.75f, 0.75f, mFont_MODE_POLY);
+#else
         mFont_SetLineStrings(game, (u8*)mes2_timer, sizeof(mes2_timer), mes_x2, mes_y2, 75, 40, 75, 255,
                              FALSE, FALSE, 0.75f, 0.75f, mFont_MODE_POLY);
+#endif
         mes_x2 = mes_x + 64.0f;
+#ifdef TARGET_PC
+        mFont_SetLineStrings(game, (u8*)pc_ko_patched_str(PC_KO_S7_AL_TIMER3, mes3_timer),
+                             g_pc_ko_mode ? 7 : sizeof(mes3_timer), mes_x2, mes_y2, 75, 40, 75, 255, FALSE, FALSE,
+                             0.75f, 0.75f, mFont_MODE_POLY);
+#else
         mFont_SetLineStrings(game, (u8*)mes3_timer, sizeof(mes3_timer), mes_x2, mes_y2, 75, 40, 75, 255,
                              FALSE, FALSE, 0.75f, 0.75f, mFont_MODE_POLY);
+#endif
         mes_x2 = mes_x + 104.0f;
         mFont_SetLineStrings(game, (u8*)mes4_timer, sizeof(mes4_timer), mes_x2, mes_y2, 75, 40, 75, 255,
                              FALSE, FALSE, 0.75f, 0.75f, mFont_MODE_POLY);
@@ -254,8 +269,14 @@ static void mAL_set_character(Submenu* submenu, mSM_MenuInfo_c* menu_info, GAME*
         mes_y = (base_y + -7.0f) + 19.0f;
         mes_x2 = (base_x + -85.0f) + 12.0f + 51.0f;
         mes_y2 = (base_y + -7.0f) + 19.0f + -2.0f;
+#ifdef TARGET_PC
+        mFont_SetLineStrings(game, (u8*)pc_ko_patched_str(PC_KO_S7_AL_TIME2, str_time_mes2),
+                             g_pc_ko_mode ? 4 : sizeof(str_time_mes2), mes_x2, mes_y2, 75, 40, 75, 255, FALSE, FALSE,
+                             0.75f, 0.75f, mFont_MODE_POLY);
+#else
         mFont_SetLineStrings(game, (u8*)str_time_mes2, sizeof(str_time_mes2), mes_x2, mes_y2, 75, 40, 75,
                              255, FALSE, FALSE, 0.75f, 0.75f, mFont_MODE_POLY);
+#endif
         mes_x2 = (base_x + -85.0f) + 12.0f + 82.0f;
         mFont_SetLineStrings(game, (u8*)str_time_mes3, sizeof(str_time_mes3), mes_x2, mes_y2, 75, 40, 75,
                              255, FALSE, FALSE, 0.75f, 0.75f, mFont_MODE_POLY);

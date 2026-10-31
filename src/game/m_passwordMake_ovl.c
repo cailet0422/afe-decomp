@@ -5,6 +5,9 @@
 #include "m_editor_ovl.h"
 #include "m_font.h"
 #include "sys_matrix.h"
+#ifdef TARGET_PC
+#include "pc_ko.h"
+#endif
 
 mPM_Ovl_c pm_ovl_data;
 
@@ -149,12 +152,24 @@ static void mPM_set_character(Submenu* submenu, GAME* game, int sel_idx, f32 x, 
     f32 cursor_y;
     mFont_SetLineStrings(game, title_str, sizeof(title_str), x + 122.0f, 32.0f - y, 255, 255, 255, 255, FALSE, FALSE,
                          1.0f, 1.0f, mFont_MODE_POLY);
+#ifdef TARGET_PC
+    /* "town" and "name" in the Korean patch's code section */
+    mFont_SetLineStrings(game, (u8*)pc_ko_patched_str(PC_KO_S7_PM_TOWN, countory_title_str),
+                         g_pc_ko_mode ? 4 : sizeof(countory_title_str), x + 179.0f, 70.0f - y, mPM_moji_color[1][0],
+                         mPM_moji_color[1][1], mPM_moji_color[1][2], 255, FALSE, FALSE, 0.875f, 0.875f,
+                         mFont_MODE_POLY);
+    mFont_SetLineStrings(game, (u8*)pc_ko_patched_str(PC_KO_S7_PM_NAME, person_title_str),
+                         g_pc_ko_mode ? 4 : sizeof(person_title_str), x + 97.0f, 98.0f - y, mPM_moji_color[1][0],
+                         mPM_moji_color[1][1], mPM_moji_color[1][2], 255, FALSE, FALSE, 0.875f, 0.875f,
+                         mFont_MODE_POLY);
+#else
     mFont_SetLineStrings(game, (u8*)countory_title_str, sizeof(countory_title_str), x + 179.0f, 70.0f - y,
                          mPM_moji_color[1][0], mPM_moji_color[1][1], mPM_moji_color[1][2], 255, FALSE, FALSE, 0.875f,
                          0.875f, mFont_MODE_POLY);
     mFont_SetLineStrings(game, (u8*)person_title_str, sizeof(person_title_str), x + 97.0f, 98.0f - y,
                          mPM_moji_color[1][0], mPM_moji_color[1][1], mPM_moji_color[1][2], 255, FALSE, FALSE, 0.875f,
                          0.875f, mFont_MODE_POLY);
+#endif
     mFont_SetLineStrings(game, passwordMake_ovl->town_name, passwordMake_ovl->lengths[mPM_ENTRY_TOWN], x + 102.0f,
                          68.0f - y, mPM_moji_color[sel_idx][0], mPM_moji_color[sel_idx][1], mPM_moji_color[sel_idx][2],
                          255, FALSE, FALSE, 1.0f, 1.0f, mFont_MODE_POLY);

@@ -111,7 +111,17 @@ static void mMsg_sound_voice_endcode_set(mMsg_Window_c* msg_p) {
 
 static int mMsg_sound_CodeVoice(mMsg_Window_c* msg_p, int idx, int voice_entry) {
     u8* data = msg_p->msg_data->text_buf.data;
+#ifdef TARGET_PC
+    /* The Korean patch voices a syllable by its consonant and vowel */
+    int voice_id = pc_ko_voice(&data[idx], idx > 0 ? data[idx - 1] : -1);
+
+    if (voice_id == PC_KO_VOICE_DEFAULT) {
+        voice_id = mMsg_sound_voice_get2(data[idx]);
+    }
+    pc_ko_voice_log(msg_p->msg_data->msg_no, &data[idx], voice_id);
+#else
     int voice_id = mMsg_sound_voice_get2(data[idx]);
+#endif
 
     if (voice_id < 0) {
         return FALSE;

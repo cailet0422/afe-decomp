@@ -10,6 +10,9 @@
 #include "sys_matrix.h"
 #include "m_flashrom.h"
 #include "m_common_data.h"
+#ifdef TARGET_PC
+#include "pc_ko.h"
+#endif
 
 /* ' みとうろく' (Unregisterd) */
 static u8 mitouroku_str[6] = { 0x20, 0x1F, 0x13, 0x02, 0xC0, 0x07 };
@@ -143,8 +146,15 @@ static u8 _debug_player_select[10] = { 0xE4, 0xBA, 0x90, 0xB4, 0x90, 0x20, 0x0D,
 
 static void player_select_draw_title(GAME_PLAYER_SELECT* player_select) {
     mFont_SetMatrix(player_select->game.graph, mFont_MODE_FONT);
+#ifdef TARGET_PC
+    mFont_SetLineStrings_AndSpace((GAME*)player_select,
+                                  (u8*)pc_ko_patched_str(PC_KO_S7_PLAYER_SELECT, _debug_player_select),
+                                  g_pc_ko_mode ? 13 : ARRAY_SIZE(_debug_player_select, u8), 85.0f, 15.0f, 200, 200,
+                                  200, 255, FALSE, TRUE, 0, 1.2f, 1.2f, mFont_MODE_FONT);
+#else
     mFont_SetLineStrings_AndSpace((GAME*)player_select, _debug_player_select, ARRAY_SIZE(_debug_player_select, u8),
                                   85.0f, 15.0f, 200, 200, 200, 255, FALSE, TRUE, 0, 1.2f, 1.2f, mFont_MODE_FONT);
+#endif
     mFont_UnSetMatrix(player_select->game.graph, mFont_MODE_FONT);
 }
 
