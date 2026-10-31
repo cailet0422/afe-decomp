@@ -1077,8 +1077,10 @@ static void mMP_set_label_dl(GAME* game, mMP_LabelInfo_c* label_info, f32 xpos, 
         if (label->str != NULL) {
 #ifdef TARGET_PC
             if (g_pc_ko_mode) {
-                /* Korean patch: one-line labels from the disc */
-                u32 entry = PC_KO_DATA_MAP_LABELS + label_no * sizeof(mMP_Label_c);
+                /* Korean patch: one-line labels from the disc. The table is in
+                 * the GameCube's layout, 0x1C bytes an entry (sizeof is 40 on
+                 * 64-bit, which skipped or garbled most labels) */
+                u32 entry = PC_KO_DATA_MAP_LABELS + label_no * 0x1C;
 
                 mFont_SetLineStrings(game, (u8*)pc_ko_data_ptr(entry + 0x14, label->str),
                                      pc_ko_data_u32(entry + 0x18, label->str_len), x, y, 120, 95, 205, 255, FALSE,
