@@ -1996,10 +1996,10 @@ static int mED_pc_typing(Submenu* submenu, mSM_MenuInfo_c* menu_info, mED_EDIT_F
                     if (editor_ovl->max_line_no > 1) {
                         command = mED_COMMAND_OUTPUT_CODE;
                         code = CHAR_NEW_LINE;
-                    } else if (type == mED_TYPE_BOARD) {
+                    } else if (type == mED_TYPE_BOARD && submenu->overlay->board_ovl->field != mBD_FIELD_FOOTER) {
                         command = mED_COMMAND_CURSOL_LOWER; /* next part of the letter */
                     } else {
-                        command = mED_COMMAND_END_EDIT;
+                        command = mED_COMMAND_END_EDIT; /* a one-line field, or the letter's closing */
                     }
                     break;
                 case PC_TYPING_CMD_END:
@@ -2011,6 +2011,17 @@ static int mED_pc_typing(Submenu* submenu, mSM_MenuInfo_c* menu_info, mED_EDIT_F
         }
 
         grown = mED_pc_run(submenu, menu_info, edit_func, command, code, trail);
+        if (op == PC_TYPING_CMD_ENTER && command == mED_COMMAND_OUTPUT_CODE && !editor_ovl->se_flag) {
+            /* No room for another line: Enter goes to the line below, from a
+             * letter's last line on to its closing, and with no line below
+             * it finishes, so pressing it again and again always ends */
+            command = mED_COMMAND_CURSOL_LOWER;
+            mED_pc_run(submenu, menu_info, edit_func, command, 0, -1);
+            if (!editor_ovl->se_flag && type != mED_TYPE_BOARD) {
+                command = mED_COMMAND_END_EDIT;
+                mED_pc_run(submenu, menu_info, edit_func, command, 0, -1);
+            }
+        }
         ran = TRUE;
         if (preedit) {
             if (grown > 0) {
