@@ -8,6 +8,13 @@
 
 #define banti_MODE_FONT 0
 #define banti_MODE_POLY_OPA 1
+#ifdef TARGET_PC
+/* afe-port: the minimap has the bottom left corner (pc_minimap.c), and how far
+ * a window wider than 4:3 reaches past the game's 320-wide picture on each
+ * side, in its pixels (pc_gx.c) */
+extern int pc_minimap_on(void);
+extern float pc_gx_ui_extra_half_width(void);
+#endif
 
 enum {
     banti_STATE_SHOWN,
@@ -101,6 +108,13 @@ static void banti_chk_disp_left(GAME_PLAY* play) {
         if (banti.move_timer > 10.0f) {
             banti.move_timer = 10.0f;
 
+#ifdef TARGET_PC
+            /* Not to the bottom left while the minimap is there: the clock
+             * stays hidden until the player leaves the bottom right */
+            if (pc_minimap_on()) {
+                banti.disabled = TRUE;
+            } else
+#endif
             switch (banti.state) {
                 case banti_STATE_HIDDEN:
                     banti.disp_left = TRUE;
@@ -799,11 +813,25 @@ void banti_draw(GAME_PLAY* play) {
             CLOSE_DISP(graph);
         }
 
+#ifdef TARGET_PC
+        {
+            /* In a window wider than 4:3 the picture is the middle of it: put
+             * the clock in the window's corner, as far from its edge */
+            f32 edge = pc_gx_ui_extra_half_width() * mFont_SCALE_F;
+
+            if (banti.disp_left == TRUE) {
+                Matrix_translate(-1430.0f - edge, -1240.0f - banti.disp_ofs_y, 0.0f, MTX_LOAD);
+            } else {
+                Matrix_translate(1430.0f + edge, -1240.0f - banti.disp_ofs_y, 0.0f, MTX_LOAD);
+            }
+        }
+#else
         if (banti.disp_left == TRUE) {
             Matrix_translate(-1430.0f, -1240.0f - banti.disp_ofs_y, 0.0f, MTX_LOAD);
         } else {
             Matrix_translate(1430.0f, -1240.0f - banti.disp_ofs_y, 0.0f, MTX_LOAD);
         }
+#endif
         
         Matrix_scale(0.41f, 0.41f, 0.41f, MTX_MULT);
 
