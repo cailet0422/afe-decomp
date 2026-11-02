@@ -7167,6 +7167,27 @@ extern int mCD_SaveStation_Passport_bg(s32* chan) {
     return ret;
 }
 
+#ifdef TARGET_PC
+/* The multiplayer (pc_mp_game.c): the town as it is now, as the save part of
+ * a town file on a card (what the station reads from the other slot), and
+ * where that part lies in the file */
+extern void mCD_PC_SnapshotSave(Save* out) {
+    bcopy(&Common_Get(save).save, out, sizeof(Save_t));
+    out->save.save_check.version = mFRm_VERSION;
+    mFRm_SetSaveCheckData(&out->save.save_check);
+    out->save.save_check.checksum = 0;
+    out->save.save_check.checksum = mFRm_GetFlatCheckSum((u16*)out, sizeof(Save), out->save.save_check.checksum);
+}
+
+extern int mCD_PC_LandFileInfo(const char** name, int* file_size, int* save_ofs0, int* save_ofs1) {
+    *name = l_mCD_land_file_name;
+    *file_size = mCD_LAND_SAVE_SIZE;
+    *save_ofs0 = mCD_get_offset(mCD_FILE_SAVE_MAIN);
+    *save_ofs1 = mCD_get_offset(mCD_FILE_SAVE_MAIN + 1);
+    return sizeof(Save);
+}
+
+#endif
 extern void mCD_toNextLand(void) {
     mCD_persistent_data_c persis;
     Save_t* save = &l_keepSave.save;

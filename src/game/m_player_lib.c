@@ -1456,6 +1456,26 @@ extern void mPlib_change_player_face_pallet(GAME* game) {
     }
 }
 
+#ifdef TARGET_PC
+/* The multiplayer's other players (pc_mp_puppet.c): the face textures (eyes
+ * and mouths, 0xE00 bytes) and the face palette (0x20) of any look, as the
+ * player's own are chosen above (no bee swelling or decoy face) */
+extern void mPlib_PC_LoadFace(int sex, int face_type, int sunburn_rank, u8* tex_p, u16* pal_p) {
+    u32 tex_rom = mPlib_Get_UseFaceTexRom_p_common(sex, face_type, FALSE, FALSE);
+    u32 pal_rom = tex_rom + 0xE00;
+
+    if (sunburn_rank > 0) {
+        u32 idx = mPlib_Get_UseFaceRom_index(sex, face_type, FALSE, FALSE, mPlayer_USE_FACE_ROM_TYPE_PAL);
+
+        pal_rom = mPlib_Get_UseFaceTexRom_p_common(mPr_SEX_FEMALE, mPr_FACE_TYPE7, TRUE, TRUE) + 0xE00 +
+                  (sunburn_rank + idx) * 0x20;
+    }
+    _JW_GetResourceAram(tex_rom, tex_p, 0xE00);
+    _JW_GetResourceAram(pal_rom, (u8*)pal_p, mNW_PALETTE_SIZE);
+    mPlib_ByteSwapPlayerPalette(pal_p);
+}
+
+#endif
 extern void mPlib_change_player_face(GAME* game) {
     u8* player_face_p = mPlib_get_player_face_p(game);
     u32 player_face_rom_p = mPlib_Get_UseFaceTexRom_p();

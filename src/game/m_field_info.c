@@ -1296,15 +1296,27 @@ extern int mFI_GetBlockUtNum2FG(mActor_name_t* item, int bx, int bz, int ut_x, i
     return res;
 }
 
+#ifdef TARGET_PC
+/* The multiplayer (pc_mp_game.c) passes on changes to the town's items */
+extern void pc_mp_fg_written(int bx, int bz, int ut_x, int ut_z, mActor_name_t old_item, mActor_name_t new_item);
+extern void pc_mp_deposit_written(int bx, int bz, int ut_x, int ut_z, int on);
+
+#endif
 extern int mFI_BlockUtNumtoFGSet(mActor_name_t item, int bx, int bz, int ut_x, int ut_z) {
     int res = FALSE;
     mActor_name_t* fg_p = mFI_BkNumtoUtFGTop(bx, bz);
 
     if (fg_p != NULL && (ut_x >= 0 && ut_x < UT_X_NUM) && (ut_z >= 0 && ut_z < UT_Z_NUM)) {
         int ut_num = mFI_GetUtNum(ut_x, ut_z);
+#ifdef TARGET_PC
+        mActor_name_t old_item = fg_p[ut_num];
+#endif
 
         res = TRUE;
         fg_p[ut_num] = item;
+#ifdef TARGET_PC
+        pc_mp_fg_written(bx, bz, ut_x, ut_z, old_item, item);
+#endif
     }
 
     return res;
@@ -1341,7 +1353,16 @@ extern int mFI_UtNumtoFGSet_common(mActor_name_t item, int ut_x, int ut_z, int u
     }
 #endif
 
+#ifdef TARGET_PC
+    {
+        mActor_name_t old_item = g_fdinfo->block_info[block_num].fg_info.items_p[ut_num];
+
+        g_fdinfo->block_info[block_num].fg_info.items_p[ut_num] = item;
+        pc_mp_fg_written(bx, bz, b_ut_x, b_ut_z, old_item, item);
+    }
+#else
     g_fdinfo->block_info[block_num].fg_info.items_p[ut_num] = item;
+#endif
 
     if (update) {
         mFI_SetFGUpData();
@@ -2186,6 +2207,11 @@ static int mFI_BkUtNum2SetDeposit(int bx, int bz, int ut_x, int ut_z, int type) 
 
     if (deposit_p != NULL) {
         res = mFI_SetDeposit(deposit_p, ut_x, ut_z, type);
+#ifdef TARGET_PC
+        if (type != mFI_DEPOSIT_GET) {
+            pc_mp_deposit_written(bx, bz, ut_x, ut_z, type == mFI_DEPOSIT_ON);
+        }
+#endif
     }
 
     return res;

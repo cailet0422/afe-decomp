@@ -260,6 +260,10 @@
 #include "ac_monument.h"
 #include "ac_island_npc.h"
 
+#ifdef TARGET_PC
+extern ACTOR_PROFILE Pc_Mp_Player_Profile;
+
+#endif
 #define MAKE_ACTOR_DLF(actor)\
   {0,0,NULL,NULL,NULL,&actor##_Profile, 0,0,0,0}
 
@@ -453,7 +457,11 @@ ACTOR_DLFTBL actor_dlftbls[] = {
   MAKE_ACTOR_DLF(Museum),
   MAKE_ACTOR_DLF(Ev_Ghost),
   MAKE_ACTOR_DLF(Museum_Picture),
+#ifdef TARGET_PC
+  MAKE_ACTOR_DLF(Pc_Mp_Player), /* the multiplayer's other players (pc_mp_puppet.c), in the unused slot */
+#else
   MAKE_ACTOR_NULL(),
+#endif
   MAKE_ACTOR_DLF(Museum_Fish),
   MAKE_ACTOR_DLF(Museum_Insect),
   MAKE_ACTOR_DLF(Bridge_A),
