@@ -2331,6 +2331,91 @@ static void My_Room_Actor_dt(ACTOR* actorx, GAME* game) {
     }
 }
 
+#ifdef TARGET_PC
+#include "ac_my_indoor.h"
+
+/* The multiplayer (pc_mp_game.c): the host's changes to a house arrive
+ * while a guest stands in it. They are kept until this room is quiet, then
+ * applied to the save and the furniture is built again from it, the way the
+ * room's constructor does. */
+extern int pc_mp_room_changes_pending(int house, int floor);
+extern int pc_mp_room_apply_changes(int house, int floor); /* 1 if the wallpaper or carpet changed */
+
+static int aMR_PC_RoomQuiet(MY_ROOM_ACTOR* my_room, GAME* game) {
+    GAME_PLAY* play = (GAME_PLAY*)game;
+    PLAYER_ACTOR* player = GET_PLAYER_ACTOR(play);
+    int i;
+
+    if (my_room->state != 0 || my_room->demo_flag || my_room->msg_type != 0 || my_room->pickup_info.pickup_flag ||
+        my_room->parent_ftr.ftrID != -1 || player == NULL) {
+        return FALSE;
+    }
+    for (i = 0; i < 3; i++) {
+        if (my_room->rsv_ftr[i].exist_flag) {
+            return FALSE;
+        }
+    }
+    /* not sitting, in bed or holding anything */
+    switch (player->now_main_index) {
+        case mPlayer_INDEX_WAIT:
+        case mPlayer_INDEX_WALK:
+        case mPlayer_INDEX_RUN:
+        case mPlayer_INDEX_DASH:
+            break;
+        default:
+            return FALSE;
+    }
+    return mMsg_CHECK_MAINHIDE();
+}
+
+static void aMR_PC_SyncRoom(ACTOR* actorx, GAME* game) {
+    MY_ROOM_ACTOR* my_room = (MY_ROOM_ACTOR*)actorx;
+    GAME_PLAY* play = (GAME_PLAY*)game;
+    int field_id = mFI_GetFieldId();
+    int house;
+    int floor;
+
+    if (mFI_GET_TYPE(field_id) != mFI_FIELD_PLAYER0_ROOM) {
+        return;
+    }
+    house = mFI_GET_PLAYER_ROOM_NO(field_id);
+    floor = mFI_GetNowPlayerHouseFloorNo();
+    if (!pc_mp_room_changes_pending(house, floor) || !aMR_PC_RoomQuiet(my_room, game)) {
+        return;
+    }
+
+    /* as the destructor: what the furniture keeps goes back to the save */
+    aMR_AllFurnitureDestruct(actorx);
+    aMR_SaveSwitchData(my_room);
+    if (pc_mp_room_apply_changes(house, floor) && CLIP(my_indoor_clip) != NULL &&
+        CLIP(my_indoor_clip)->my_indoor_actor_p != NULL) {
+        MY_INDOOR_ACTOR* my_indoor = CLIP(my_indoor_clip)->my_indoor_actor_p;
+
+        my_indoor->floor_num = Save_Get(homes[house]).floors[floor].wall_floor.flooring_idx;
+        my_indoor->wall_num = Save_Get(homes[house]).floors[floor].wall_floor.wallpaper_idx;
+        CLIP(my_indoor_clip)->indoor_dma_again_proc();
+    }
+
+    /* as the constructor */
+    aMR_InitFurnitureWork();
+    aMR_InitFurnitureTable(l_aMR_work.ftr_actor_list, l_aMR_work.list_size);
+    aMR_InitFurnitureActorExistTable();
+    aMR_InitHaniwaOnTable(actorx);
+    aMR_InitFurnitureBankTable();
+    my_room->bgm_info.reserved_ftr_actor = NULL;
+    my_room->bgm_info.active_ftr_actor = NULL;
+    my_room->bgm_info.md_no = -1;
+    my_room->bgm_info.last_md_no = -1;
+    aMR_MakeFurnitureActor(actorx, play, mCoBG_LAYER0);
+    aMR_MakeFurnitureActor(actorx, play, mCoBG_LAYER1);
+    my_room->parent_ftr.ftrID = -1;
+    aMR_MakeItemDataInFurniture();
+    aMR_DeleteMusicWhichMusicBoxDontHave();
+    aMR_ClearSwitchSaveData(my_room);
+    aMR_OneMDFurnitureSwitchOn();
+}
+
+#endif
 #include "../src/actor/ac_my_room_move.c_inc"
 #include "../src/actor/ac_my_room_draw.c_inc"
 
