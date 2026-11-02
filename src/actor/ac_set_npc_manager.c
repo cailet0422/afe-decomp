@@ -7,6 +7,9 @@
 #include "libultra/libultra.h"
 #include "m_random_field.h"
 #include "m_event_map_npc.h"
+#ifdef TARGET_PC
+extern int pc_mp_npc_guest(void);
+#endif
 
 static void aSNMgr_actor_ct(ACTOR* actorx, GAME* game);
 static void aSNMgr_actor_dt(ACTOR* actorx, GAME* game);
@@ -1270,7 +1273,13 @@ static void aSNMgr_actor_move(ACTOR* actorx, GAME* game) {
         case mFI_WADE_NONE:
             if (play->fb_fade_type == FADE_TYPE_NONE) {
                 aSNMgr_clear_make_npc(manager->npc_info.make, aSNMgr_EVENT_NORMAL_NPC_NUM);
+#ifdef TARGET_PC
+                /* a guest in the multiplayer host's town: the villagers
+                 * away from it go where the host's go (pc_mp_game.c) */
+                if (!aSNMgr_chk_arbeit_and_demo_and_halloween() && !pc_mp_npc_guest()) {
+#else
                 if (!aSNMgr_chk_arbeit_and_demo_and_halloween()) {
+#endif
                     aSNMgr_force_go_home(manager);
                     aSNMgr_walk_npc(manager, game);
                 }

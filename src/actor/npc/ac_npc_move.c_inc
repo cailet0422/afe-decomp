@@ -738,6 +738,9 @@ static void aNPC_actor_move_hide(ACTOR* actorx, GAME* game) {
     aNPC_schedule_proc(nactorx, play);
     aNPC_action_proc(nactorx, play);
     aNPC_check_feel_tim(nactorx);
+#ifdef TARGET_PC
+    aNPC_pc_mp_report(nactorx);
+#endif
 }
 
 static void aNPC_actor_move_show_before(ACTOR* actorx, GAME* game) {
@@ -783,11 +786,17 @@ static void aNPC_actor_move_show(ACTOR* actorx, GAME* game) {
     }
 
     aNPC_schedule_proc(nactorx, play);
+#ifdef TARGET_PC
+    aNPC_pc_mp_follow(nactorx, play);
+#endif
     aNPC_action_proc(nactorx, play);
     aNPC_talk_request_check(actorx, game);
     aNPC_angle_calc(nactorx);
     aNPC_calc_fatigue(nactorx);
     aNPC_actor_move_show_after(actorx, game);
+#ifdef TARGET_PC
+    aNPC_pc_mp_report(nactorx);
+#endif
 }
 
 static void aNPC_actor_move(ACTOR* actorx, GAME* game) {

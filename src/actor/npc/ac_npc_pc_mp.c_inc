@@ -1,0 +1,154 @@
+/* ac_npc_pc_mp.c_inc - the port's multiplayer (pc_mp_game.c), TARGET_PC only
+ *
+ * The host's villagers lead: the host reports each resident villager's
+ * position, facing and walk/run/stand a few times a second, and on a guest
+ * in the host's town the same villager follows it with its own walk action
+ * (so it animates as it walks) while it is wandering. Talking to a villager,
+ * greetings, going home, sleeping and the like stay each player's own. */
+
+#define aNPC_PC_MP_HIDDEN (1 << 0)  /* inside its house (hidden) */
+#define aNPC_PC_MP_AT_HOME (1 << 1) /* Animal_c is_home */
+#define aNPC_PC_MP_FREE (1 << 2)    /* wandering: others may follow it */
+
+enum {
+    aNPC_PC_MP_STAND,
+    aNPC_PC_MP_WALK,
+    aNPC_PC_MP_RUN,
+    aNPC_PC_MP_BUSY, /* greeting, talking, catching... */
+};
+
+extern void pc_mp_npc_report(int idx, mActor_name_t npc_id, f32 x, f32 y, f32 z, s16 angle, int act, int flags);
+extern int pc_mp_npc_target(int idx, mActor_name_t npc_id, f32* x, f32* y, f32* z, s16* angle, int* act, int* flags);
+
+static int aNPC_pc_mp_index(NPC_ACTOR* nactorx, mActor_name_t* npc_id) {
+    int idx;
+
+    if (nactorx->actor_class.id != mAc_PROFILE_NORMAL_NPC || nactorx->npc_info.list == NULL ||
+        nactorx->npc_info.animal == NULL) {
+        return -1;
+    }
+    idx = (int)(nactorx->npc_info.list - Common_Get(npclist));
+    if (idx < 0 || idx >= ANIMAL_NUM_MAX) {
+        return -1;
+    }
+    *npc_id = nactorx->npc_info.animal->id.npc_id;
+    return idx;
+}
+
+/* wandering, nothing of its own going on */
+static int aNPC_pc_mp_free(NPC_ACTOR* nactorx) {
+    if (nactorx->condition_info.talk_condition != aNPC_TALK_TYPE_NONE ||
+        mDemo_Get_talk_actor() == (ACTOR*)nactorx || mDemo_IS_ANY_TALK_DEMO((ACTOR*)nactorx) ||
+        nactorx->think.force_call_flag != aNPC_FORCE_CALL_NONE || nactorx->condition_info.hide_flg ||
+        nactorx->condition_info.hide_request || nactorx->condition_info.pitfall_flag ||
+        nactorx->schedule.type != aNPC_SCHEDULE_TYPE_FIELD ||
+        (nactorx->think.idx != aNPC_THINK_WANDER && nactorx->think.idx != aNPC_THINK_WALK_WANDER)) {
+        return FALSE;
+    }
+    if (nactorx->action.step != aNPC_ACTION_END_STEP) {
+        switch (nactorx->action.idx) {
+            case aNPC_ACT_WAIT:
+            case aNPC_ACT_WALK:
+            case aNPC_ACT_RUN:
+            case aNPC_ACT_TURN:
+            case aNPC_ACT_TURN2:
+                break;
+            default:
+                return FALSE;
+        }
+    }
+    return TRUE;
+}
+
+/* the host: this villager's state after its move */
+static void aNPC_pc_mp_report(NPC_ACTOR* nactorx) {
+    mActor_name_t npc_id;
+    int idx = aNPC_pc_mp_index(nactorx, &npc_id);
+    int act;
+    int flags = 0;
+
+    if (idx < 0) {
+        return;
+    }
+    switch (nactorx->action.step == aNPC_ACTION_END_STEP ? aNPC_ACT_WAIT : nactorx->action.idx) {
+        case aNPC_ACT_WAIT:
+        case aNPC_ACT_TURN:
+        case aNPC_ACT_TURN2:
+            act = aNPC_PC_MP_STAND;
+            break;
+        case aNPC_ACT_WALK:
+            act = aNPC_PC_MP_WALK;
+            break;
+        case aNPC_ACT_RUN:
+            act = aNPC_PC_MP_RUN;
+            break;
+        default:
+            act = aNPC_PC_MP_BUSY;
+            break;
+    }
+    if (nactorx->condition_info.hide_flg) {
+        flags |= aNPC_PC_MP_HIDDEN;
+    }
+    if (nactorx->npc_info.animal->is_home) {
+        flags |= aNPC_PC_MP_AT_HOME;
+    }
+    if (aNPC_pc_mp_free(nactorx)) {
+        flags |= aNPC_PC_MP_FREE;
+    }
+    pc_mp_npc_report(idx, npc_id, nactorx->actor_class.world.position.x, nactorx->actor_class.world.position.y,
+                     nactorx->actor_class.world.position.z, nactorx->actor_class.shape_info.rotation.y, act, flags);
+}
+
+/* a guest: after its own think, walk where the host's one is (a request of
+ * priority 3: above wandering, below talking and greeting) */
+static void aNPC_pc_mp_follow(NPC_ACTOR* nactorx, GAME_PLAY* play) {
+    ACTOR* actorx = (ACTOR*)nactorx;
+    mActor_name_t npc_id;
+    int idx = aNPC_pc_mp_index(nactorx, &npc_id);
+    f32 x, y, z, dx, dz, d2;
+    s16 angle;
+    int act, flags;
+
+    if (idx < 0 || !pc_mp_npc_target(idx, npc_id, &x, &y, &z, &angle, &act, &flags)) {
+        return;
+    }
+    if ((flags & aNPC_PC_MP_HIDDEN) || !aNPC_pc_mp_free(nactorx)) {
+        return; /* (going home, talking...: its own) */
+    }
+    nactorx->palActorIgnoreTimer = -1; /* no greetings among themselves */
+    /* (not into its own door on the way, nor kept to its circle) */
+    nactorx->condition_info.demo_flg |= aNPC_COND_DEMO_SKIP_MOVE_CIRCLE_REV | aNPC_COND_DEMO_SKIP_MOVE_RANGE_CHECK |
+                                        aNPC_COND_DEMO_SKIP_ENTRANCE_CHECK;
+
+    dx = x - actorx->world.position.x;
+    dz = z - actorx->world.position.z;
+    d2 = dx * dx + dz * dz;
+    if (d2 > 400.0f * 400.0f || (d2 > 160.0f * 160.0f && (actorx->state_bitfield & ACTOR_STATE_NO_CULL) == 0)) {
+        /* far off (a talk, a spawn): there at once, best while out of sight */
+        actorx->world.position.x = x;
+        actorx->world.position.y = y;
+        actorx->world.position.z = z;
+        actorx->last_world_position = actorx->world.position;
+        actorx->shape_info.rotation.y = angle;
+        actorx->world.angle.y = angle;
+        nactorx->movement.mv_angl = angle;
+        dx = dz = d2 = 0.0f;
+    }
+
+    if (act == aNPC_PC_MP_WALK || act == aNPC_PC_MP_RUN || d2 > 24.0f * 24.0f) {
+        u16 args[6];
+
+        args[0] = 0;
+        args[1] = 0;
+        args[2] = (u16)(s16)x;
+        args[3] = (u16)(s16)z;
+        args[4] = 0;
+        args[5] = 0;
+        aNPC_set_request_act(nactorx, 3, (act == aNPC_PC_MP_RUN || d2 > 120.0f * 120.0f) ? aNPC_ACT_RUN : aNPC_ACT_WALK,
+                             aNPC_ACT_TYPE_TO_POINT, args);
+    } else {
+        aNPC_set_request_act(nactorx, 3, aNPC_ACT_WAIT, aNPC_ACT_TYPE_DEFAULT, aNPC_req_default_data);
+        nactorx->movement.mv_angl = angle;
+    }
+    (void)play;
+}

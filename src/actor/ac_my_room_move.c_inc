@@ -3089,6 +3089,9 @@ static void My_Room_Actor_move(ACTOR* actorx, GAME* game) {
     u32 player_no = Common_Get(player_no);
     int i;
 
+#ifdef TARGET_PC
+    aMR_PC_SyncRoom(actorx, game);
+#endif
     my_room->goki_ct_proc(actorx, game);
     if (my_room->state == 0) {
         aMR_RequestPlayerBikkuri(actorx, game);
