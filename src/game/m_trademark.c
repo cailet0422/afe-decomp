@@ -34,7 +34,16 @@
 #include "m_sdcard.h"
 #include "reload_data.h"
 
+#ifdef TARGET_PC
+/* On the GameCube the boot's initial menu thread (initial_menu.c) shows the
+ * Nintendo logo while the game loads, so the first trademark scene draws
+ * nothing and goes on at once. The port runs no such thread (pc_os.c):
+ * the first one shows the logo as the later ones do (it was a black screen
+ * on PC, and whatever the frame buffer held on Android). */
+static int mTR_first_flag = FALSE;
+#else
 static int mTR_first_flag = TRUE;
+#endif
 
 static Door_data_c demo_1_door_data = { SCENE_TITLE_DEMO, 4, FALSE, 0, { 2180, 200, 824 }, EMPTY_NO, 3, { 0, 0, 0 } };
 static Door_data_c demo_2_door_data = { SCENE_TITLE_DEMO, 4, FALSE, 0, { 3218, 40, 3074 }, EMPTY_NO, 3, { 0, 0, 0 } };
