@@ -799,6 +799,36 @@ static void restore_fgdata_one(ACTOR* actor, GAME_PLAY* play) {
         restore_fgdata(actor, play);
     }
 }
+#ifdef TARGET_PC
+
+/* afe-port autosave: what restore_fgdata_all would put back (the names of
+ * the actors made from units), into a copy of the Save instead; the live
+ * units keep their placeholders while the actors exist. Items of the
+ * misc kind (put on the nearest empty unit) are left out. */
+extern void Actor_info_PC_restore_fgdata_copy(GAME_PLAY* play, void* copy) {
+    u8* base = (u8*)&Common_Get(save).save;
+    Actor_info* info = &play->actor_info;
+    ACTOR* actor;
+    int i;
+
+    for (i = 0; i < ACTOR_PART_NUM; i++) {
+        for (actor = info->list[i].actor; actor != NULL; actor = actor->next_actor) {
+            mActor_name_t name = actor->npc_id;
+            mActor_name_t* unit;
+
+            if ((restore_flag[i] != TRUE && actor->restore_fg != TRUE) || name == EMPTY_NO ||
+                actor->move_actor_list_idx != -1 || actor->block_x < 0 || actor->block_z < 0 ||
+                ITEM_NAME_GET_TYPE(name) == NAME_TYPE_ITEM2) {
+                continue;
+            }
+            unit = mFI_GetUnitFG(actor->home.position);
+            if (unit != NULL && (u8*)unit >= base && (u8*)unit < base + sizeof(Save_t)) {
+                *(mActor_name_t*)((u8*)copy + ((u8*)unit - base)) = name;
+            }
+        }
+    }
+}
+#endif
 
 extern void restore_fgdata_all(GAME_PLAY* play) {
     Actor_info* info;

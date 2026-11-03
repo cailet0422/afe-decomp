@@ -17,6 +17,11 @@ enum {
     aNPC_PC_MP_BUSY, /* greeting, talking, catching... */
 };
 
+#ifdef aNPC_NPC2
+/* in its house (the indoor controller): room coordinates, a message of their own */
+#define pc_mp_npc_report pc_mp_npc_room_report
+#define pc_mp_npc_target pc_mp_npc_room_target
+#endif
 extern void pc_mp_npc_report(int idx, mActor_name_t npc_id, f32 x, f32 y, f32 z, s16 angle, int act, int flags);
 extern int pc_mp_npc_target(int idx, mActor_name_t npc_id, f32* x, f32* y, f32* z, s16* angle, int* act, int* flags);
 
@@ -41,8 +46,14 @@ static int aNPC_pc_mp_free(NPC_ACTOR* nactorx) {
         mDemo_Get_talk_actor() == (ACTOR*)nactorx || mDemo_IS_ANY_TALK_DEMO((ACTOR*)nactorx) ||
         nactorx->think.force_call_flag != aNPC_FORCE_CALL_NONE || nactorx->condition_info.hide_flg ||
         nactorx->condition_info.hide_request || nactorx->condition_info.pitfall_flag ||
+#ifdef aNPC_NPC2
+        /* walking about its room (not coming in, going out or hidden) */
+        nactorx->schedule.type != aNPC_SCHEDULE_TYPE_IN_HOUSE ||
+        nactorx->schedule.step != aNPC_SCHEDULE_IN_HOUSE_STEP_WANDER || nactorx->think.idx != aNPC_THINK_WANDER) {
+#else
         nactorx->schedule.type != aNPC_SCHEDULE_TYPE_FIELD ||
         (nactorx->think.idx != aNPC_THINK_WANDER && nactorx->think.idx != aNPC_THINK_WALK_WANDER)) {
+#endif
         return FALSE;
     }
     if (nactorx->action.step != aNPC_ACTION_END_STEP) {
@@ -115,15 +126,22 @@ static void aNPC_pc_mp_follow(NPC_ACTOR* nactorx, GAME_PLAY* play) {
     if ((flags & aNPC_PC_MP_HIDDEN) || !aNPC_pc_mp_free(nactorx)) {
         return; /* (going home, talking...: its own) */
     }
+#ifndef aNPC_NPC2
     nactorx->palActorIgnoreTimer = -1; /* no greetings among themselves */
     /* (not into its own door on the way, nor kept to its circle) */
     nactorx->condition_info.demo_flg |= aNPC_COND_DEMO_SKIP_MOVE_CIRCLE_REV | aNPC_COND_DEMO_SKIP_MOVE_RANGE_CHECK |
                                         aNPC_COND_DEMO_SKIP_ENTRANCE_CHECK;
+#endif
 
     dx = x - actorx->world.position.x;
     dz = z - actorx->world.position.z;
     d2 = dx * dx + dz * dz;
+#ifdef aNPC_NPC2
+    /* a room is small: far off only on coming in (a random place) or after a talk */
+    if (d2 > 120.0f * 120.0f) {
+#else
     if (d2 > 400.0f * 400.0f || (d2 > 160.0f * 160.0f && (actorx->state_bitfield & ACTOR_STATE_NO_CULL) == 0)) {
+#endif
         /* far off (a talk, a spawn): there at once, best while out of sight */
         actorx->world.position.x = x;
         actorx->world.position.y = y;
@@ -152,3 +170,18 @@ static void aNPC_pc_mp_follow(NPC_ACTOR* nactorx, GAME_PLAY* play) {
     }
     (void)play;
 }
+
+#ifdef aNPC_NPC2
+/* a guest: the host's villager is in its room (not hidden), in the house
+ * this player is in */
+static int aNPC_pc_mp_room_shown(NPC_ACTOR* nactorx) {
+    mActor_name_t npc_id;
+    int idx = aNPC_pc_mp_index(nactorx, &npc_id);
+    f32 x, y, z;
+    s16 angle;
+    int act, flags;
+
+    return idx >= 0 && pc_mp_npc_target(idx, npc_id, &x, &y, &z, &angle, &act, &flags) &&
+           !(flags & aNPC_PC_MP_HIDDEN);
+}
+#endif

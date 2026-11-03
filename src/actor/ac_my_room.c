@@ -2333,6 +2333,7 @@ static void My_Room_Actor_dt(ACTOR* actorx, GAME* game) {
 
 #ifdef TARGET_PC
 #include "ac_my_indoor.h"
+#include "m_room_type.h"
 
 /* The multiplayer (pc_mp_game.c): the host's changes to a house arrive
  * while a guest stands in it. They are kept until this room is quiet, then
@@ -2393,6 +2394,9 @@ static void aMR_PC_SyncRoom(ACTOR* actorx, GAME* game) {
 
         my_indoor->floor_num = Save_Get(homes[house]).floors[floor].wall_floor.flooring_idx;
         my_indoor->wall_num = Save_Get(homes[house]).floors[floor].wall_floor.wallpaper_idx;
+        /* (a design of the owner's as wallpaper or carpet: its way of tiling) */
+        my_indoor->wall_is_original_design = mRmTp_GetNowSceneOriginalWallStatus();
+        my_indoor->floor_is_original_design = mRmTp_GetNowSceneOriginalFloorStatus();
         CLIP(my_indoor_clip)->indoor_dma_again_proc();
     }
 

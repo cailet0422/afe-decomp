@@ -3325,8 +3325,19 @@ static void mCD_SetResetCode(Private_c* priv) {
     priv->reset_code++;
 }
 
+#ifdef TARGET_PC
+/* afe-port settings: Mr. Resetti comes (1) or not (0, the default: the
+ * port saves by itself, pc_autosave.c) */
+extern int pc_resetti_enabled(void);
+
+#endif
 static void mCD_SetResetInfo(Private_c* priv) {
     Common_Set(reset_flag, FALSE);
+#ifdef TARGET_PC
+    if (!pc_resetti_enabled()) {
+        return; /* no visit, and the count of resets stays as it is */
+    }
+#endif
     if (mCD_CheckResetCode(priv) == FALSE) {
 
         /* No reset penalty if zurumode 2 is enabled */
@@ -7185,6 +7196,78 @@ extern int mCD_PC_LandFileInfo(const char** name, int* file_size, int* save_ofs0
     *save_ofs0 = mCD_get_offset(mCD_FILE_SAVE_MAIN);
     *save_ofs1 = mCD_get_offset(mCD_FILE_SAVE_MAIN + 1);
     return sizeof(Save);
+}
+
+/* The port's autosave (pc_autosave.c): the town as the gyroid's "save and
+ * continue" would write it (play time, travel time, the version, the check
+ * data and the checksum; the copy-protect code and the reset code are left
+ * as they are), with what live actors keep out of the Save put back in the
+ * copy (play: the frame's actors; NULL between scenes, when there are none).
+ * FALSE when the gyroid would not save either: no save yet, a visitor, the
+ * first day before the first save, Mr. Resetti's visit, a trip starting. */
+extern void Actor_info_PC_restore_fgdata_copy(GAME_PLAY* play, void* copy);
+
+extern int mCD_PC_AutoSaveSnapshot(Save* out, GAME_PLAY* play) {
+    Private_c* priv = Common_Get(now_private);
+    int player_no = Common_Get(player_no);
+    int house;
+
+    if (priv == NULL || !Save_Get(save_exist) || player_no < 0 || player_no >= mPr_FOREIGNER ||
+        Common_Get(reset_flag) || l_keepSave_set || mEv_CheckFirstIntro() ||
+        !mLd_CheckThisLand(priv->player_ID.land_name, priv->player_ID.land_id)) {
+        return FALSE;
+    }
+    house = mHS_get_arrange_idx(player_no);
+    if (house < 0 || (!Save_Get(homes[house]).flags.has_saved && mEv_CheckFirstJob())) {
+        return FALSE;
+    }
+    mCkRh_SavePlayTime(player_no);
+    Save_Set(travel_hard_time, lbRTC_HardTime());
+    if (mCD_castingoff_mura_chk() != TRUE) {
+        Save_Set(nukegara_time, lbRTC_HardTime());
+    }
+    bcopy(&Common_Get(save).save, out, sizeof(Save_t));
+    if (play != NULL) {
+        Actor_info_PC_restore_fgdata_copy(play, out);
+    }
+    out->save.save_check.version = mFRm_VERSION;
+    mFRm_SetSaveCheckData(&out->save.save_check);
+    out->save.save_check.checksum = 0;
+    out->save.save_check.checksum = mFRm_GetFlatCheckSum((u16*)out, sizeof(Save), out->save.save_check.checksum);
+    return TRUE;
+}
+
+/* The autosave of a player visiting another town (the station's trip): its
+ * own town file is as it was left at the station; put the traveller's data
+ * (pockets, bells, letters...) in its place there, as the trip home would,
+ * keeping that town's loan and museum contact. TRUE if file_save (a save
+ * part read from the own town's file) was changed. */
+extern int mCD_PC_PatchTraveller(Save* file_save) {
+    Private_c* priv = Common_Get(now_private);
+    int i;
+
+    if (priv == NULL || Common_Get(player_no) != mPr_FOREIGNER || priv != mPr_GetForeignerP() ||
+        mFRm_ReturnCheckSum((u16*)file_save, sizeof(Save)) != 0) {
+        return FALSE;
+    }
+    for (i = 0; i < PLAYER_NUM; i++) {
+        Private_c* own = &file_save->save.private_data[i];
+
+        if (mPr_CheckCmpPersonalID(&own->player_ID, &priv->player_ID)) {
+            u32 loan = own->inventory.loan;
+            u8 contacted = own->museum_record.contacted;
+
+            bcopy(priv, own, sizeof(Private_c));
+            own->inventory.loan = loan;
+            own->museum_record.contacted = contacted;
+            own->exists = TRUE;
+            file_save->save.save_check.checksum = 0;
+            file_save->save.save_check.checksum =
+                mFRm_GetFlatCheckSum((u16*)file_save, sizeof(Save), file_save->save.save_check.checksum);
+            return TRUE;
+        }
+    }
+    return FALSE;
 }
 
 #endif

@@ -827,6 +827,12 @@ static void aNPC_think_hide_main_proc(NPC_ACTOR* nactorx, GAME_PLAY* play) {
         mEvNM_CheckJointEvent(nactorx->actor_class.npc_id) == FALSE) {
         nactorx->think.end_flag = TRUE;
     }
+#ifdef TARGET_PC
+    /* the multiplayer: in on a guest's screen when the host's is in */
+    else if (aNPC_pc_mp_room_shown(nactorx) && mEvNM_CheckJointEvent(nactorx->actor_class.npc_id) == FALSE) {
+        nactorx->think.end_flag = TRUE;
+    }
+#endif
 }
 
 static void aNPC_think_hide_proc(NPC_ACTOR* nactorx, GAME_PLAY* play, int proc_type) {
