@@ -391,6 +391,14 @@ extern void play_cleanup(GAME* game) {
 
     mHsRm_GetHuusuiRoom(NULL, Common_Get(player_no));
     mFM_Field_dt();
+#ifdef TARGET_PC
+    {
+        /* afe-port autosave: between scenes every actor has put its data back */
+        extern void pc_autosave_scene_end(void);
+
+        pc_autosave_scene_end();
+    }
+#endif
     mCD_toNextLand();
     mEA_CleanCardDLProgram();
     mCsd_Set_EfbTextureBuffer_p(NULL, 0);

@@ -147,6 +147,11 @@ static ACTOR* aNPC_check_gyoei(NPC_ACTOR* nactorx);
 static ACTOR* aNPC_check_insect(NPC_ACTOR* nactorx, GAME_PLAY* play);
 static void aNPC_talk_demo_proc(ACTOR* actorx, GAME* game);
 static void aNPC_group_talk_chg_actor(void);
+#ifdef TARGET_PC
+static void aNPC_pc_mp_report(NPC_ACTOR* nactorx);
+static void aNPC_pc_mp_follow(NPC_ACTOR* nactorx, GAME_PLAY* play);
+static int aNPC_pc_mp_room_shown(NPC_ACTOR* nactorx);
+#endif
 
 #include "../src/actor/npc/ac_npc_data.c_inc"
 #include "../src/actor/npc/ac_npc_cloth.c_inc"
@@ -165,5 +170,8 @@ static void aNPC_group_talk_chg_actor(void);
 #include "../src/actor/npc/ac_npc_dt.c_inc"
 #include "../src/actor/npc/ac_npc_save.c_inc"
 #include "../src/actor/npc/ac_npc_ctrl.c_inc"
+#ifdef TARGET_PC
+#include "../src/actor/npc/ac_npc_pc_mp.c_inc"
+#endif
 
 #undef aNPC_NPC2
