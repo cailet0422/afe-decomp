@@ -3091,6 +3091,7 @@ static void My_Room_Actor_move(ACTOR* actorx, GAME* game) {
 
 #ifdef TARGET_PC
     aMR_PC_SyncRoom(actorx, game);
+    aMR_PC_KeepState(actorx, game);
 #endif
     my_room->goki_ct_proc(actorx, game);
     if (my_room->state == 0) {

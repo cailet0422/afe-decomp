@@ -2369,6 +2369,59 @@ static int aMR_PC_RoomQuiet(MY_ROOM_ACTOR* my_room, GAME* game) {
     return mMsg_CHECK_MAINHIDE();
 }
 
+/* The room's state in the save while the room is loaded, for the port's
+ * multiplayer host (pc_mp_game.c sends a house's floors from the save): the
+ * constructor clears the switches (lamps, TVs, radios...) there and only the
+ * destructor writes them back, so they are written again every half
+ * second; the gyroid steps too. */
+static void aMR_PC_KeepState(ACTOR* actorx, GAME* game) {
+    MY_ROOM_ACTOR* my_room = (MY_ROOM_ACTOR*)actorx;
+
+    if (l_aMR_work.ftr_actor_list != NULL && l_aMR_work.used_list != NULL && game->frame_counter % 30 == 0) {
+        aMR_SaveSwitchData(my_room);
+        aMR_SaveHaniwaStepData(my_room);
+    }
+}
+
+/* The items storage furniture holds while the room is loaded (the
+ * constructor takes them out of the save, aMR_MakeItemDataInFurniture), put
+ * where the destructor would put them (aMR_KeepItem2Fg) but in a copy of
+ * the floor: floor is the save's floor, copy a copy of size bytes. */
+extern void aMR_PC_StorageIntoCopy(const void* floor, void* copy, int size) {
+    FTR_ACTOR* ftr_actor = l_aMR_work.ftr_actor_list;
+    u8* used = l_aMR_work.used_list;
+    int i;
+
+    if (ftr_actor == NULL || used == NULL) {
+        return;
+    }
+    for (i = 0; i < l_aMR_work.list_size; i++, ftr_actor++, used++) {
+        int idx = 0;
+        int layer;
+
+        if (!*used) {
+            continue;
+        }
+        for (layer = ftr_actor->layer + 1; layer < mCoBG_LAYER_NUM && idx < 3; layer++, idx++) {
+            mActor_name_t* fg_p;
+            int ut_x;
+            int ut_z;
+
+            if (ftr_actor->items[idx] == EMPTY_NO) {
+                continue;
+            }
+            fg_p = aMR_GetLayerTopFg(layer);
+            if (fg_p != NULL && aMR_Wpos2PlaceNumber(&ut_x, &ut_z, ftr_actor->position, ftr_actor->shape_type)) {
+                long off = (long)((const u8*)&fg_p[ut_x + ut_z * UT_X_NUM] - (const u8*)floor);
+
+                if (off >= 0 && off + (long)sizeof(mActor_name_t) <= size) {
+                    *(mActor_name_t*)((u8*)copy + off) = ftr_actor->items[idx];
+                }
+            }
+        }
+    }
+}
+
 static void aMR_PC_SyncRoom(ACTOR* actorx, GAME* game) {
     MY_ROOM_ACTOR* my_room = (MY_ROOM_ACTOR*)actorx;
     GAME_PLAY* play = (GAME_PLAY*)game;
