@@ -545,6 +545,12 @@ extern void lbRk_HarvestMoonDay(lbRTC_ymd_c* harvest_moon_day, int year) {
 
   // If the year is within the pre-calculated range, use the stored values
   if ((year >= lbRk_HARVEST_MOON_YEAR_MIN) && (year < lbRk_HARVEST_MOON_YEAR_MAX + 1)) {
+#ifdef TARGET_PC
+    /* The table gives the month and day only; update_event_rumor reads the
+       year too (for the leap-year test of lbRTC_Sub_DD, which a September or
+       October date never needs), so it was an uninitialised stack value */
+    harvest_moon_day->year = year;
+#endif
     year -= lbRk_HARVEST_MOON_YEAR_MIN;
     harvest_moon_day->month = ev_day[year].month;
     harvest_moon_day->day = ev_day[year].day;
