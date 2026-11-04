@@ -145,7 +145,14 @@ const char* JKRFileLoader::fetchVolumeName(char* buffer, long bufferSize, const 
         path++;
         while (*path != 0 && *path != '/') {
             if (1 < bufferSize) {
+#ifdef TARGET_PC
+                /* The C libraries' _tolower is defined for upper case only: MinGW's subtracts 'A' - 'a'
+                   from any character and Android's ORs in 0x20 ('_' becomes DEL), so on Windows and
+                   Android "/agb_special/..." named no volume. tolower leaves other characters alone. */
+                *buffer = (char)tolower((unsigned char)*path);
+#else
                 *buffer = _tolower(*path);
+#endif
                 buffer++;
                 bufferSize--;
             }
