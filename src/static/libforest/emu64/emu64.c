@@ -1430,8 +1430,22 @@ int emu64::replace_combine_to_tev(Gfx* g) {
     }
 
     sc_tev.cmd = G_SETCOMBINE_TEV;
+#ifdef TARGET_PC
+    /* On 64-bit sc_tev is 12 bytes (its second word at w1's place, 4 bytes
+     * wide) and w1 is 8: reading it as Gwords took 4 bytes of the stack past
+     * it into w1, and whole-Gfx comparisons of combiners saw them */
+    {
+        Gfx whole;
+
+        memset(&whole, 0, sizeof(whole));
+        memcpy(&whole, &sc_tev, sizeof(sc_tev) < sizeof(whole) ? sizeof(sc_tev) : sizeof(whole));
+        g->words.w0 = whole.words.w0;
+        g->words.w1 = whole.words.w1;
+    }
+#else
     g->words.w0 = ((Gwords*)&sc_tev)->w0;
     g->words.w1 = ((Gwords*)&sc_tev)->w1;
+#endif
     return 0;
     }
 }

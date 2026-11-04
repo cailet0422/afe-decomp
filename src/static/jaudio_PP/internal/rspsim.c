@@ -225,7 +225,10 @@ extern s32 RspStart(u32* pTaskCmds, s32 allTasks) {
                 break;
 
             case A_CMD_RESAMPLE: { // A_RESAMPLE
-                s16 spC[8];
+                /* (PC copy) the state saved at the end is the 8 entries from spC[var_r8 - 4],
+                 * up to 3 past the 8 used: zeroed room for them, not the stack (the next
+                 * call reads back only the first 5) */
+                s16 spC[8 + 4] = { 0 };
                 s16* var_r4;
                 s32 j;
                 s16* var_r6;

@@ -577,7 +577,18 @@ static void Debug_mode_zelda_malloc_info_output(gfxprint_t* gfxprint) {
 
     if (zelda_MallocIsInitalized()) {
         graph_alloc = THA_GA_getFreeBytes(&gamePT->graph->polygon_opaque_thaga);
+#ifdef TARGET_PC
+        {
+            size_t m, f, a; /* (zelda_GetFreeArena takes size_t, wider on 64-bit) */
+
+            zelda_GetFreeArena(&m, &f, &a);
+            max = (u32)m;
+            free = (u32)f;
+            alloc = (u32)a;
+        }
+#else
         zelda_GetFreeArena(&max, &free, &alloc);
+#endif
 
         gfxprint_color(gfxprint, 200, 200, 250, 255); /* color -> opaque lilac */
         gfxprint_locate8x8(gfxprint, 3, 23);

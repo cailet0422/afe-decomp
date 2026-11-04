@@ -1614,7 +1614,9 @@ static void Nas_SubSeq(sub* subtrack) {
                                 break;
                             case SUBTRACK_CMD_MACRO_SET_FROM_CALLBACK: // call custom sequence callback and update macro register value
                                 if (cmdArgs[0] <= 4) {
-                                    if (AG.seq_callbacks[cmdArgs[0]] != nullptr) {
+                                    /* (PC copy) "<= 4" reads one past seq_callbacks[4]: NULL on the GameCube, other
+                                     * fields read as a pointer on 64-bit */
+                                    if (cmdArgs[0] < ARRAY_COUNT(AG.seq_callbacks) && AG.seq_callbacks[cmdArgs[0]] != nullptr) {
                                         NA_CALLBACK = AG.seq_callbacks[cmdArgs[0]];
                                         m->value = (*NA_CALLBACK)(m->value, subtrack);
                                     }
@@ -2623,7 +2625,8 @@ static void Nas_GroupSeq(group* grp) {
                     } else if (cmd == GRP_CMD_CALLBACK) {
                         cmd = Nas_ReadByteData(m);
                         if (cmd <= 4) {
-                            if (AG.seq_callbacks[cmd] != nullptr) {
+                            /* (PC copy) as SUBTRACK_CMD_MACRO_SET_FROM_CALLBACK */
+                            if (cmd < ARRAY_COUNT(AG.seq_callbacks) && AG.seq_callbacks[cmd] != nullptr) {
                                 NA_GRP_CALLBACK = (GRP_CALLBACK)AG.seq_callbacks[cmd];
                                 m->value = (*(GRP_CALLBACK)AG.seq_callbacks[cmd])(m->value, grp);
                             }
