@@ -1,52 +1,61 @@
 # GitHub Actions
 
-This repository includes [.github.example/workflows/build.yml](/.github.example/workflows/build.yml) as an example CI workflow. To use it for your project, follow the setup instructions below.
+[.github/workflows/build.yml](/.github/workflows/build.yml) builds `GAEJ01_01` (Rev 1) on every push and checks
+it against the original. On the default branch (`main`) it also updates the progress chart and table in the
+[README](/README.md#progress) when the numbers change, and commits them as `github-actions[bot]`.
 
-- [Build Repository](#build-repository)
-- [Progress](#progress)
-- [Workflow](#workflow)
+The build needs five files of the game. They must never be committed to this repository or to any public one,
+so they are kept in a **private** repository that the workflow reads with a token. Without the token the workflow
+skips the build and says so.
 
-## Build Repository
+- [The game files' repository](#the-game-files-repository)
+- [The token](#the-token)
+- [Running it](#running-it)
+- [What stays private](#what-stays-private)
 
-This repository will be used to build and store the CI build container.
+## The game files' repository
 
-> [!CAUTION]
-> This repository should be **private** to avoid exposing the game's assets.
+1. Create a new repository named `afe-decomp-orig` and make it **Private**.
+   (Another name works too: set it in a repository variable named `ORIG_REPO`, as `owner/name`, under
+   Settings → Secrets and variables → Actions → Variables.)
 
-1. [Create a **private** repository from `encounter/dtk-template-build`](https://github.com/new?template_name=dtk-template-build&template_owner=encounter). A common name is your project's repository name with `-build` appended. For example, `tww-build`.
+2. Add the files, extracted from your own copy of the game, with this layout:
 
-2. Once the repository is created, add your game's assets to the `orig/GAMEID` directory. (Replace `GAMEID` with your game's ID, matching the `orig` layout in your main repository.)  
-    **Only include game files necessary for the build**, such as `sys/main.dol` and any `.rel` or `.sel` files.
+   ```
+   orig/GAEJ01_01/sys/main.dol
+   orig/GAEJ01_01/files/foresta.rel
+   orig/GAEJ01_01/files/forestd.rel
+   orig/GAEJ01_01/files/foresti.rel
+   orig/GAEJ01_01/files/foresto.rel
+   ```
 
-3. Once the build container action completes, visit the package settings:  
-    ![GitHub repository packages](images/github_build_repo_packages.png)  
-    ![GitHub package settings](images/github_package_settings.png)
+   They are about 18 MB in all. Nothing else from the disc is needed. `GAEJ01_01/sys/...` or `sys/...` at the
+   root of the repository also work.
 
-4. Under "Manage Actions access", add your project's main repository with the "Read" role:  
-    ![GitHub package Actions access](images/github_package_settings_access.png)
+## The token
 
-## Progress
+1. In your account's Settings → Developer settings → Personal access tokens → **Fine-grained tokens**, generate a
+   new token:
+   - Repository access: **Only select repositories** → the game files' repository only.
+   - Permissions: Repository permissions → **Contents: Read-only**.
+   - An expiration date you are happy to renew; when it expires, the build fails at "Checkout the game files"
+     until the secret is replaced.
 
-1. In the [GC/Wii Decompilation Discord](https://discord.gg/hKx3FJJgrV), visit `#frogress` and request an API key for your project.  
-    Please provide the following:
-    - Project name
-    - Repository URL
-    - Game ID(s)
-    - Whether the game has RELs
+2. In this repository's Settings → Secrets and variables → Actions → **New repository secret**, add it with the
+   name `ORIG_TOKEN`.
 
-2. On GitHub, visit your repo's `/settings/secrets/actions/new` and add a new secret with the name `PROGRESS_API_KEY`:  
-    ![GitHub Actions secrets](images/github_actions_secrets.png)
+## Running it
 
-## Workflow
+- If this repository is a fork, Actions may be off: open the **Actions** tab and turn workflows on.
+- Push a commit, or open Actions → Build → **Run workflow**.
+- The run's summary shows the progress table. On `main`, a commit "Update the progress chart for …" follows
+  when the numbers changed.
+- To make the chart by hand after a local build: `python tools/progress_readme.py`.
 
-1. Rename `.github.example` to `.github`.
+## What stays private
 
-2. In `build.yml`, update the `container:` to point to the new [build image](#build-repository).
-
-3. In `build.yml`, replace `GAMEID` with your game's ID. (Or list of IDs, for multi-version support.)
-
-4. In `build.yml`, update `PROGRESS_SLUG` to match the project name on [frogress](#progress).
-
-5. Commit and push the changes to your repository.
-
-If everything is set up correctly, the workflow will build all versions on every push or pull request, and upload progress on pushes the `main` branch.
+- Workflows of pull requests from forks get no secrets, and the workflow does not run for pull requests at all;
+  branches of this repository are built on push. Someone else's pull request cannot read the game files.
+- The game files are copied into the build's `orig/` and the private checkout is deleted; nothing of the build is
+  uploaded. Only `README.md` and `assets/progress-*.svg` are committed.
+- Keep the game files' repository private, and the token limited to that repository and to reading.

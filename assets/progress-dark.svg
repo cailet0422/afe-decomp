@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="540" viewBox="0 0 720 540" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif" role="img" aria-label="Decompilation progress of GAEJ01_01: 99.81% of the code matched, 99.17% linked">
+<rect x="0.5" y="0.5" width="719" height="539" rx="12" fill="#1a1a19" stroke="#383835"/>
+<text x="24" y="42" font-size="18" font-weight="600" fill="#f0efec" text-anchor="start">Dōbutsu no Mori e+ decompilation</text>
+<text x="24" y="64" font-size="13" font-weight="normal" fill="#c3c2b7" text-anchor="start">GAEJ01_01 · Rev 1 (JP) · bytes of code</text>
+<rect x="24.0" y="86" width="216.0" height="64" rx="8" fill="none" stroke="#383835"/>
+<text x="38.0" y="116" font-size="22" font-weight="600" fill="#f0efec" text-anchor="start">99.81%</text>
+<text x="38.0" y="136" font-size="12" font-weight="normal" fill="#c3c2b7" text-anchor="start">of the code matched</text>
+<rect x="252.0" y="86" width="216.0" height="64" rx="8" fill="none" stroke="#383835"/>
+<text x="266.0" y="116" font-size="22" font-weight="600" fill="#f0efec" text-anchor="start">99.17%</text>
+<text x="266.0" y="136" font-size="12" font-weight="normal" fill="#c3c2b7" text-anchor="start">of the code linked from source</text>
+<rect x="480.0" y="86" width="216.0" height="64" rx="8" fill="none" stroke="#383835"/>
+<text x="494.0" y="116" font-size="22" font-weight="600" fill="#f0efec" text-anchor="start">23,370 / 23,376</text>
+<text x="494.0" y="136" font-size="12" font-weight="normal" fill="#c3c2b7" text-anchor="start">functions matched</text>
+<rect x="24" y="168" width="12" height="12" rx="3" fill="#5598e7"/>
+<text x="42" y="178" font-size="12" font-weight="normal" fill="#c3c2b7" text-anchor="start">Linked from source</text>
+<rect x="192" y="168" width="12" height="12" rx="3" fill="#1c5cab"/>
+<text x="210" y="178" font-size="12" font-weight="normal" fill="#c3c2b7" text-anchor="start">Matched, file not linked yet</text>
+<text x="24" y="216" font-size="11" font-weight="600" fill="#c3c2b7" text-anchor="start">BY BINARY</text>
+<text x="24" y="252" font-size="13" font-weight="normal" fill="#f0efec" text-anchor="start">DOL</text>
+<path d="M148.0,242 H460.0 A4,4 0 0 1 464.0,246 V250 A4,4 0 0 1 460.0,254 H148.0 A4,4 0 0 1 144.0,250 V246 A4,4 0 0 1 148.0,242 Z" fill="#383835"/>
+<path d="M148.0,242 H450.0 V254 H148.0 A4,4 0 0 1 144.0,250 V246 A4,4 0 0 1 148.0,242 Z" fill="#5598e7"/>
+<path d="M452.0,242 H457.1 A4,4 0 0 1 461.1,246 V250 A4,4 0 0 1 457.1,254 H452.0 V242 Z" fill="#1c5cab"/>
+<text x="478" y="252" font-size="13" fill="#f0efec"><tspan font-weight="600">99.09%</tspan><tspan fill="#c3c2b7"> matched · 95.92% linked</tspan></text>
+<text x="24" y="282" font-size="13" font-weight="normal" fill="#f0efec" text-anchor="start">RELs</text>
+<path d="M148.0,272 H460.0 A4,4 0 0 1 464.0,276 V280 A4,4 0 0 1 460.0,284 H148.0 A4,4 0 0 1 144.0,280 V276 A4,4 0 0 1 148.0,272 Z" fill="#383835"/>
+<path d="M148.0,272 H460.0 A4,4 0 0 1 464.0,276 V280 A4,4 0 0 1 460.0,284 H148.0 A4,4 0 0 1 144.0,280 V276 A4,4 0 0 1 148.0,272 Z" fill="#5598e7"/>
+<text x="478" y="282" font-size="13" fill="#f0efec"><tspan font-weight="600">100%</tspan><tspan fill="#c3c2b7"> matched · 100% linked</tspan></text>
+<text x="24" y="312" font-size="11" font-weight="600" fill="#c3c2b7" text-anchor="start">BY PART</text>
+<text x="24" y="348" font-size="13" font-weight="normal" fill="#f0efec" text-anchor="start">Game code</text>
+<path d="M148.0,338 H460.0 A4,4 0 0 1 464.0,342 V346 A4,4 0 0 1 460.0,350 H148.0 A4,4 0 0 1 144.0,346 V342 A4,4 0 0 1 148.0,338 Z" fill="#383835"/>
+<path d="M148.0,338 H460.0 A4,4 0 0 1 464.0,342 V346 A4,4 0 0 1 460.0,350 H148.0 A4,4 0 0 1 144.0,346 V342 A4,4 0 0 1 148.0,338 Z" fill="#5598e7"/>
+<text x="478" y="348" font-size="13" fill="#f0efec"><tspan font-weight="600">100%</tspan><tspan fill="#c3c2b7"> matched · 100% linked</tspan></text>
+<text x="24" y="378" font-size="13" font-weight="normal" fill="#f0efec" text-anchor="start">Dolphin SDK</text>
+<path d="M148.0,368 H460.0 A4,4 0 0 1 464.0,372 V376 A4,4 0 0 1 460.0,380 H148.0 A4,4 0 0 1 144.0,376 V372 A4,4 0 0 1 148.0,368 Z" fill="#383835"/>
+<path d="M148.0,368 H460.0 A4,4 0 0 1 464.0,372 V376 A4,4 0 0 1 460.0,380 H148.0 A4,4 0 0 1 144.0,376 V372 A4,4 0 0 1 148.0,368 Z" fill="#5598e7"/>
+<text x="478" y="378" font-size="13" fill="#f0efec"><tspan font-weight="600">100%</tspan><tspan fill="#c3c2b7"> matched · 100% linked</tspan></text>
+<text x="24" y="408" font-size="13" font-weight="normal" fill="#f0efec" text-anchor="start">JSystem</text>
+<path d="M148.0,398 H460.0 A4,4 0 0 1 464.0,402 V406 A4,4 0 0 1 460.0,410 H148.0 A4,4 0 0 1 144.0,406 V402 A4,4 0 0 1 148.0,398 Z" fill="#383835"/>
+<path d="M148.0,398 H415.4 V410 H148.0 A4,4 0 0 1 144.0,406 V402 A4,4 0 0 1 148.0,398 Z" fill="#5598e7"/>
+<path d="M417.4,398 H449.4 A4,4 0 0 1 453.4,402 V406 A4,4 0 0 1 449.4,410 H417.4 V398 Z" fill="#1c5cab"/>
+<text x="478" y="408" font-size="13" fill="#f0efec"><tspan font-weight="600">96.68%</tspan><tspan fill="#c3c2b7"> matched · 85.13% linked</tspan></text>
+<text x="24" y="438" font-size="13" font-weight="normal" fill="#f0efec" text-anchor="start">NES emulator</text>
+<path d="M148.0,428 H460.0 A4,4 0 0 1 464.0,432 V436 A4,4 0 0 1 460.0,440 H148.0 A4,4 0 0 1 144.0,436 V432 A4,4 0 0 1 148.0,428 Z" fill="#383835"/>
+<path d="M148.0,428 H460.0 A4,4 0 0 1 464.0,432 V436 A4,4 0 0 1 460.0,440 H148.0 A4,4 0 0 1 144.0,436 V432 A4,4 0 0 1 148.0,428 Z" fill="#5598e7"/>
+<text x="478" y="438" font-size="13" fill="#f0efec"><tspan font-weight="600">100%</tspan><tspan fill="#c3c2b7"> matched · 100% linked</tspan></text>
+<text x="24" y="468" font-size="13" font-weight="normal" fill="#f0efec" text-anchor="start">Libraries</text>
+<path d="M148.0,458 H460.0 A4,4 0 0 1 464.0,462 V466 A4,4 0 0 1 460.0,470 H148.0 A4,4 0 0 1 144.0,466 V462 A4,4 0 0 1 148.0,458 Z" fill="#383835"/>
+<path d="M148.0,458 H460.0 A4,4 0 0 1 464.0,462 V466 A4,4 0 0 1 460.0,470 H148.0 A4,4 0 0 1 144.0,466 V462 A4,4 0 0 1 148.0,458 Z" fill="#5598e7"/>
+<text x="478" y="468" font-size="13" fill="#f0efec"><tspan font-weight="600">100%</tspan><tspan fill="#c3c2b7"> matched · 100% linked</tspan></text>
+<text x="24" y="504" font-size="11" font-weight="normal" fill="#c3c2b7" text-anchor="start">Matched: the function compiles to the original bytes. Linked: the whole file is built from source.</text>
+<text x="24" y="520" font-size="11" font-weight="normal" fill="#c3c2b7" text-anchor="start">These numbers last changed at commit eead5e4 (2026-11-04).</text>
+</svg>
