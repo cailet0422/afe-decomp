@@ -2822,7 +2822,11 @@ extern void mED_editor_ovl_construct(Submenu* submenu) {
     submenu->overlay->editor_ovl->cursol_draw = &mED_cursol_draw;
 #ifdef TARGET_PC
     mED_pc_preedit_len = 0;
-    pc_typing_editor_open(menu_info->data0 == mED_TYPE_LEDIT_LATIN);
+    /* Typed text does not go into passwords (mED_pc_typing): there the keyboard stays the controller */
+    pc_typing_editor_open(menu_info->data0 == mED_TYPE_PASSWORDMAKE || menu_info->data0 == mED_TYPE_PASSWORDCHK
+                              ? PC_TYPING_EDITOR_NO_TEXT
+                          : menu_info->data0 == mED_TYPE_LEDIT_LATIN ? PC_TYPING_EDITOR_LATIN
+                                                                     : PC_TYPING_EDITOR_TEXT);
 #endif
 }
 
