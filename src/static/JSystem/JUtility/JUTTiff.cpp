@@ -411,8 +411,20 @@ void JUTTiff::createIFD0() {
         storeEntry_ascii(data, 0x110, (u8*)mIFD0.mModel);
     }
 
+#ifdef TARGET_PC
+    {
+        /* StripOffsets and StripByteCounts are mStripCount longs, read from a 2-byte local: past it on
+           the stack (ASan). They are placeholders that createMainImage writes over, so give zeros. */
+        static const u32 zeroStrips[1024] = { 0 };
+        void* strips = mStripCount <= ARRAY_COUNT(zeroStrips) ? (void*)zeroStrips : (void*)dummyStripData;
+
+        storeEntry_multidata(data, 0x111, strips);
+        storeEntry_multidata(data, 0x117, strips);
+    }
+#else
     storeEntry_multidata(data, 0x111, dummyStripData);
     storeEntry_multidata(data, 0x117, dummyStripData);
+#endif
 
     storeEntry_rational(data, 0x11A, 0x48, 1); // 72 DPI (0x48 = 72)
     storeEntry_rational(data, 0x11B, 0x48, 1); // 72 DPI

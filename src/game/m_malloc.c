@@ -19,7 +19,17 @@ extern void zelda_free(void* ptr) {
 }
 
 extern void zelda_GetFreeArena(size_t* max, size_t* free, size_t* alloc) {
+#ifdef TARGET_PC
+  /* __osGetFreeArena writes u32s: on 64-bit size_t is wider */
+  u32 m, f, a;
+
+  __osGetFreeArena(&zelda_arena, &m, &f, &a);
+  *max = m;
+  *free = f;
+  *alloc = a;
+#else
   __osGetFreeArena(&zelda_arena,max,free,alloc);
+#endif
 }
 
 extern size_t zelda_GetTotalFreeSize(void) {

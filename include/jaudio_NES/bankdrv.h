@@ -21,7 +21,11 @@ Inst_* Bank_InstChange(Bank_*, u32);
 Voice_* Bank_VoiceChange(Bank_*, u32);
 Perc_* Bank_PercChange(Bank_*, u32);
 int Bank_GetInstKeymap(Inst_*, u8);
+#ifdef TARGET_PC
+intptr_t Bank_GetInstVmap(Inst_*, u8, u8);
+#else
 int Bank_GetInstVmap(Inst_*, u8, u8);
+#endif
 Vmap_* Bank_GetPercVmap(Perc_*, u8, u8);
 int Bank_GetVoiceMap(Voice_*, u16);
 f32 Bank_SenseToOfs(Sense_*, u8);

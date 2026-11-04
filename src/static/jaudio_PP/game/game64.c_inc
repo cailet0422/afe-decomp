@@ -614,6 +614,24 @@ const u8 TRGPRIO[] = {
     70,  70,  70,  70,
     70,  70,  70,  70,
     70,  70,  70,  70
+#ifdef TARGET_PC
+    ,
+    /* 0x80-0xFF. Sou_TrgStart indexes this table with the low byte of the SE id without a bounds
+       check (see the @BUG there), and the game plays SEs whose low byte is 0x80 or more (0x8D,
+       0x97, 0x98, 0x9A, 0x9B, 0xA8, 0xB0, 0xCF, 0x42E6, ...). On the GameCube, those read the
+       rodata that follows the table: sou_trg_se_init and the next init tables, big-endian. These
+       are those bytes from the DOL, so the PC builds give these SEs the GameCube's priorities;
+       before, each build read whatever its own linker had put there (other values on 32-bit and
+       64-bit, with little-endian floats), which changed which SE a new one could replace. */
+      0,   0,   0,   0,   0,   0,   0,   0,  63, 128,   0,   0,  63, 128,   0,   0,
+     63, 128,   0,   0,  63, 128,   0,   0,  63,   0,   0,   0,   0,   0,   0,   0,
+      0,   0,   0,   0,   0,   0,   0,   0,  63, 128,   0,   0,  63, 128,   0,   0,
+     63, 128,   0,   0,  63, 128,   0,   0,  63, 128,   0,   0,  63, 128,   0,   0,
+     63,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+     63, 128,   0,   0,  63,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+      0,   0,   0,   0,  70,  28,  60,   0,  70,  28,  60,   0,   0,   0,   0,   0,
+      0,   0,   0,   0,  63,   0,   0,   0,  70,  28,  60,   0,   0,   0,   0,   0
+#endif
 };
 
 const SOU_TRG_SE sou_trg_se_init = {
@@ -679,6 +697,79 @@ const SOU_SE_FADE sou_se_fade_init = {
     1.f
 };
 
+#ifdef TARGET_PC
+/* The GameCube has these .bss arrays one after another in this order (0x770 bytes), and the game
+   writes and reads past the end of sou_lev_se and sou_lev_ongen_data into the next ones (the @BUGs
+   in Sou_SeFadeoutRoutine, Sou_SeFadeinRoutine and Na_OngenPos). gcc pads each of them to 32
+   bytes, so on the desktop builds those accesses hit other fields than on the GameCube (Android's
+   clang happens to keep them together). They are kept together here in the GameCube's order. */
+static struct sou_pc_bss_s {
+    SOU_LS_STACK ls_stack[6];
+    SOU_TRG_SE trg_se[6];
+    SOU_VOICE_SE voice_se[2];
+    SOU_LEV_SE lev_se[6];
+    SOU_LEV_ONGEN_DATA lev_ongen_data[4];
+    SOU_ONGEN_ENTRY ongen_entry[50];
+    SOU_ROOM_INS room_ins[50];
+    SOU_SE_FADE se_fade[16];
+} sou_pc_bss;
+typedef char sou_pc_bss_layout[(offsetof(struct sou_pc_bss_s, lev_se) == 0x138 &&
+                                offsetof(struct sou_pc_bss_s, lev_ongen_data) == 0x1B0 &&
+                                offsetof(struct sou_pc_bss_s, ongen_entry) == 0x200 &&
+                                offsetof(struct sou_pc_bss_s, room_ins) == 0x520 &&
+                                sizeof(struct sou_pc_bss_s) == 0x770) ? 1 : -1];
+#define sou_ls_stack (sou_pc_bss.ls_stack)
+#define sou_trg_se (sou_pc_bss.trg_se)
+#define sou_voice_se (sou_pc_bss.voice_se)
+#define sou_lev_se (sou_pc_bss.lev_se)
+#define sou_lev_ongen_data (sou_pc_bss.lev_ongen_data)
+#define sou_ongen_entry (sou_pc_bss.ongen_entry)
+#define sou_room_ins (sou_pc_bss.room_ins)
+#define sou_se_fade (sou_pc_bss.se_fade)
+
+/* Where the byte at offset ofs of sou_pc_bss that the GameCube (big-endian) stores is on this
+   little-endian host: the same field, its bytes in the other order. Only the arrays that the
+   out-of-range writes reach have their fields listed (pad bytes as fields of 1). */
+static u8* Sou_PC_GcByte(u32 ofs) {
+    static const u8 lev_ongen_fields[] = { 1, 1, 1, 1, 4, 1, 1, 1, 1, 4, 4 };
+    static const u8 ongen_entry_fields[] = { 4, 1, 1, 2, 1, 1, 1, 1, 4 };
+    static const u8 room_ins_fields[] = { 4, 1, 1, 1, 1 };
+    const u8* fields;
+    u32 base, stride, n, rel, start, i;
+
+    if (ofs >= offsetof(struct sou_pc_bss_s, lev_ongen_data) && ofs < offsetof(struct sou_pc_bss_s, ongen_entry)) {
+        base = offsetof(struct sou_pc_bss_s, lev_ongen_data), stride = sizeof(SOU_LEV_ONGEN_DATA);
+        fields = lev_ongen_fields, n = sizeof(lev_ongen_fields);
+    } else if (ofs >= offsetof(struct sou_pc_bss_s, ongen_entry) && ofs < offsetof(struct sou_pc_bss_s, room_ins)) {
+        base = offsetof(struct sou_pc_bss_s, ongen_entry), stride = sizeof(SOU_ONGEN_ENTRY);
+        fields = ongen_entry_fields, n = sizeof(ongen_entry_fields);
+    } else if (ofs >= offsetof(struct sou_pc_bss_s, room_ins) && ofs < offsetof(struct sou_pc_bss_s, se_fade)) {
+        base = offsetof(struct sou_pc_bss_s, room_ins), stride = sizeof(SOU_ROOM_INS);
+        fields = room_ins_fields, n = sizeof(room_ins_fields);
+    } else {
+        return (u8*)&sou_pc_bss + ofs;
+    }
+    rel = (ofs - base) % stride;
+    for (i = 0, start = 0; i < n - 1 && rel >= start + fields[i]; i++) {
+        start += fields[i];
+    }
+    /* byte rel - start of a big-endian field of fields[i] bytes */
+    return (u8*)&sou_pc_bss + (ofs - rel) + start + (fields[i] - 1 - (rel - start));
+}
+
+/* sou_lev_se[i].volumeScale = v for an i past the array, giving the next arrays the values they
+   get on the GameCube */
+static void Sou_PC_SetLevSeVolumeScalePast(u8 i, f32 v) {
+    u32 ofs = offsetof(struct sou_pc_bss_s, lev_se) + i * sizeof(SOU_LEV_SE) + offsetof(SOU_LEV_SE, volumeScale);
+    u32 bits;
+    int k;
+
+    memcpy(&bits, &v, sizeof(bits));
+    for (k = 0; k < 4; k++) {
+        *Sou_PC_GcByte(ofs + k) = (u8)(bits >> (24 - 8 * k));
+    }
+}
+#else
 SOU_LS_STACK sou_ls_stack[6];
 SOU_TRG_SE sou_trg_se[6];
 SOU_VOICE_SE sou_voice_se[2];
@@ -687,6 +778,7 @@ SOU_LEV_ONGEN_DATA sou_lev_ongen_data[4];
 SOU_ONGEN_ENTRY sou_ongen_entry[50];
 SOU_ROOM_INS sou_room_ins[50];
 SOU_SE_FADE sou_se_fade[16];
+#endif
 
 const SOU_LS_STACK sou_ls_stack_init = {
     0,0,0,0,
@@ -2037,7 +2129,11 @@ void Sou_SeFadeoutRoutine() {
             if (i >= 8 && i <= 14) {
                 // @BUG - 'i' is out of range for sou_lev_se.
                 // Level sounds are given to subtracks 8-14, so this index should be i - 8.
+#ifdef TARGET_PC
+                Sou_PC_SetLevSeVolumeScalePast(i, 0.f);
+#else
                 sou_lev_se[i].volumeScale = 0.f;
+#endif
             }
         } else if (sou_se_fade[i]._0 != 0) {
             if (sou_se_fade[i]._0 == sou_se_fade[i]._2) {
@@ -2064,7 +2160,11 @@ void Sou_SeFadeinRoutine() {
             if (i >= 8 && i <= 14) {
                 // @BUG - 'i' is out of range for sou_lev_se.
                 // Level sounds are given to subtracks 8-14, so this index should be i - 8.
+#ifdef TARGET_PC
+                Sou_PC_SetLevSeVolumeScalePast(i, 1.f);
+#else
                 sou_lev_se[i].volumeScale = 1.f;
+#endif
             }
         } else if (sou_se_fade[i]._4 != 0) {
             if (sou_se_fade[i]._4 == sou_se_fade[i]._6) {
@@ -3014,6 +3114,23 @@ void Na_OngenPos(u32 id, u8 index, u16 angle, f32 distance) {
 
         //! @BUG: should be ARRAY_COUNT(sou_lev_ongen_data), reading unknown data
         if (index == NA_ONGEN_POS_SE_RIVER_FLOW) {
+#ifdef TARGET_PC
+            /* Past its 4 entries this reads sou_ongen_entry and sou_room_ins, which follow it in
+               sou_pc_bss as on the GameCube. Through a pointer, so that the compiler does not take
+               the array's size as the loop's bound. */
+            const SOU_LEV_ONGEN_DATA* lev = (const SOU_LEV_ONGEN_DATA*)((const u8*)&sou_pc_bss +
+                                                                        offsetof(struct sou_pc_bss_s, lev_ongen_data));
+
+            for (i = 0; i < ARRAY_COUNT(sou_ongen_entry); i++) {
+                if (lev[i].se_id == NA_ONGEN_POS_SE_WATERFALL) {
+                    for (j = 0; j < ARRAY_COUNT(sou_ongen_entry); j++) {
+                        if (lev[j].se_id == NA_ONGEN_POS_SE_RIVER_FLOW && lev[j].distance < distance) {
+                            return;
+                        }
+                    }
+                }
+            }
+#else
             for (i = 0; i < ARRAY_COUNT(sou_ongen_entry); i++) {
                 if (sou_lev_ongen_data[i].se_id == NA_ONGEN_POS_SE_WATERFALL) {
                     for (j = 0; j < ARRAY_COUNT(sou_ongen_entry); j++) {
@@ -3023,6 +3140,7 @@ void Na_OngenPos(u32 id, u8 index, u16 angle, f32 distance) {
                     }
                 }
             }
+#endif
         }
 
         if (index == 0 || distance > SOU_ONGEN_AREA1) {
