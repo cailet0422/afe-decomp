@@ -325,6 +325,11 @@ static void mNtc_check_treasure() {
     f32 rng;
     int list_type;
 
+#ifdef TARGET_PC
+    /* As in mNtc_set_auto_nwrite: the handbill fills only part of the message,
+     * and the rest went into the save as whatever was on the stack */
+    bzero(&post, sizeof(post));
+#endif
     treasure_buried_time = Save_GetPointer(treasure_buried_time);
     treasure_checked_time = Save_GetPointer(treasure_checked_time);
     animal = Save_Get(animals);
