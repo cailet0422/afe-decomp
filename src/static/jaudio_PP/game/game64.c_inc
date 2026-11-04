@@ -614,6 +614,24 @@ const u8 TRGPRIO[] = {
     70,  70,  70,  70,
     70,  70,  70,  70,
     70,  70,  70,  70
+#ifdef TARGET_PC
+    ,
+    /* 0x80-0xFF. Sou_TrgStart indexes this table with the low byte of the SE id without a bounds
+       check (see the @BUG there), and the game plays SEs whose low byte is 0x80 or more (0x8D,
+       0x97, 0x98, 0x9A, 0x9B, 0xA8, 0xB0, 0xCF, 0x42E6, ...). On the GameCube, those read the
+       rodata that follows the table: sou_trg_se_init and the next init tables, big-endian. These
+       are those bytes from the DOL, so the PC builds give these SEs the GameCube's priorities;
+       before, each build read whatever its own linker had put there (other values on 32-bit and
+       64-bit, with little-endian floats), which changed which SE a new one could replace. */
+      0,   0,   0,   0,   0,   0,   0,   0,  63, 128,   0,   0,  63, 128,   0,   0,
+     63, 128,   0,   0,  63, 128,   0,   0,  63,   0,   0,   0,   0,   0,   0,   0,
+      0,   0,   0,   0,   0,   0,   0,   0,  63, 128,   0,   0,  63, 128,   0,   0,
+     63, 128,   0,   0,  63, 128,   0,   0,  63, 128,   0,   0,  63, 128,   0,   0,
+     63,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+     63, 128,   0,   0,  63,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+      0,   0,   0,   0,  70,  28,  60,   0,  70,  28,  60,   0,   0,   0,   0,   0,
+      0,   0,   0,   0,  63,   0,   0,   0,  70,  28,  60,   0,   0,   0,   0,   0
+#endif
 };
 
 const SOU_TRG_SE sou_trg_se_init = {

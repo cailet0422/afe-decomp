@@ -1906,18 +1906,20 @@ void emu64::combine_manual() {
     static u64 highlow_errs[NUM_COMBINER_HIGHLOW_ERRS];
     static u32 last_highlow;
     u8 orig_combine_cmd = ((Gsetcombine_new*)&this->combine_gfx)->cmd;
-    Gsetcombine_new combine_mode_cmd_fixed = *(Gsetcombine_new*)&this->combine_gfx;
+    /* A whole Gfx: on 64-bit, Gsetcombine_new is 12 bytes but Gfx.words.w1 is 8 bytes at offset 8,
+       so reading w1 through a Gsetcombine_new copy read 4 bytes past it. */
+    Gfx combine_fixed_gfx = this->combine_gfx;
+    Gsetcombine_new* combine_mode_cmd_fixed = (Gsetcombine_new*)&combine_fixed_gfx;
 
     /* replace_combine_to_tev() marks TEXEL1 paths as G_SETCOMBINE_NOTEV.
        Manual combine cases are keyed with G_SETCOMBINE opcode, so normalize
        the command byte before matching the mode payload. */
-    if (combine_mode_cmd_fixed.cmd == G_SETCOMBINE_NOTEV) {
-        combine_mode_cmd_fixed.cmd = G_SETCOMBINE;
+    if (combine_mode_cmd_fixed->cmd == G_SETCOMBINE_NOTEV) {
+        combine_mode_cmd_fixed->cmd = G_SETCOMBINE;
     }
 
     /* gsDPSetCombineLERPInline gives w0 << 32 | w1 */
-    u64 combine_mode = ((u64)((Gfx*)&combine_mode_cmd_fixed)->words.w0 << 32) |
-                       (u32)((Gfx*)&combine_mode_cmd_fixed)->words.w1;
+    u64 combine_mode = ((u64)combine_fixed_gfx.words.w0 << 32) | (u32)combine_fixed_gfx.words.w1;
     switch (combine_mode) {
         case gsDPSetCombineLERPInline(TEXEL0, 0, SHADE, TEXEL0, 0, 0, 0, TEXEL0, SHADE, ENVIRONMENT, PRIMITIVE,
                                       COMBINED, 0, 0, 0, COMBINED): {
