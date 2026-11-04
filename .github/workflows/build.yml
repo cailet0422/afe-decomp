@@ -1,72 +1,119 @@
 name: Build
 
+# Builds Rev 1 (GAEJ01_01), checks it against the original, and on the default
+# branch updates the README's progress chart and table when the numbers change.
+#
+# The build needs five files of the game (sys/main.dol and the four RELs). They
+# are kept in a private repository and read with a token in the ORIG_TOKEN
+# secret; without the secret the build is skipped. See docs/github_actions.md.
+#
+# There is no pull_request trigger: workflows of pull requests from forks get
+# no secrets, and the branches of this repository are built on push.
+
 on:
   push:
-  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  VERSION: GAEJ01_01
 
 jobs:
-  build:
-    # This is a *private* build container.
-    # See docs/github_actions.md for more information.
-    container: ghcr.io/acreteam/ac-build:main
-
+  check:
+    name: Look for the game files
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        # Add game versions here
-        version: [GAEJ01_00, GAEJ01_01]
-
+    outputs:
+      found: ${{ steps.token.outputs.found }}
     steps:
-    # Checkout the repository
-    - name: Checkout
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
-        submodules: recursive
+      - name: Look for the ORIG_TOKEN secret
+        id: token
+        env:
+          ORIG_TOKEN: ${{ secrets.ORIG_TOKEN }}
+        run: |
+          if [ -n "$ORIG_TOKEN" ]; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::The ORIG_TOKEN secret is not set, so the build is skipped. See docs/github_actions.md."
+          fi
 
-    # Set Git config
-    - name: Git config
-      run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+  build:
+    name: Build GAEJ01_01
+    needs: check
+    if: needs.check.outputs.found == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      # To commit the progress chart on the default branch.
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
-    # Normalize file mod times
-    - name: Restore timestamps
-      run: |
-        uv run https://raw.githubusercontent.com/MestreLion/git-tools/refs/tags/v2025.08/git-restore-mtime \
-            --merge --commit-time
+      - name: Checkout the game files
+        uses: actions/checkout@v4
+        with:
+          # The private repository with the game files: the ORIG_REPO variable,
+          # or <owner>/afe-decomp-orig.
+          repository: ${{ vars.ORIG_REPO || format('{0}/afe-decomp-orig', github.repository_owner) }}
+          token: ${{ secrets.ORIG_TOKEN }}
+          path: .orig-private
+          persist-credentials: false
 
-    # Copy the original files to the workspace
-    - name: Prepare
-      run: cp -a /orig .
+      - name: Put the game files in orig
+        run: |
+          src=.orig-private
+          for dir in "$src/orig/$VERSION" "$src/$VERSION" "$src"; do
+            if [ -f "$dir/sys/main.dol" ]; then
+              mkdir -p "orig/$VERSION"
+              cp -R "$dir/sys" "$dir/files" "orig/$VERSION/"
+              break
+            fi
+          done
+          rm -rf "$src"
+          if [ ! -f "orig/$VERSION/sys/main.dol" ]; then
+            echo "::error::The game files' repository has no sys/main.dol (looked in orig/$VERSION/, $VERSION/ and its root)."
+            exit 1
+          fi
 
-    # Restore cached files
-    - name: Cache build
-      uses: actions/cache@v4
-      with:
-        path: |
-          build
-          .ninja_deps
-          .ninja_log
-        key: ${{ runner.os }}-${{ matrix.version }}-${{ github.sha }}
-        restore-keys: ${{ runner.os }}-${{ matrix.version }}-
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
 
-    # Build the project
-    - name: Build
-      run: |
-        python configure.py --map --version ${{ matrix.version }} \
-            --binutils /binutils --compilers /compilers
-        ninja all_source progress build/${{ matrix.version }}/report.json
+      - name: Install ninja
+        run: python -m pip install ninja
 
-    # Upload map files
-    - name: Upload map
-      uses: actions/upload-artifact@v4
-      with:
-        name: ${{ matrix.version }}_maps
-        path: build/${{ matrix.version }}/**/*.MAP
+      - name: Configure
+        run: python configure.py --version "$VERSION"
 
-    # Upload progress report
-    - name: Upload report
-      uses: actions/upload-artifact@v4
-      with:
-        name: ${{ matrix.version }}_report
-        path: build/${{ matrix.version }}/report.json
+      # The default target checks the binaries' SHA-1 against
+      # config/GAEJ01_01/build.sha1 and makes build/GAEJ01_01/report.json.
+      - name: Build and check against the original
+        run: ninja all_source progress
+
+      - name: Draw the progress chart
+        run: |
+          python tools/progress_readme.py --version "$VERSION"
+          sed -n '/<!-- progress-table:start -->/,/<!-- progress-table:end -->/p' README.md \
+            | grep -v '^<!-- progress-table' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Commit the progress chart
+        if: github.ref_name == github.event.repository.default_branch
+        run: |
+          git add README.md assets/progress-light.svg assets/progress-dark.svg
+          if git diff --cached --quiet; then
+            echo "The progress did not change."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Update the progress chart for ${GITHUB_SHA::7}"
+          if ! git push; then
+            echo "::warning::The branch moved on during the build; the run for the newer commit updates the chart."
+          fi
