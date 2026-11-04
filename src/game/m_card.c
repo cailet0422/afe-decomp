@@ -7237,6 +7237,70 @@ extern int mCD_PC_AutoSaveSnapshot(Save* out, GAME_PLAY* play) {
     return TRUE;
 }
 
+/* The port's autosave of a town that has no file on a card yet (a new game
+ * not saved at the gyroid): its first save, made as the gyroid's "save and
+ * continue" makes it (mCD_SaveHome_bg creates the town file on a card with
+ * room and writes all of it), run to its end at once, since the cards are
+ * files on the PC. Only where the gyroid would save: the player in their own
+ * town, owning their house, and on the first day once they have met someone
+ * ("a little more work"). Called with no actors (between scenes) or after the
+ * caller has checked the moment is quiet; the caller then writes the Save
+ * part with what live actors keep out of it (mCD_PC_AutoSaveSnapshot). TRUE
+ * if the town file was made. */
+extern int mCD_PC_FirstSave(void) {
+    Private_c* priv = Common_Get(now_private);
+    int player_no = Common_Get(player_no);
+    mCD_memMgr_c* mgr = &l_memMgr;
+    mHm_hs_c* home;
+    int house;
+    int has_saved;
+    int chan = -1;
+    int ret = mCD_TRANS_ERR_BUSY;
+    int i;
+
+    if (priv == NULL || Save_Get(save_exist) || player_no < 0 || player_no >= PLAYER_NUM ||
+        Common_Get(reset_flag) || l_keepSave_set || mEv_CheckFirstIntro() ||
+        !mLd_CheckThisLand(priv->player_ID.land_name, priv->player_ID.land_id)) {
+        return FALSE;
+    }
+    house = mHS_get_arrange_idx(player_no);
+    if (house < 0) {
+        return FALSE;
+    }
+    home = Save_GetPointer(homes[house]);
+    if (mPr_NullCheckPersonalID(&priv->player_ID) || !mPr_CheckCmpPersonalID(&priv->player_ID, &home->ownerID)) {
+        return FALSE;
+    }
+    if (!home->flags.has_saved && mEv_CheckFirstJob() && mNpc_GetFriendAnimalNum(&priv->player_ID) == 0) {
+        return FALSE;
+    }
+    if (mgr->save_home_info.proc != 0 || mgr->workArea != NULL) {
+        return FALSE; /* the card is busy */
+    }
+
+    has_saved = home->flags.has_saved;
+    home->flags.has_saved = TRUE; /* as the gyroid does before its save (aHNW_set_save_permission) */
+    /* (at least 112 calls: the routine keeps its "saving" message up that long) */
+    for (i = 0; i < 1000 && ret == mCD_TRANS_ERR_BUSY; i++) {
+        ret = mCD_SaveHome_bg(1, &chan);
+    }
+    if (ret == mCD_TRANS_ERR_BUSY) {
+        /* never finished: leave the card and the town to the game as they were */
+        if (mgr->copy_protect != -1) {
+            Common_Set(copy_protect, mgr->copy_protect);
+        }
+        Save_Set(save_exist, FALSE);
+        mCD_ClearMemMgr_com2(mgr);
+        sAdo_SysLevStop(NA_SE_47);
+        SoftResetEnable = TRUE;
+    }
+    if (ret != mCD_TRANS_ERR_NONE) {
+        home->flags.has_saved = has_saved;
+        return FALSE;
+    }
+    return TRUE;
+}
+
 /* The autosave of a player visiting another town (the station's trip): its
  * own town file is as it was left at the station; put the traveller's data
  * (pockets, bells, letters...) in its place there, as the trip home would,
