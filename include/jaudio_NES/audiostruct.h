@@ -470,8 +470,19 @@ typedef struct delay_ {
 /* sizeof(macro) == 0x1C */
 typedef struct macro_ {
     /* 0x00 */ u8* pc;
+#ifdef TARGET_PC
+    /* Some scripts call one level deeper than the stack has room for (the
+     * sound of the gyroid "키다리팀바" (0x1730), placed in a room): the call
+     * stores stack[4]. On the GameCube that is remaining_loop_iters, and the
+     * return finds its address there all the same; with 8-byte pointers it
+     * also overwrote depth, and the next return jumped to nowhere. Room for
+     * that level and more. */
+    u8* stack[8];
+    u8 remaining_loop_iters[8];
+#else
     /* 0x04 */ u8* stack[4];
     /* 0x14 */ u8 remaining_loop_iters[4];
+#endif
     /* 0x18 */ u8 depth;
     /* 0x19 */ s8 value;
 } macro;
