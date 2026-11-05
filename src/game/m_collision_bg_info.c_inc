@@ -1553,6 +1553,58 @@ extern int mCoBG_GetBlockBgCheckMode(void) {
     return mCoBG_block_bgcheck_mode & 1;
 }
 
+#ifdef TARGET_PC
+extern xyz_t mCoBG_UniqueWallCheck(ACTOR* actorx, f32 range, f32 y_ofs) {
+    return mCoBG_UniqueWallCheckOpen(actorx, range, y_ofs, 0);
+}
+
+/* Keeps the actor in its block, which reaches on into the next block on the
+ * sides seamless crossing opens when open */
+extern xyz_t mCoBG_UniqueWallCheckOpen(ACTOR* actorx, f32 range, f32 y_ofs, int open) {
+    int bx;
+    int bz;
+    xyz_t ret = { 0.0f, 0.0f, 0.0f };
+
+    mCoBG_InitRevpos(&l_ActorInf.rev_pos);
+    mCoBG_GetCurrentCenterPosition(&l_ActorInf.center_pos, actorx);
+    mCoBG_GetOldCenterPosition(&l_ActorInf.old_center_pos, actorx);
+    mCoBG_GetSpeedByWpos(l_ActorInf.speed_xz0, actorx);
+
+    if (mFI_Wpos2BlockNum(&bx, &bz, l_ActorInf.old_center_pos)) {
+        xyz_t block_base = { 0.0f, 0.0f, 0.0f };
+        f32 width = mFI_BK_WORLDSIZE_X;
+        f32 height = mFI_BK_WORLDSIZE_Z;
+        int open_sides = open ? mFI_SeamlessSides(l_ActorInf.old_center_pos) : 0;
+
+        mCoBG_SetXyz_t(&l_ActorInf.rev_pos, 0.0f, 0.0f, 0.0f);
+        mFI_BkNum2WposXZ(&block_base.x, &block_base.z, bx, bz);
+        if (mCoBG_GetBlockBgCheckMode() == mCoBG_BLOCK_BGCHECK_MODE_INTRO_DEMO &&
+            (mFI_BkNum2BlockKind(bx, bz) & mRF_BLOCKKIND_PLAYER) != 0
+        ) {
+            block_base.x += mFI_UT_WORLDSIZE_X_F;
+            block_base.z += mFI_UT_WORLDSIZE_Z_F;
+            return mCoBG_ScopeWallCheck(actorx, &block_base, mFI_BK_WORLDSIZE_X - 2 * mFI_UT_WORLDSIZE_X, mFI_BK_WORLDSIZE_Z - 2 * mFI_UT_WORLDSIZE_Z, range, y_ofs);
+        }
+        if (open_sides & (1 << mFI_MOVEDIR_LEFT)) {
+            block_base.x -= mFI_BK_WORLDSIZE_X_F;
+            width += mFI_BK_WORLDSIZE_X_F;
+        }
+        if (open_sides & (1 << mFI_MOVEDIR_RIGHT)) {
+            width += mFI_BK_WORLDSIZE_X_F;
+        }
+        if (open_sides & (1 << mFI_MOVEDIR_UP)) {
+            block_base.z -= mFI_BK_WORLDSIZE_Z_F;
+            height += mFI_BK_WORLDSIZE_Z_F;
+        }
+        if (open_sides & (1 << mFI_MOVEDIR_DOWN)) {
+            height += mFI_BK_WORLDSIZE_Z_F;
+        }
+        return mCoBG_ScopeWallCheck(actorx, &block_base, width, height, range, y_ofs);
+    }
+
+    return ret;
+}
+#else
 extern xyz_t mCoBG_UniqueWallCheck(ACTOR* actorx, f32 range, f32 y_ofs) {
     int bx;
     int bz;
@@ -1581,6 +1633,7 @@ extern xyz_t mCoBG_UniqueWallCheck(ACTOR* actorx, f32 range, f32 y_ofs) {
 
     return ret;
 }
+#endif
 
 // GAFU01 reworks this to check based on the actor's world position, use stack xyz_t instead of l_ActorInf.rev_pos,
 // and moves carry out reverse to before the ground check.

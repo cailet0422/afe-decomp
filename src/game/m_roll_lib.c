@@ -161,7 +161,11 @@ extern int mRlib_Set_Position_Check(ACTOR* actor) {
 }
 
 extern int mRlib_HeightGapCheck_And_ReversePos(ACTOR* actor) {
+#ifdef TARGET_PC
+    if (mFI_GetPlayerWadeScroll() == mFI_WADE_INPROGRESS && mCoBG_ExistHeightGap_KeepAndNow_Detail(actor->world.position)) {
+#else
     if (mFI_GetPlayerWade() == mFI_WADE_INPROGRESS && mCoBG_ExistHeightGap_KeepAndNow_Detail(actor->world.position)) {
+#endif
         if (mRlib_Set_Position_Check(actor) != FALSE) {
             actor->position_speed.y = 0.0f;
         } else {

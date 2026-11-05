@@ -297,7 +297,11 @@ static void aBALL_OBJcheck(BALL_ACTOR* actor, GAME*) {
     xyz_t collisionSpeed;
     xyz_t collision;
 
+#ifdef TARGET_PC
+    wade = mFI_GetPlayerWadeScroll();
+#else
     wade = mFI_GetPlayerWade();
+#endif
 
     if (ClObj_DID_COLLIDE(actor->ball_pipe.collision_obj)) {
         collided = actor->ball_pipe.collision_obj.collided_actor;

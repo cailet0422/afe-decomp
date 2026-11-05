@@ -66,6 +66,12 @@ extern void mPlib_request_main_mail_land_from_submenu(void);
 extern void mPlib_request_main_demo_wait_from_submenu(ACTOR* speak_actor_p);
 extern void mPlib_Set_unable_wade(int v);
 extern int mPlib_Get_unable_wade(void);
+#ifdef TARGET_PC
+/* Seamless block crossing: the frame of the block change the player walked
+ * into (told to the rest of the game as the scroll's wade), -1 when none */
+extern void mPlib_Set_seamless_wade_frame(int frame);
+extern int mPlib_Get_seamless_wade_frame(void);
+#endif
 extern int mPlib_Check_able_force_speak_label(GAME* game, ACTOR* label);
 extern void mPlib_Set_able_force_speak_label(ACTOR* label);
 extern void mPlib_Reset_able_force_speak_label(void);

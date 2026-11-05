@@ -80,10 +80,14 @@ static void aYAT_actor_move(ACTOR* actor, GAME* game) {
     mFI_Wpos2BlockNum(&yatai_bx, &yatai_bz, actor->world.position);
     mFI_Wpos2BlockNum(&player_bx, &player_bz, player_actor->actor_class.world.position);
 
+#ifdef TARGET_PC
+    if (!mDemo_CHECK_SCROLL(&player_actor->actor_class) && (yatai_bx != player_bx || yatai_bz != player_bz))
+#else
     if (mDemo_Check(mDemo_TYPE_SCROLL, &player_actor->actor_class) == FALSE
         && mDemo_Check(mDemo_TYPE_SCROLL2, &player_actor->actor_class) == FALSE
         && mDemo_Check(mDemo_TYPE_SCROLL3, &player_actor->actor_class) == FALSE
         && (yatai_bx != player_bx || yatai_bz != player_bz))
+#endif
     {
         Actor_delete(actor);
     }

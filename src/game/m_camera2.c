@@ -1300,6 +1300,33 @@ static void Camera2_main_Talk(GAME_PLAY* play) {
     Camera2_change_main_index(play);
 }
 
+#ifdef TARGET_PC
+/* Seamless block crossing: the camera's area goes on into the blocks the
+ * player can walk into, so the camera follows the player over a block's edge
+ * (the borders as Camera2_main_Normal_SetEndCenterPos_fromPlayer has them:
+ * x0 the right one, x1 the left, z0 the top, z1 the bottom) */
+static void Camera2_OpenSeamlessBorders(GAME_PLAY* play, f32* x0, f32* x1, f32* z0, f32* z1) {
+    int sides;
+
+    if (play->camera.flags & 1) {
+        return;
+    }
+    sides = mFI_SeamlessSides(get_player_actor_withoutCheck(play)->actor_class.world.position);
+    if (sides & (1 << mFI_MOVEDIR_RIGHT)) {
+        *x0 += mFI_GetBlockWidth();
+    }
+    if (sides & (1 << mFI_MOVEDIR_LEFT)) {
+        *x1 -= mFI_GetBlockWidth();
+    }
+    if (sides & (1 << mFI_MOVEDIR_UP)) {
+        *z0 -= mFI_GetBlockHeight();
+    }
+    if (sides & (1 << mFI_MOVEDIR_DOWN)) {
+        *z1 += mFI_GetBlockHeight();
+    }
+}
+#endif
+
 static void Camera2_main_Normal_SetEndCenterPos_fromPlayer(GAME_PLAY* play, xyz_t* end_center_pos) {
     PLAYER_ACTOR* player = get_player_actor_withoutCheck(play);
     f32 border_x0;
@@ -1331,6 +1358,9 @@ static void Camera2_main_Normal_SetEndCenterPos_fromPlayer(GAME_PLAY* play, xyz_
     }
 
     Camera2_GetBorderScale(play, scale, &border_x0, &border_x1, &border_z0, &border_z1);
+#ifdef TARGET_PC
+    Camera2_OpenSeamlessBorders(play, &border_x0, &border_x1, &border_z0, &border_z1);
+#endif
     *end_center_pos = player->actor_class.eye.position;
 
     if (mPlib_get_player_actor_main_index((GAME*)play) == mPlayer_INDEX_DEMO_GETON_BOAT_WAIT) {

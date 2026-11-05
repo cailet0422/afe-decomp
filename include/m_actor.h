@@ -1197,6 +1197,13 @@ extern void Shape_Info_init(ACTOR* actor, f32 ofs_y, mActor_shadow_proc shadow_p
 extern void Actor_delete(ACTOR* actor);
 extern int Actor_draw_actor_no_culling_check(ACTOR* actor);
 extern int Actor_draw_actor_no_culling_check2(ACTOR* actor, xyz_t* camera_pos, f32 camera_w);
+#ifdef TARGET_PC
+/* Seamless block crossing: the actors made from the units of the blocks next
+ * to the player's come within their culling area less this (ac_birth_control.c)
+ * and go once out of it by as much (Actor_delete_check), so that none comes and
+ * goes on its edge as the camera moves or with how high it stands */
+#define Actor_SEAMLESS_CULL_MARGIN 96.0f
+#endif
 extern void Actor_info_ct(GAME* game, Actor_info* actor_info, Actor_data* player_data);
 extern void Actor_info_dt(Actor_info* actor_info, GAME_PLAY* play);
 extern void Actor_info_call_actor(GAME_PLAY* play, Actor_info* actor_info);
