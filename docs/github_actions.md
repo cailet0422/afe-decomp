@@ -19,18 +19,24 @@ skips the build and says so.
    (Another name works too: set it in a repository variable named `ORIG_REPO`, as `owner/name`, under
    Settings → Secrets and variables → Actions → Variables.)
 
-2. Add the files, extracted from your own copy of the game, with this layout:
+2. Add your own copy of the game (Rev 1), in either form:
 
-   ```
-   orig/GAEJ01_01/sys/main.dol
-   orig/GAEJ01_01/files/foresta.rel
-   orig/GAEJ01_01/files/forestd.rel
-   orig/GAEJ01_01/files/foresti.rel
-   orig/GAEJ01_01/files/foresto.rel
-   ```
+   - **The disc image**: an ISO, CISO, RVZ, WIA, WBFS, GCZ, NFS or TGC file, or a `.7z` or `.zip` with one in
+     it, anywhere in the repository. The workflow copies the five files out of it and decompresses the RELs
+     (they are `files/*.rel.szs` on the disc). Mind GitHub's limits: 25 MB a file when uploading in the
+     browser, 100 MB with `git push`. A compressed image often fits; a full 1.4 GB ISO does not.
+   - **The five files**, with this layout:
 
-   They are about 18 MB in all. Nothing else from the disc is needed. `GAEJ01_01/sys/...` or `sys/...` at the
-   root of the repository also work.
+     ```
+     orig/GAEJ01_01/sys/main.dol
+     orig/GAEJ01_01/files/foresta.rel
+     orig/GAEJ01_01/files/forestd.rel
+     orig/GAEJ01_01/files/foresti.rel
+     orig/GAEJ01_01/files/foresto.rel
+     ```
+
+     They are about 18 MB in all, and the RELs must be decompressed (not `.rel.szs`). `GAEJ01_01/sys/...` or
+     `sys/...` at the root of the repository also work.
 
 ## The token
 
@@ -56,6 +62,6 @@ skips the build and says so.
 
 - Workflows of pull requests from forks get no secrets, and the workflow does not run for pull requests at all;
   branches of this repository are built on push. Someone else's pull request cannot read the game files.
-- The game files are copied into the build's `orig/` and the private checkout is deleted; nothing of the build is
-  uploaded. Only `README.md` and `assets/progress-*.svg` are committed.
+- The game files are copied into the build's `orig/`, and the private checkout and anything unpacked from it are
+  deleted; nothing of the build is uploaded. Only `README.md` and `assets/progress-*.svg` are committed.
 - Keep the game files' repository private, and the token limited to that repository and to reading.
