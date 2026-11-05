@@ -251,6 +251,11 @@ extern int mFI_SeamlessActive(void);
 /* the sides of the block at wpos that run on into the next block (bits
  * 1 << mFI_MOVEDIR_*), none when seamless crossing is not active */
 extern int mFI_SeamlessSides(xyz_t wpos);
+/* Seamless crossing's area: the 3x3 blocks around the player's own, where the
+ * game keeps up the world as in the player's block. Its middle (FALSE when
+ * there is none), and whether a block is in it */
+extern int mFI_SeamlessCenter(int* bx, int* bz);
+extern int mFI_SeamlessNear(int bx, int bz);
 #endif
 extern int mFI_BkNum2WposXZ(f32* wpos_x, f32* wpos_z, int bx, int bz);
 extern void mFI_UtNum2PosXZInBk(f32* pos_x, f32* pos_z, int ut_x, int ut_z);

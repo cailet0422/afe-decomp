@@ -86,6 +86,12 @@ static int aBT_check_alive(BOAT_ACTOR* boat_actor, GAME_PLAY* play) {
         play->block_table.block_x == bx && play->block_table.block_z == bz) {
         alive = TRUE;
     }
+#ifdef TARGET_PC
+    /* seamless crossing: in view from the blocks around (Kapp'n waits, below) */
+    else if (mFI_SeamlessNear(bx, bz)) {
+        alive = TRUE;
+    }
+#endif
 
     return alive;
 }
@@ -264,8 +270,21 @@ static void aBT_calc_speed(BOAT_ACTOR* boat_actor) {
 }
 
 static void aBT_demo_ctrl_birth_wait(BOAT_ACTOR* boat_actor, GAME_PLAY* play) {
+#ifdef TARGET_PC
+    ACTOR* boat_demo;
+
+    /* seamless crossing: made from the next block, Kapp'n comes (with the boat's
+     * demo) once the boat's block is the game's, as when walking in */
+    if (mFI_SeamlessActive() && (boat_actor->actor_class.block_x != play->block_table.block_x ||
+                                 boat_actor->actor_class.block_z != play->block_table.block_z)) {
+        return;
+    }
+    boat_demo = Actor_info_make_actor(&play->actor_info, (GAME*)play, mAc_PROFILE_BOAT_DEMO, 0.0f, 0.0f, 0.0f, 0, 0, 0,
+                                      -1, -1, -1, EMPTY_NO, -1, -1, -1);
+#else
     ACTOR* boat_demo = Actor_info_make_actor(&play->actor_info, (GAME*)play, mAc_PROFILE_BOAT_DEMO, 0.0f, 0.0f, 0.0f, 0,
                                              0, 0, -1, -1, -1, EMPTY_NO, -1, -1, -1);
+#endif
 
     if (boat_demo != NULL) {
         aBT_setupAction(boat_actor, play, aBT_ACTION_WAIT);

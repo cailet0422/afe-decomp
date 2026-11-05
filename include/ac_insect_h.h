@@ -10,7 +10,14 @@
 extern "C" {
 #endif
 
+#ifdef TARGET_PC
+/* room for the insects of seamless crossing's area (aINS_searchRegistSpace
+ * keeps to the GameCube's 8, and the one for a caught insect, without it) */
+#define aINS_ACTOR_NUM 33
+#define aINS_GC_NEW_NUM 8
+#else
 #define aINS_ACTOR_NUM 9
+#endif
 #define aINS_MAX_STRESS_DIST (3 * mFI_UNIT_BASE_SIZE_F)
 #define aINS_PATIENCE_STEP 0.5f
 

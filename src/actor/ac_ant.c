@@ -168,8 +168,15 @@ static void aANT_actor_move(ACTOR* actorx, GAME* game) {
     ANT_ACTOR* ant = (ANT_ACTOR*)actorx;
     GAME_PLAY* play = (GAME_PLAY*)game;
 
+#ifdef TARGET_PC
+    /* (seamless crossing: not while its block is in the player's area) */
+    if ((actorx->state_bitfield & ACTOR_STATE_NO_CULL) == 0 &&
+        (actorx->block_x != play->block_table.block_x || actorx->block_z != play->block_table.block_z) &&
+        !mFI_SeamlessNear(actorx->block_x, actorx->block_z)) {
+#else
     if ((actorx->state_bitfield & ACTOR_STATE_NO_CULL) == 0 &&
         (actorx->block_x != play->block_table.block_x || actorx->block_z != play->block_table.block_z)) {
+#endif
         Actor_delete(actorx);
     } else {
         if (actorx->world.position.x < 0.0f && actorx->world.position.z < 0.0f) {

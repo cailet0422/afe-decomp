@@ -244,9 +244,16 @@ static void aINS_cull_check(ACTOR* actorx, GAME* game) {
             }
 
             /* Despawn if player is more than 15 units away and in another acre and has not caught it */
+#ifdef TARGET_PC
+            /* (and, with seamless crossing, its acre is out of the player's area) */
+            if (actorx->player_distance_xz > 600.0f &&
+                (actorx->block_x != play->block_table.block_x || actorx->block_z != play->block_table.block_z) &&
+                (ACTOR*)mPlib_Get_item_net_catch_label() != actorx && !mFI_SeamlessNear(actorx->block_x, actorx->block_z)) {
+#else
             if (actorx->player_distance_xz > 600.0f &&
                 (actorx->block_x != play->block_table.block_x || actorx->block_z != play->block_table.block_z) &&
                 (ACTOR*)mPlib_Get_item_net_catch_label() != actorx) {
+#endif
                 aINS_destruct(actorx, game);
             }
         }

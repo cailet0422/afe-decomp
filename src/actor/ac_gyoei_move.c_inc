@@ -38,7 +38,13 @@ static int aGYO_cull_check(ACTOR* actorx, GAME_PLAY* play) {
 
         actorx->state_bitfield &= ~ACTOR_STATE_NO_CULL;
         dist = search_position_distance(&actorx->world.position, &playerx->world.position);
+#ifdef TARGET_PC
+        /* seamless crossing: not while its block is in the player's area */
+        if (dist > 600.0f && (actorx->block_x != play->block_table.block_x || actorx->block_z != play->block_table.block_z) &&
+            !mFI_SeamlessNear(actorx->block_x, actorx->block_z)) {
+#else
         if (dist > 600.0f && (actorx->block_x != play->block_table.block_x || actorx->block_z != play->block_table.block_z)) {
+#endif
             aGYO_destruct(actorx, (GAME*)play);
             ret = TRUE;
         }

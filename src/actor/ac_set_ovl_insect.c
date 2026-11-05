@@ -2814,6 +2814,14 @@ static int aSOI_ins_make(aSOI_set_data_c* set_data, aSetMgr_player_pos_c* player
     return res;
 }
 
+#ifdef TARGET_PC
+extern int aSOI_spirit_event_on(void) {
+    mEv_gst_common_c* ghost_common = (mEv_gst_common_c*)mEv_get_common_area(mEv_EVENT_GHOST, 0x37);
+
+    return ghost_common != NULL && (ghost_common->flags & mEv_GHOST_FLAG_ACTIVE) != 0;
+}
+#endif
+
 extern int aSOI_insect_set(SET_MANAGER* set_manager, GAME_PLAY* play) {
     static aSOI_insect_spawn_info_f_c copy_range[aSetMgr_INSECT_SPAWN_INFO_COUNT];
     static aSOI_set_data_c set_data;
