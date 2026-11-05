@@ -90,6 +90,40 @@ static void Player_actor_main_Demo_geton_boat_wade_other_func1(ACTOR* actor, GAM
     Player_actor_ChangeFace_for_Wade(actor, game, player->main_data.wade.timer);
 }
 
+#ifdef TARGET_PC
+#define mPlayer_SEAMLESS_WADE_FRAMES 38 /* as long as the scroll's wade (its timer 0 to 37) */
+
+/* Seamless block crossing: once the player has walked into another block,
+ * the game moves its block there as the scroll's setup does (at the player's
+ * own position) and tells the rest of the game of it as of the scroll
+ * (mFI_SetPlayerWade's start, progress and end, over as many frames) while
+ * the player walks on. Leaving the scene (a fade other than the one into it)
+ * cuts it short once its progress has been told, so that its end is too, and
+ * so does a scroll starting (mFI_SetPlayerWade tells its end then). */
+static void Player_actor_SeamlessBlockChange(ACTOR* actor, GAME* game) {
+    GAME_PLAY* play = (GAME_PLAY*)game;
+    int leaving = play->fb_fade_type != FADE_TYPE_NONE && play->fb_fade_type != FADE_TYPE_IN;
+    int scroll = mPlib_check_player_actor_main_index_AllWade(game) == TRUE;
+    int frame = mPlib_Get_seamless_wade_frame();
+    int bx;
+    int bz;
+
+    if (frame >= 0) {
+        Player_actor_ChangeFace_for_Wade(actor, game, (f32)frame);
+        frame++;
+        mPlib_Set_seamless_wade_frame(
+            frame < mPlayer_SEAMLESS_WADE_FRAMES && !scroll && (!leaving || frame < 2) ? frame : -1);
+    } else if (!leaving && !scroll && mFI_SeamlessSides(actor->world.position) != 0 &&
+               mFI_Wpos2BlockNum(&bx, &bz, actor->world.position) &&
+               (bx != play->block_table.block_x || bz != play->block_table.block_z)) {
+        Player_actor_setup_main_Wade_other_func1(actor, game);
+        mFI_SetBearActor(play, actor->world.position, TRUE);
+        Common_Set(in_initial_block, FALSE);
+        mPlib_Set_seamless_wade_frame(0);
+    }
+}
+#endif
+
 static void Player_actor_main_Sitdown_wait_other_func2(ACTOR* actor, GAME* game) {
     if (Common_Get(clip.my_room_clip)) {
         Common_Get(clip.my_room_clip)->call_sit_down_ongen_pos_se_proc(&actor->world.position);
@@ -322,6 +356,9 @@ static void Player_actor_move_other_func2(ACTOR* actor, GAME* game) {
     Player_actor_sound_SetStatus(actor);
     Player_actor_Set_Indoor_Camera_Index(actor, game);
     Player_actor_check_forward(actor, game);
+#ifdef TARGET_PC
+    Player_actor_SeamlessBlockChange(actor, game);
+#endif
     mFI_SetPlayerWade(game);
     Player_actor_check_little_shake_tree(actor, game);
     Player_actor_check_shake_tree_timer(actor);

@@ -4,6 +4,10 @@
 #include "m_field_info.h"
 #include "m_common_data.h"
 #include "GBA2/gba2.h"
+#ifdef TARGET_PC
+#include "m_player_lib.h"
+#include "m_skin_matrix.h"
+#endif
 
 static void aBC_actor_ct(ACTOR*, GAME*);
 static void aBC_actor_dt(ACTOR*, GAME*);
@@ -159,6 +163,100 @@ static void aBC_setupActor(BIRTH_CONTROL_ACTOR* birth_control, GAME_PLAY* play) 
     birth_control->setup_actor_flag = setup_actor_flag;
 }
 
+#ifdef TARGET_PC
+/* Seamless block crossing: the camera sees into the blocks next to the
+ * player's, so their structures, props and objects (houses, the shops,
+ * mailboxes, gyroids, snowmen, balls...) are made into actors as
+ * aBC_setupActor does for the player's block, each as it comes near the
+ * screen. The game takes most away again once off it (Actor_delete_check:
+ * not the player's block), so one is made only well inside where the actor
+ * culling keeps it: the smallest culling area of those actors (m_actor.c's
+ * default; the post office's distance) less Actor_SEAMLESS_CULL_MARGIN, by
+ * the last frame's camera. */
+static int aBC_seamlessNearScreen(GAME_PLAY* play, f32 x, f32 z) {
+    static ACTOR probe;
+    xyz_t camera_pos;
+    f32 camera_w;
+
+    probe.cull_width = 350.0f - Actor_SEAMLESS_CULL_MARGIN;
+    probe.cull_height = 700.0f - Actor_SEAMLESS_CULL_MARGIN;
+    probe.cull_radius = 350.0f - Actor_SEAMLESS_CULL_MARGIN;
+    probe.cull_distance = 500.0f - Actor_SEAMLESS_CULL_MARGIN;
+    probe.world.position.x = x;
+    probe.world.position.z = z;
+    probe.world.position.y = mCoBG_GetBgY_OnlyCenter_FromWpos2(probe.world.position, 0.0f);
+    Skin_Matrix_PrjMulVector(&play->projection_matrix, &probe.world.position, &camera_pos, &camera_w);
+    return Actor_draw_actor_no_culling_check2(&probe, &camera_pos, camera_w);
+}
+
+static void aBC_setupSeamlessBlock(GAME_PLAY* play, int bx, int bz) {
+    mFI_block_tbl_c own = play->block_table;
+    mActor_name_t* item_p = mFI_BkNumtoUtFGTop(bx, bz);
+    f32 base_x;
+    f32 base_z;
+    int ut_x;
+    int ut_z;
+
+    if (item_p == NULL || !mFI_BkNum2WposXZ(&base_x, &base_z, bx, bz)) {
+        return;
+    }
+
+    /* made as for the game's block (the actors take theirs from it) */
+    play->block_table.block_x = bx;
+    play->block_table.block_z = bz;
+    play->block_table.pos_x = base_x;
+    play->block_table.pos_z = base_z;
+    play->block_table.items = item_p;
+    for (ut_z = 0; ut_z < UT_Z_NUM; ut_z++) {
+        for (ut_x = 0; ut_x < UT_X_NUM; ut_x++, item_p++) {
+            mActor_name_t item = *item_p;
+            int type = ITEM_NAME_GET_TYPE(item);
+            f32 x = base_x + aBC_pos_table[ut_x];
+            f32 z = base_z + aBC_pos_table[ut_z];
+
+            /* not the boat: it goes unless in the game's block (aBT_check_alive),
+             * and Kapp'n comes with it, so both come as the player steps in */
+            if ((type != NAME_TYPE_ITEM2 && type != NAME_TYPE_PROPS && type != NAME_TYPE_STRUCT) || item == BOAT ||
+                !aBC_seamlessNearScreen(play, x, z)) {
+                continue;
+            }
+            if (type == NAME_TYPE_ITEM2) {
+                aBC_setupOtherActor(play, item, move_obj_profile_table[item - ETC_START], x, z, EMPTY_NO);
+            } else if (type == NAME_TYPE_PROPS) {
+                aBC_setupOtherActor(play, item, props_profile_table[item - ACTOR_PROP_START], x, z,
+                                    item >= SNOWMAN0 && item <= SNOWMAN8 ? EMPTY_NO : RSV_NO);
+            } else if (Common_Get(clip).structure_clip != NULL) {
+                (*Common_Get(clip).structure_clip->setup_actor_proc)((GAME*)play, item, -1, x, z);
+            }
+        }
+    }
+    play->block_table = own;
+}
+
+/* the blocks around the player's, but the game's own (aBC_setupActor), which
+ * differs for a moment when the player has stepped back (m_player) */
+static void aBC_setupSeamlessBlocks(GAME_PLAY* play) {
+    ACTOR* playerx = GET_PLAYER_ACTOR_ACTOR(play);
+    int pbx;
+    int pbz;
+    int bx;
+    int bz;
+
+    if (!mFI_SeamlessActive() || playerx == NULL ||
+        (play->fb_fade_type != FADE_TYPE_NONE && play->fb_fade_type != FADE_TYPE_IN) ||
+        !mFI_Wpos2BlockNum(&pbx, &pbz, playerx->world.position)) {
+        return;
+    }
+    for (bz = pbz - 1; bz <= pbz + 1; bz++) {
+        for (bx = pbx - 1; bx <= pbx + 1; bx++) {
+            if ((bx != play->block_table.block_x || bz != play->block_table.block_z) && mFI_BlockCheck(bx, bz)) {
+                aBC_setupSeamlessBlock(play, bx, bz);
+            }
+        }
+    }
+}
+#endif
+
 static int aBC_setupCommonMvActor(GAME_PLAY* play, mFM_move_actor_c* mv_actor_list, int mv_actor_list_no, s16 profile,
                                   f32 pos_x, f32 pos_z) {
     Actor_info* actor_info = &play->actor_info;
@@ -294,6 +392,9 @@ static void aBC_actor_move(ACTOR* actorx, GAME* game) {
             aBC_deleteActor_part(play, ACTOR_PART_ITEM);
             aBC_setupActor(birth_control, play);
         }
+#ifdef TARGET_PC
+        aBC_setupSeamlessBlocks(play);
+#endif
 
         if (birth_control->move_actor_list_exists_flag == TRUE && birth_control->move_actor_bitfield != 0) {
             int bx = play->block_table.block_x;

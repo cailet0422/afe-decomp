@@ -1788,9 +1788,23 @@ static int Player_actor_CheckAbleMoveDemoWadeBoatBlock(ACTOR* actorx, s16 angle_
     return mFI_MOVEDIR_NONE;
 }
 
+#ifdef TARGET_PC
+/* Seamless block crossing: the player may walk on into the next block,
+ * except where the scroll would not start either: while an event keeps the
+ * player in the block, in a demo such as a talk, or in a scroll */
+static int Player_actor_SeamlessCrossing(void) {
+    return mPlib_Get_unable_wade() == FALSE && mDemo_CheckDemo() == FALSE &&
+           mPlib_check_player_actor_main_index_AllWade(gamePT) == FALSE;
+}
+
+static void Player_actor_CorrectWadeBlockBorder(ACTOR* actorx) {
+    mCoBG_UniqueWallCheckOpen(actorx, 18.0f, 0.0f, Player_actor_SeamlessCrossing());
+}
+#else
 static void Player_actor_CorrectWadeBlockBorder(ACTOR* actorx) {
     mCoBG_UniqueWallCheck(actorx, 18.0f, 0.0f);
 }
+#endif
 
 /* Animation */
 
@@ -3705,6 +3719,11 @@ static int Player_actor_Get_WadeEndPos(GAME* game, xyz_t* end_pos_p) {
             }
 
             *end_pos_p = GET_PLAYER_ACTOR_GAME_ACTOR(game)->world.position;
+#ifdef TARGET_PC
+            if (mPlib_Get_seamless_wade_frame() >= 0) {
+                return TRUE; /* walked into the next block: already there */
+            }
+#endif
         } else {
             *end_pos_p = ZeroVec;
         }
@@ -3749,6 +3768,12 @@ static int Player_actor_Set_ScrollDemo_forWade(ACTOR* actorx, GAME* game, int np
     int dir = Player_actor_CheckAbleMoveWadeBlock(game, player_pos_p, player_angle_y, 0.65f, DEG2SHORT_ANGLE2(40.0f),
                                                   npc_check_flag);
 
+#ifdef TARGET_PC
+    if (dir != mFI_MOVEDIR_NONE && Player_actor_SeamlessCrossing() &&
+        (mFI_SeamlessSides(*player_pos_p) & (1 << dir)) != 0) {
+        return FALSE; /* the player walks on into the next block */
+    }
+#endif
     if (dir != mFI_MOVEDIR_NONE) {
         PLAYER_ACTOR* player = (PLAYER_ACTOR*)actorx;
 

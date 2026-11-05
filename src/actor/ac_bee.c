@@ -374,7 +374,11 @@ static void aBEE_actor_move(ACTOR* actorx, GAME* game) {
     if ((actorx->world.position.x < 0.0f && actorx->world.position.z < 0.0f)) {
         // empty block, maybe for debug?
     } else {
+#ifdef TARGET_PC
+        if (bee->action == aBEE_ACT_ATTACK || mFI_GetPlayerWadeScroll() == mFI_WADE_NONE) {
+#else
         if (bee->action == aBEE_ACT_ATTACK || mFI_GetPlayerWade() == mFI_WADE_NONE) {
+#endif
             Actor_position_moveF(actorx);
         }
 

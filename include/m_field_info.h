@@ -244,6 +244,14 @@ extern int mFI_Wpos2BkandUtNuminBlock(int* bx, int* bz, int* ut_x, int* ut_z, xy
 extern int mFI_WpostoLposInBK(xyz_t* lpos, xyz_t wpos);
 extern int mFI_LposInBKtoWpos(xyz_t* wpos, xyz_t lpos, int bx, int bz);
 extern int mFI_ScrollCheck(xyz_t wpos, u8 dir);
+#ifdef TARGET_PC
+/* Seamless block crossing (the PC port's setting): on, outdoors in the town,
+ * not in the title demo nor on the first day's arrival */
+extern int mFI_SeamlessActive(void);
+/* the sides of the block at wpos that run on into the next block (bits
+ * 1 << mFI_MOVEDIR_*), none when seamless crossing is not active */
+extern int mFI_SeamlessSides(xyz_t wpos);
+#endif
 extern int mFI_BkNum2WposXZ(f32* wpos_x, f32* wpos_z, int bx, int bz);
 extern void mFI_UtNum2PosXZInBk(f32* pos_x, f32* pos_z, int ut_x, int ut_z);
 extern void mFI_BkandUtNum2Wpos(xyz_t* wpos, int bx, int bz, int ut_x, int ut_z);
@@ -326,6 +334,11 @@ extern void mFI_InitMoveActorBitData();
 extern void mFI_SetPlayerWade(GAME* game);
 extern int mFI_CheckPlayerWade(int wade);
 extern int mFI_GetPlayerWade();
+#ifdef TARGET_PC
+/* mFI_GetPlayerWade for what stops during the scroll (the ball, bees):
+ * none while seamless crossing's block change is told, as the game goes on */
+extern int mFI_GetPlayerWadeScroll(void);
+#endif
 extern int mFI_GetNextBlockNum(int* bx, int* bz);
 extern u16* mFI_GetDepositP(int bx, int bz);
 extern void mFI_ClearDeposit(int bx, int bz);

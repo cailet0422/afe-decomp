@@ -455,6 +455,31 @@ extern int mFI_ScrollCheck(xyz_t wpos, u8 dir) {
     return mFI_BlockCheck(bx, bz);
 }
 
+#ifdef TARGET_PC
+extern int pc_seamless_blocks(void);
+
+extern int mFI_SeamlessActive(void) {
+    return pc_seamless_blocks() && mFI_GET_TYPE(mFI_GetFieldId()) == mFI_FIELD_FG &&
+           mEv_CheckTitleDemo() == mEv_TITLEDEMO_NONE &&
+           mCoBG_GetBlockBgCheckMode() == mCoBG_BLOCK_BGCHECK_MODE_NORMAL;
+}
+
+extern int mFI_SeamlessSides(xyz_t wpos) {
+    int sides = 0;
+    int dir;
+
+    if (!mFI_SeamlessActive()) {
+        return 0;
+    }
+    for (dir = mFI_MOVEDIR_RIGHT; dir <= mFI_MOVEDIR_DOWN; dir++) {
+        if (mFI_ScrollCheck(wpos, dir)) {
+            sides |= 1 << dir;
+        }
+    }
+    return sides;
+}
+#endif
+
 extern int mFI_BkNum2WposXZ(f32* wpos_x, f32* wpos_z, int bx, int bz) {
     int res = FALSE;
 
@@ -2069,6 +2094,42 @@ extern void mFI_InitMoveActorBitData() {
 
 static int l_player_wade;
 
+#ifdef TARGET_PC
+/* the block change being told is seamless crossing's (the player walks on, no scroll) */
+static int l_player_wade_seamless;
+
+extern void mFI_SetPlayerWade(GAME* game) {
+    int scroll;
+
+    if (GET_PLAYER_ACTOR_GAME(game) == NULL) {
+        l_player_wade = mFI_WADE_ERROR;
+        return;
+    }
+
+    scroll = mPlib_check_player_actor_main_index_AllWade(game) == TRUE;
+    if (scroll && l_player_wade_seamless &&
+        (l_player_wade == mFI_WADE_START || l_player_wade == mFI_WADE_INPROGRESS)) {
+        /* a scroll starts while seamless crossing's block change is told: that
+         * one's end first, then the scroll's start */
+        l_player_wade = mFI_WADE_END;
+    } else if (scroll || mPlib_Get_seamless_wade_frame() >= 0) {
+        if (l_player_wade == mFI_WADE_NONE || l_player_wade == mFI_WADE_END) {
+            l_player_wade = mFI_WADE_START;
+            l_player_wade_seamless = !scroll;
+        } else {
+            l_player_wade = mFI_WADE_INPROGRESS;
+        }
+    } else if (l_player_wade == mFI_WADE_INPROGRESS) {
+        l_player_wade = mFI_WADE_END;
+    } else {
+        l_player_wade = mFI_WADE_NONE;
+    }
+}
+
+extern int mFI_GetPlayerWadeScroll(void) {
+    return l_player_wade_seamless && l_player_wade != mFI_WADE_ERROR ? mFI_WADE_NONE : l_player_wade;
+}
+#else
 extern void mFI_SetPlayerWade(GAME* game) {
     PLAYER_ACTOR* player = GET_PLAYER_ACTOR_GAME(game);
 
@@ -2088,6 +2149,7 @@ extern void mFI_SetPlayerWade(GAME* game) {
         l_player_wade = mFI_WADE_ERROR;
     }
 }
+#endif
 
 extern int mFI_CheckPlayerWade(int wade) {
     int res = FALSE;

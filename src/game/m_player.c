@@ -668,6 +668,9 @@ extern void Player_actor_ct(ACTOR* actorx, GAME* game) {
 
     Player_actor_init_value(actorx, game);
     Common_Set(player_actor_exists, TRUE);
+#ifdef TARGET_PC
+    mPlib_Set_seamless_wade_frame(-1);
+#endif
     Player_actor_Check_player_sunburn_for_ct(actorx); //
     mPlib_change_player_face(game);                   //
     Player_actor_ct_other_func1(actorx, game);        //

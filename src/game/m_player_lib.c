@@ -1947,6 +1947,18 @@ extern int mPlib_Get_unable_wade(void) {
     return Common_Get(unable_wade);
 }
 
+#ifdef TARGET_PC
+static int l_seamless_wade_frame = -1;
+
+extern void mPlib_Set_seamless_wade_frame(int frame) {
+    l_seamless_wade_frame = frame;
+}
+
+extern int mPlib_Get_seamless_wade_frame(void) {
+    return l_seamless_wade_frame;
+}
+#endif
+
 extern int mPlib_Check_able_force_speak_label(GAME* game, ACTOR* label) {
     if (Common_Get(player_actor_exists) == FALSE) {
         return FALSE;

@@ -306,6 +306,23 @@ static void Actor_cull_check(ACTOR* actor) {
     }
 }
 
+#ifdef TARGET_PC
+/* Seamless block crossing: off screen, but not yet by Actor_SEAMLESS_CULL_MARGIN
+ * more (what is made from units: villagers are not made ahead of the screen) */
+static int Actor_PC_seamless_near_screen(ACTOR* actor) {
+    static ACTOR grown;
+
+    if (actor->part == ACTOR_PART_NPC) {
+        return FALSE;
+    }
+    grown.cull_width = actor->cull_width + Actor_SEAMLESS_CULL_MARGIN;
+    grown.cull_height = actor->cull_height + Actor_SEAMLESS_CULL_MARGIN;
+    grown.cull_radius = actor->cull_radius + Actor_SEAMLESS_CULL_MARGIN;
+    grown.cull_distance = actor->cull_distance + Actor_SEAMLESS_CULL_MARGIN;
+    return mFI_SeamlessActive() && Actor_draw_actor_no_culling_check2(&grown, &actor->camera_position, actor->camera_w);
+}
+#endif
+
 static void Actor_delete_check(ACTOR* actor, GAME* game) {
     GAME_PLAY* play = (GAME_PLAY*)game;
 
@@ -314,6 +331,11 @@ static void Actor_delete_check(ACTOR* actor, GAME* game) {
         if (actor->npc_id != EMPTY_NO) {
             if (actor->block_x >= 0 && actor->block_z >= 0) {
                 if (actor->block_x != play->block_table.block_x || actor->block_z != play->block_table.block_z) {
+#ifdef TARGET_PC
+                    if (Actor_PC_seamless_near_screen(actor)) {
+                        return;
+                    }
+#endif
                     Actor_delete(actor);
                 }
             }
