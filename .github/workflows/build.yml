@@ -3,9 +3,10 @@ name: Build
 # Builds Rev 1 (GAEJ01_01), checks it against the original, and on the default
 # branch updates the README's progress chart and table when the numbers change.
 #
-# The build needs five files of the game (sys/main.dol and the four RELs). They
-# are kept in a private repository and read with a token in the ORIG_TOKEN
-# secret; without the secret the build is skipped. See docs/github_actions.md.
+# The build needs five files of the game (sys/main.dol and the four RELs), or a
+# disc image to copy them out of. They are kept in a private repository and read
+# with a token in the ORIG_TOKEN secret; without the secret the build is
+# skipped. See docs/github_actions.md.
 #
 # There is no pull_request trigger: workflows of pull requests from forks get
 # no secrets, and the branches of this repository are built on push.
@@ -65,26 +66,68 @@ jobs:
           path: .orig-private
           persist-credentials: false
 
-      - name: Put the game files in orig
-        run: |
-          src=.orig-private
-          for dir in "$src/orig/$VERSION" "$src/$VERSION" "$src"; do
-            if [ -f "$dir/sys/main.dol" ]; then
-              mkdir -p "orig/$VERSION"
-              cp -R "$dir/sys" "$dir/files" "orig/$VERSION/"
-              break
-            fi
-          done
-          rm -rf "$src"
-          if [ ! -f "orig/$VERSION/sys/main.dol" ]; then
-            echo "::error::The game files' repository has no sys/main.dol (looked in orig/$VERSION/, $VERSION/ and its root)."
-            exit 1
-          fi
-
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+
+      # dtk reads the disc image, if the game files' repository holds one.
+      - name: Download dtk
+        run: |
+          tag=$(sed -n 's/^config\.dtk_tag = "\(.*\)"$/\1/p' configure.py)
+          python tools/download_tool.py dtk build/tools/dtk --tag "$tag"
+
+      # The game files' repository may hold either
+      #   - the files themselves: sys/main.dol and files/fores{a,d,i,o}.rel, in
+      #     orig/GAEJ01_01/, GAEJ01_01/ or its root; or
+      #   - a disc image (ISO, CISO, RVZ, ...), or a .7z or .zip with one in it.
+      #     The files are copied out of it, and the RELs (files/*.rel.szs on the
+      #     disc) decompressed.
+      # Nothing of them is printed.
+      - name: Put the game files in orig
+        run: |
+          src=.orig-private
+          dest="orig/$VERSION"
+          mkdir -p "$dest/sys" "$dest/files"
+          for dir in "$src/orig/$VERSION" "$src/$VERSION" "$src"; do
+            if [ -f "$dir/sys/main.dol" ]; then
+              cp -R "$dir/sys" "$dir/files" "$dest/"
+              echo "Found the extracted files."
+              break
+            fi
+          done
+
+          if [ ! -f "$dest/sys/main.dol" ]; then
+            find_image() {
+              find "$1" -type f \( -iname '*.iso' -o -iname '*.gcm' -o -iname '*.ciso' -o -iname '*.rvz' \
+                -o -iname '*.wia' -o -iname '*.wbfs' -o -iname '*.gcz' -o -iname '*.nfs' -o -iname '*.tgc' \) \
+                -print -quit
+            }
+            image=$(find_image "$src")
+            if [ -z "$image" ]; then
+              archive=$(find "$src" -type f \( -iname '*.7z' -o -iname '*.zip' \) -print -quit)
+              if [ -n "$archive" ]; then
+                command -v 7z > /dev/null || sudo apt-get install -y -qq p7zip-full > /dev/null
+                7z x -bso0 -bsp0 -o.orig-unpacked "$archive"
+                image=$(find_image .orig-unpacked)
+              fi
+            fi
+            if [ -n "$image" ]; then
+              echo "Found a disc image; copying the files out of it."
+              build/tools/dtk vfs cp -q "$image:sys/main.dol" "$dest/sys/main.dol"
+              for module in foresta forestd foresti foresto; do
+                if ! build/tools/dtk vfs cp -q "$image:files/$module.rel.szs" "$dest/files/$module.rel" 2> /dev/null; then
+                  build/tools/dtk vfs cp -q "$image:files/$module.rel" "$dest/files/$module.rel"
+                fi
+              done
+            fi
+          fi
+
+          rm -rf "$src" .orig-unpacked
+          if [ ! -f "$dest/sys/main.dol" ]; then
+            echo "::error::The game files' repository has neither sys/main.dol (in orig/$VERSION/, $VERSION/ or its root) nor a disc image (or a .7z or .zip with one). See docs/github_actions.md."
+            exit 1
+          fi
 
       - name: Install ninja
         run: python -m pip install ninja
