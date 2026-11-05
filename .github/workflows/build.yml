@@ -75,6 +75,7 @@ jobs:
       - name: Download dtk
         run: |
           tag=$(sed -n 's/^config\.dtk_tag = "\(.*\)"$/\1/p' configure.py)
+          mkdir -p build/tools
           python tools/download_tool.py dtk build/tools/dtk --tag "$tag"
 
       # The game files' repository may hold either
