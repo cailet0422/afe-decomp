@@ -104,6 +104,10 @@ enum insect_term {
 };
 
 extern int aSOI_insect_set(SET_MANAGER* set_manager, GAME_PLAY* play);
+#ifdef TARGET_PC
+/* the Wisp's spirits are out in the town today */
+extern int aSOI_spirit_event_on(void);
+#endif
 extern mActor_name_t aSOI_get_insect_now(void);
 
 #ifdef __cplusplus

@@ -226,8 +226,8 @@ extern int mDemo_CheckEventMsgDemo(void);
 #ifdef TARGET_PC
 /* Seamless block crossing (mFI_SeamlessActive): the structures that go once
  * the player is in another block, outside the scroll, are seen from the next
- * block, so they stay as through a scroll; the next block change takes away
- * those of blocks out of the way (aBC_deleteActor_part) */
+ * block, so they stay as through a scroll; a block change takes away those of
+ * blocks out of the way (aBC_deleteActor_part) */
 #define mDemo_CHECK_SCROLL(actor) (mFI_SeamlessActive() || mDemo_Check(mDemo_TYPE_SCROLL, (actor)) || mDemo_Check(mDemo_TYPE_SCROLL2, (actor)) || mDemo_Check(mDemo_TYPE_SCROLL3, (actor)))
 #else
 #define mDemo_CHECK_SCROLL(actor) (mDemo_Check(mDemo_TYPE_SCROLL, (actor)) || mDemo_Check(mDemo_TYPE_SCROLL2, (actor)) || mDemo_Check(mDemo_TYPE_SCROLL3, (actor)))

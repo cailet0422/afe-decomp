@@ -192,8 +192,14 @@ static int aINS_searchRegistSpace(int make_type) {
 
     if (make_type == aINS_MAKE_NEW) {
         int i;
+#ifdef TARGET_PC
+        int num = mFI_SeamlessActive() ? aINS_ACTOR_NUM - 1 : aINS_GC_NEW_NUM;
+
+        for (i = 0; i < num; i++) {
+#else
 
         for (i = 0; i < aINS_ACTOR_NUM - 1; i++) {
+#endif
             if (insect->exist_flag == FALSE) {
                 return i;
             }

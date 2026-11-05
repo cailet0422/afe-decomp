@@ -116,6 +116,87 @@ static void aSetMgr_clear_keep(aSetMgr_keep_c* keep) {
   bzero(keep, sizeof(aSetMgr_keep_c));
 }
 
+#ifdef TARGET_PC
+/* Seamless block crossing: every block that comes into the player's area
+ * (mFI_SeamlessNear) gets its insects and fish as walking into it gives them,
+ * once while it stays in the area; the block a scene starts in gets none, as
+ * on the GameCube. The block the player then walks into has had them already.
+ * l_seamless_set holds the blocks of the area that have had them. On the
+ * Wisp's day the game keeps its own way: a spirit left behind moves on. */
+static s8 l_seamless_set[9][2];
+static int l_seamless_set_num;
+
+static int aSetMgr_seamless_was_set(int bx, int bz) {
+  int i;
+
+  for (i = 0; i < l_seamless_set_num; i++) {
+    if (l_seamless_set[i][0] == bx && l_seamless_set[i][1] == bz) {
+      return TRUE;
+    }
+  }
+  return FALSE;
+}
+
+static void aSetMgr_seamless_mark_set(int bx, int bz) {
+  l_seamless_set[l_seamless_set_num][0] = bx;
+  l_seamless_set[l_seamless_set_num][1] = bz;
+  l_seamless_set_num++;
+}
+
+static void aSetMgr_seamless_set(SET_MANAGER* set_manager, GAME_PLAY* play) {
+  /* the blocks around the middle, the sides first */
+  static const s8 around[8][2] = { { 0, -1 }, { 0, 1 }, { -1, 0 }, { 1, 0 }, { -1, -1 }, { 1, -1 }, { -1, 1 }, { 1, 1 } };
+  int cx;
+  int cz;
+  int i;
+  int n;
+
+  if (!mFI_SeamlessCenter(&cx, &cz) || aSOI_spirit_event_on()) {
+    l_seamless_set_num = 0;
+    return;
+  }
+
+  /* forget the blocks that have left the area */
+  for (i = n = 0; i < l_seamless_set_num; i++) {
+    if (mFI_SeamlessNear(l_seamless_set[i][0], l_seamless_set[i][1])) {
+      l_seamless_set[n][0] = l_seamless_set[i][0];
+      l_seamless_set[n][1] = l_seamless_set[i][1];
+      n++;
+    }
+  }
+  l_seamless_set_num = n;
+  if (n == 0) {
+    aSetMgr_seamless_mark_set(cx, cz);
+  }
+
+  /* one block a frame, while the game's own setting is not going on */
+  if (set_manager->move_proc != aSetMgr_MOVE_move_check_set) {
+    return;
+  }
+  for (i = 0; i < 8; i++) {
+    int bx = cx + around[i][0];
+    int bz = cz + around[i][1];
+
+    if (mFI_BlockCheck(bx, bz) && mFI_SeamlessNear(bx, bz) && !aSetMgr_seamless_was_set(bx, bz)) {
+      s8 own_bx = play->block_table.block_x;
+      s8 own_bz = play->block_table.block_z;
+
+      /* the insects take their block from the game's */
+      set_manager->player_pos.next_bx = bx;
+      set_manager->player_pos.next_bz = bz;
+      play->block_table.block_x = bx;
+      play->block_table.block_z = bz;
+      aSOI_insect_set(set_manager, play);
+      aSOG_gyoei_set(set_manager, play);
+      play->block_table.block_x = own_bx;
+      play->block_table.block_z = own_bz;
+      aSetMgr_seamless_mark_set(bx, bz);
+      break;
+    }
+  }
+}
+#endif
+
 /**
  * @brief Check if the 'move' func state should be updated to 'check_wait'.
  * 
@@ -132,6 +213,16 @@ static int aSetMgr_move_check_set(GAME_PLAY* play, SET_MANAGER* set_manager) {
   /* update the next acre position if player is starting acre transition state */
   if (aSetMgr_check_player_wade_start() == TRUE) {
     aSetMgr_renewal_player_next_pos(&set_manager->player_pos.next_bx, &set_manager->player_pos.next_bz);
+#ifdef TARGET_PC
+    if (l_seamless_set_num > 0 && mFI_SeamlessActive()) {
+      if (aSetMgr_seamless_was_set(set_manager->player_pos.next_bx, set_manager->player_pos.next_bz)) {
+        return FALSE; /* it had them as it came into seamless crossing's area */
+      }
+      if (l_seamless_set_num < 9) {
+        aSetMgr_seamless_mark_set(set_manager->player_pos.next_bx, set_manager->player_pos.next_bz);
+      }
+    }
+#endif
     set_manager->next_move_proc = aSetMgr_MOVE_move_check_wait;
     wading = TRUE;
   }
@@ -227,6 +318,9 @@ static void aSetMgr_move(ACTOR* actor, GAME* game) {
   if ((*move[set_manager->move_proc])(play, set_manager) == TRUE) {
     set_manager->move_proc = set_manager->next_move_proc;
   }
+#ifdef TARGET_PC
+  aSetMgr_seamless_set(set_manager, play);
+#endif
 }
 
 /**
@@ -255,6 +349,9 @@ static void aSetMgr_ct(ACTOR* actor, GAME* game) {
   set_manager->wait_timer = aSetMgr_WAIT_TIME;
 
   aSetMgr_clear_keep(&set_manager->keep);
+#ifdef TARGET_PC
+  l_seamless_set_num = 0;
+#endif
 }
 
 /**

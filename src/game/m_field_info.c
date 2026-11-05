@@ -478,6 +478,26 @@ extern int mFI_SeamlessSides(xyz_t wpos) {
     }
     return sides;
 }
+
+/* the sea between the town and the island (the boat's way) is left to the
+ * game's own way: the island has its own season, set during the trip */
+static int mFI_SeamlessGround(int bx, int bz) {
+    return (mFI_BkNum2BlockKind(bx, bz) & mRF_BLOCKKIND_OFFING) == 0;
+}
+
+extern int mFI_SeamlessCenter(int* bx, int* bz) {
+    PLAYER_ACTOR* player;
+
+    return mFI_SeamlessActive() && (player = GET_PLAYER_ACTOR((GAME_PLAY*)gamePT)) != NULL &&
+           mFI_Wpos2BlockNum(bx, bz, player->actor_class.world.position) && mFI_SeamlessGround(*bx, *bz);
+}
+
+extern int mFI_SeamlessNear(int bx, int bz) {
+    int cx;
+    int cz;
+
+    return mFI_SeamlessCenter(&cx, &cz) && ABS(bx - cx) <= 1 && ABS(bz - cz) <= 1 && mFI_SeamlessGround(bx, bz);
+}
 #endif
 
 extern int mFI_BkNum2WposXZ(f32* wpos_x, f32* wpos_z, int bx, int bz) {

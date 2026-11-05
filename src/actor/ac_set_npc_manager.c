@@ -1019,7 +1019,13 @@ static int aSNMgr_set_go_home_status(SET_NPC_MANAGER_ACTOR* manager, int anm_idx
         chk_bz = home_bz + add_bz[i];
         
         if (mFI_BlockCheck(chk_bx, chk_bz) == TRUE) {
+#ifdef TARGET_PC
+            /* seamless crossing: not into the player's area either, where it would be seen to appear */
+            if ((chk_bx != bx || chk_bz != bz) && (chk_bx != player_bx || chk_bz != player_bz) &&
+                !mFI_SeamlessNear(chk_bx, chk_bz)) {
+#else
             if ((chk_bx != bx || chk_bz != bz) && (chk_bx != player_bx || chk_bz != player_bz)) {
+#endif
                 if (aSNMgr_set_go_home_status_sub(manager, anm_idx, chk_bx, chk_bz, walk_status[i]) == TRUE) {
                     ret = TRUE;
                     break;
@@ -1203,6 +1209,73 @@ static void aSNMgr_set_npc_regular(SET_NPC_MANAGER_ACTOR* manager) {
     }
 }
 
+#ifdef TARGET_PC
+/* Seamless block crossing: the villagers out in the blocks of the player's
+ * area (mFI_SeamlessNear) come out as actors there, as those of the block the
+ * player walks into do (aSNMgr_set_npc_regular), with the game's block standing
+ * for theirs while each is made (actors take their block from it); those at
+ * home come with their block as before. The game's block keeps its own way.
+ * NPC actors share 10 sets of clothes (ac_npc), so this stops at
+ * aSNMgr_SEAMLESS_NPC_MAX of them, leaving room for the block the player walks
+ * into, and the blocks beside the player's come before those at its corners;
+ * on the day of a gathering of villagers (an event) the game keeps its own way. */
+#define aSNMgr_SEAMLESS_NPC_MAX 6
+
+static void aSNMgr_set_npc_seamless(SET_NPC_MANAGER_ACTOR* manager, GAME_PLAY* play) {
+    aSNMgr_npc_info_c* npc_info_p = &manager->npc_info;
+    s8 own_bx = play->block_table.block_x;
+    s8 own_bz = play->block_table.block_z;
+    int cx;
+    int cz;
+    int dist;
+    int i;
+
+    if (CLIP(npc_clip) == NULL || CLIP(npc_clip)->setupActor_proc == NULL || npc_info_p->joint_event != 0 ||
+        !mFI_SeamlessCenter(&cx, &cz)) {
+        return; /* (a gathering of villagers today needs the actors) */
+    }
+    for (dist = 1; dist <= 2; dist++) {
+        for (i = 0; i < ANIMAL_NUM_MAX; i++) {
+            mNpcW_info_c* winfo_p = npc_info_p->winfo_p[i];
+            int bx;
+            int bz;
+            int ux;
+            int uz;
+            int made;
+
+            if (play->actor_info.list[ACTOR_PART_NPC].num_actors >= aSNMgr_SEAMLESS_NPC_MAX) {
+                return;
+            }
+            if (!aSNMgr_chk_exist_and_appear_and_event(manager, mNpcW_APPEAR_STATUS_REGULAR, i) ||
+                npc_info_p->animal_p[i].is_home ||
+                !mFI_Wpos2BkandUtNuminBlock(&bx, &bz, &ux, &uz, npc_info_p->list_p[i].position) ||
+                (bx == own_bx && bz == own_bz) || !mFI_SeamlessNear(bx, bz) || ABS(bx - cx) + ABS(bz - cz) != dist) {
+                continue;
+            }
+            if (winfo_p != NULL && winfo_p->status != mNpcW_INFO_STATUS_WALKING &&
+                winfo_p->status != mNpcW_INFO_STATUS_STAY_IN_BLOCK && winfo_p->status != mNpcW_INFO_STATUS_ARRIVE) {
+                continue; /* as aSNMgr_set_appear_info_regular */
+            }
+            if (!aSNMgr_get_safe_utnum_regular(&ux, &uz, bx, bz, 1)) {
+                continue;
+            }
+
+            play->block_table.block_x = bx;
+            play->block_table.block_z = bz;
+            made = CLIP(npc_clip)->setupActor_proc(play, npc_info_p->animal_p[i].id.npc_id, i, i, -1, bx, bz, ux, uz);
+            play->block_table.block_x = own_bx;
+            play->block_table.block_z = own_bz;
+            if (made == TRUE) {
+                npc_info_p->list_p[i].appear_flag = FALSE;
+                if (winfo_p != NULL) {
+                    winfo_p->appear_info.status = mNpcW_APPEAR_STATUS_REGULAR;
+                }
+            }
+        }
+    }
+}
+#endif
+
 static void aSNMgr_set_npc_guest(SET_NPC_MANAGER_ACTOR* manager) {
     aSNMgr_npc_info_c* npc_info_p = &manager->npc_info;
     Animal_c* animal_p = npc_info_p->animal_p;
@@ -1282,6 +1355,11 @@ static void aSNMgr_actor_move(ACTOR* actorx, GAME* game) {
 #endif
                     aSNMgr_force_go_home(manager);
                     aSNMgr_walk_npc(manager, game);
+#ifdef TARGET_PC
+                    if (mFI_SeamlessActive()) {
+                        aSNMgr_set_npc_seamless(manager, play);
+                    }
+#endif
                 }
             }
             break;

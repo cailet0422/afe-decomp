@@ -9,7 +9,14 @@
 extern "C" {
 #endif
 
+#ifdef TARGET_PC
+/* room for the fish of seamless crossing's area (aGYO_searchRegistSpace keeps
+ * to the GameCube's 2 without it) */
+#define aGYO_MAX_GYOEI 9
+#define aGYO_GC_MAX_GYOEI 2
+#else
 #define aGYO_MAX_GYOEI 2
+#endif
 #define aGYO_EXIST_MAX 4
 
 enum {

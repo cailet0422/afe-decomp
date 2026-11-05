@@ -48,8 +48,14 @@ static int aGYO_searchRegistSpace(void) {
     GYOEI_ACTOR* gyoei = (GYOEI_ACTOR*)aGYO_ctrlActor;
     aGYO_CTRL_ACTOR* ctrl = gyoei->ctrl;
     int i;
+#ifdef TARGET_PC
+    int num = mFI_SeamlessActive() ? aGYO_MAX_GYOEI : aGYO_GC_MAX_GYOEI;
+
+    for (i = 0; i < num; i++) {
+#else
 
     for (i = 0; i < aGYO_MAX_GYOEI; i++) {
+#endif
         if (!ctrl[i].exist) {
             return i;
         }
