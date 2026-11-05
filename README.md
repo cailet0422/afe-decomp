@@ -1,5 +1,5 @@
 どうぶつの森 e+  
-[![Code Progress]][Progress] [![DOL Progress]][Progress] [![REL Progress]][Progress] [![Discord Badge]][discord]
+[![Code Progress]][Progress] [![DOL Progress]][Progress] [![REL Progress]][Progress]
 =============
 
 <a href="#progress"><picture>
@@ -13,8 +13,6 @@
 [REL Progress]: https://img.shields.io/badge/REL-100%25-256abf
 <!-- progress-badges:end -->
 [Progress]: #progress
-[Discord Badge]: https://img.shields.io/discord/727908905392275526?color=%237289DA&logo=discord&logoColor=%23FFFFFF
-[discord]: https://discord.gg/hKx3FJJgrV
 
 A decompilation of どうぶつの森 e+ (Dōbutsu no Mori e+) for the Nintendo GameCube, building byte-for-byte
 the game's `static.dol` and its four RELs.
