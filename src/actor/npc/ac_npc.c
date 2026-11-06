@@ -125,6 +125,7 @@ static void aNPC_group_talk_chg_actor(void);
 #ifdef TARGET_PC
 static void aNPC_pc_mp_report(NPC_ACTOR* nactorx);
 static void aNPC_pc_mp_follow(NPC_ACTOR* nactorx, GAME_PLAY* play);
+static int aNPC_pc_mp_held(NPC_ACTOR* nactorx);
 #endif
 
 #include "../src/actor/npc/ac_npc_data.c_inc"

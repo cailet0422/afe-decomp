@@ -12,9 +12,18 @@ extern "C" {
 #endif
 
 #define bIT_PIT_NUM 13
+#ifdef TARGET_PC
+/* the entries after the GameCube's (as many again; for the hole, 3) are for
+ * another player's, only shown (afe-port pc_mp_fx.c): this game's own keep
+ * the GameCube's, whatever the others do */
+#define bIT_DROP_NUM (19 * 2)
+#define bIT_FRUIT_DROP_NUM (6 * 2)
+#define bIT_HOLE_NUM 4
+#else
 #define bIT_DROP_NUM 19
 #define bIT_FRUIT_DROP_NUM 6
 #define bIT_HOLE_NUM 1
+#endif
 #define bIT_SHIN_NUM 1
 #define bIT_TEN_COIN_NUM 5
 #define bIT_FADE_NUM 3
@@ -159,6 +168,9 @@ struct drop_s {
     xyz_t last_position;
     f32 last_velocity_xz;
     f32 last_velocity_y;
+#ifdef TARGET_PC
+    u8 pc_visual; /* another player's, only shown (mFI_pc_fx_visual) */
+#endif
 };
 
 typedef struct drop_table_s {
@@ -188,6 +200,9 @@ struct hole_s {
     u16 max_counter;
     u16 wait_counter;
     s16 wait_type;
+#ifdef TARGET_PC
+    u8 pc_visual; /* another player's, only shown (mFI_pc_fx_visual) */
+#endif
 };
 
 typedef struct shin_s {
