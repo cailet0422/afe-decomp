@@ -1346,6 +1346,11 @@ extern int mFI_GetBlockUtNum2FG(mActor_name_t* item, int bx, int bz, int ut_x, i
 extern void pc_mp_fg_written(int bx, int bz, int ut_x, int ut_z, mActor_name_t old_item, mActor_name_t new_item);
 extern void pc_mp_deposit_written(int bx, int bz, int ut_x, int ut_z, int on);
 
+/* The multiplayer (afe-port pc_mp_fx.c): another player's hole, drop or
+ * falling fruit shown here is only shown (bg_item pc_visual): what it would
+ * write to the items is left out (the items come from that player's game) */
+int mFI_pc_fg_hold = 0;
+int mFI_pc_fx_visual = 0; /* (an effect entered now is such a one) */
 #endif
 extern int mFI_BlockUtNumtoFGSet(mActor_name_t item, int bx, int bz, int ut_x, int ut_z) {
     int res = FALSE;
@@ -1355,6 +1360,10 @@ extern int mFI_BlockUtNumtoFGSet(mActor_name_t item, int bx, int bz, int ut_x, i
         int ut_num = mFI_GetUtNum(ut_x, ut_z);
 #ifdef TARGET_PC
         mActor_name_t old_item = fg_p[ut_num];
+
+        if (mFI_pc_fg_hold > 0) {
+            return TRUE;
+        }
 #endif
 
         res = TRUE;
@@ -1399,6 +1408,9 @@ extern int mFI_UtNumtoFGSet_common(mActor_name_t item, int ut_x, int ut_z, int u
 #endif
 
 #ifdef TARGET_PC
+    if (mFI_pc_fg_hold > 0) {
+        return TRUE;
+    }
     {
         mActor_name_t old_item = g_fdinfo->block_info[block_num].fg_info.items_p[ut_num];
 
@@ -2287,6 +2299,11 @@ static int mFI_BkUtNum2SetDeposit(int bx, int bz, int ut_x, int ut_z, int type) 
     int res = FALSE;
     u16* deposit_p = mFI_GetDepositP(bx, bz);
 
+#ifdef TARGET_PC
+    if (deposit_p != NULL && type != mFI_DEPOSIT_GET && mFI_pc_fg_hold > 0) {
+        return TRUE;
+    }
+#endif
     if (deposit_p != NULL) {
         res = mFI_SetDeposit(deposit_p, ut_x, ut_z, type);
 #ifdef TARGET_PC

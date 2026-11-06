@@ -132,9 +132,17 @@ extern void sAdo_OngenPos(u32 p1, u8 p2, const xyz_t* pos) {
     }
 }
 
+#ifdef TARGET_PC
+extern void pc_mp_fx_sound(u16 id, const xyz_t* pos); /* afe-port pc_mp_fx.c: a sound of the player's move */
+#endif
+
 extern void sAdo_OngenTrgStart(u16 id, const xyz_t* pos) {
     u16 scalc;
     f32 fcalc;
+
+#ifdef TARGET_PC
+    pc_mp_fx_sound(id, pos);
+#endif
 
     sAdo_Calc_MicPosition_forTrig(&fcalc, &scalc, pos);
     Na_OngenTrgStart(id, scalc, fcalc);

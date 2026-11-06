@@ -27,6 +27,9 @@
 #include "ac_set_ovl_gyoei.h"
 #include "m_vibctl.h"
 #include "m_debug.h"
+#ifdef TARGET_PC
+extern int pc_mp_fx_player; /* afe-port pc_mp_fx.c */
+#endif
 
 /* Static function declarations, add as needed for intellisense */
 static void Player_actor_Item_Setup_main(ACTOR* actor, int now, int last);
@@ -1626,14 +1629,26 @@ extern void Player_actor_move(ACTOR* actorx, GAME* game) {
     PLAYER_ACTOR* player = (PLAYER_ACTOR*)actorx;
     int idx;
 
+#ifdef TARGET_PC
+    /* the multiplayer (afe-port pc_mp_fx.c): what the player's move makes
+     * (effects, the tree's shake, holes and drops, sounds) is shown to the
+     * others where its puppet stands */
+    pc_mp_fx_player++;
+#endif
     Player_actor_move_other_func1(actorx, game); //
     idx = player->now_main_index;
     if (mPlayer_MAIN_INDEX_VALID(idx) == FALSE || proc[idx] == NULL) {
+#ifdef TARGET_PC
+        pc_mp_fx_player--;
+#endif
         return;
     }
 
     (*proc[idx])(actorx, game);
     Player_actor_move_other_func2(actorx, game); //
+#ifdef TARGET_PC
+    pc_mp_fx_player--;
+#endif
 }
 
 typedef void (*mPlayer_DRAW_PROC)(ACTOR*, GAME*);

@@ -3,12 +3,15 @@
  * The host's villagers lead: the host reports each resident villager's
  * position, facing and walk/run/stand a few times a second, and on a guest
  * in the host's town the same villager follows it with its own walk action
- * (so it animates as it walks) while it is wandering. Talking to a villager,
- * greetings, going home, sleeping and the like stay each player's own. */
+ * (so it animates as it walks) while it is wandering. Greetings, going
+ * home, sleeping and the like stay each player's own. A talk is shown to the
+ * others: the villager stops there, facing the one it talks with, in its talk
+ * pose (the host's when a guest talks with it, so everyone's). */
 
 #define aNPC_PC_MP_HIDDEN (1 << 0)  /* inside its house (hidden) */
 #define aNPC_PC_MP_AT_HOME (1 << 1) /* Animal_c is_home */
 #define aNPC_PC_MP_FREE (1 << 2)    /* wandering: others may follow it */
+#define aNPC_PC_MP_TALK (1 << 3)    /* in a talk (with its player, or held by another's) */
 
 enum {
     aNPC_PC_MP_STAND,
@@ -24,6 +27,10 @@ enum {
 #endif
 extern void pc_mp_npc_report(int idx, mActor_name_t npc_id, f32 x, f32 y, f32 z, s16 angle, int act, int flags);
 extern int pc_mp_npc_target(int idx, mActor_name_t npc_id, f32* x, f32* y, f32* z, s16* angle, int* act, int* flags);
+/* this game's player talks with it (or not) */
+extern void pc_mp_npc_talking(int idx, mActor_name_t npc_id, int talking);
+/* another player talks with it: which way to face */
+extern int pc_mp_npc_talk_hold(int idx, mActor_name_t npc_id, f32 x, f32 z, s16* angle);
 
 static int aNPC_pc_mp_index(NPC_ACTOR* nactorx, mActor_name_t* npc_id) {
     int idx;
@@ -71,16 +78,49 @@ static int aNPC_pc_mp_free(NPC_ACTOR* nactorx) {
     return TRUE;
 }
 
+/* in a talk with this game's player */
+static int aNPC_pc_mp_talking_here(NPC_ACTOR* nactorx) {
+    return mDemo_Get_talk_actor() == (ACTOR*)nactorx;
+}
+
+/* another's talk shown: stopped, facing, in the pose of a talk (the talk
+ * action's own animation, without the talk) */
+static void aNPC_pc_mp_talk_pose(NPC_ACTOR* nactorx) {
+    if (nactorx->action.idx == aNPC_ACT_WAIT && nactorx->action.step != aNPC_ACTION_END_STEP &&
+        nactorx->condition_info.action != aNPC_ACTION_TYPE_TALK) {
+        aNPC_setupAction(nactorx, aNPC_ACTION_TYPE_TALK);
+    }
+}
+
+/* another player talks with it here: it stands, turned to them */
+static int aNPC_pc_mp_hold(NPC_ACTOR* nactorx, int idx, mActor_name_t npc_id) {
+    s16 angle;
+
+    if (aNPC_pc_mp_talking_here(nactorx) || !aNPC_pc_mp_free(nactorx) ||
+        !pc_mp_npc_talk_hold(idx, npc_id, nactorx->actor_class.world.position.x,
+                             nactorx->actor_class.world.position.z, &angle)) {
+        return FALSE;
+    }
+    aNPC_set_request_act(nactorx, 3, aNPC_ACT_WAIT, aNPC_ACT_TYPE_DEFAULT, aNPC_req_default_data);
+    nactorx->movement.mv_angl = angle;
+    aNPC_pc_mp_talk_pose(nactorx);
+    return TRUE;
+}
+
 /* the host: this villager's state after its move */
 static void aNPC_pc_mp_report(NPC_ACTOR* nactorx) {
     mActor_name_t npc_id;
     int idx = aNPC_pc_mp_index(nactorx, &npc_id);
     int act;
     int flags = 0;
+    int talking;
+    s16 hold_angle;
 
     if (idx < 0) {
         return;
     }
+    talking = aNPC_pc_mp_talking_here(nactorx);
+    pc_mp_npc_talking(idx, npc_id, talking);
     switch (nactorx->action.step == aNPC_ACTION_END_STEP ? aNPC_ACT_WAIT : nactorx->action.idx) {
         case aNPC_ACT_WAIT:
         case aNPC_ACT_TURN:
@@ -106,6 +146,11 @@ static void aNPC_pc_mp_report(NPC_ACTOR* nactorx) {
     if (aNPC_pc_mp_free(nactorx)) {
         flags |= aNPC_PC_MP_FREE;
     }
+    if (talking || pc_mp_npc_talk_hold(idx, npc_id, nactorx->actor_class.world.position.x,
+                                       nactorx->actor_class.world.position.z, &hold_angle)) {
+        flags |= aNPC_PC_MP_TALK;
+        act = aNPC_PC_MP_STAND;
+    }
     pc_mp_npc_report(idx, npc_id, nactorx->actor_class.world.position.x, nactorx->actor_class.world.position.y,
                      nactorx->actor_class.world.position.z, nactorx->actor_class.shape_info.rotation.y, act, flags);
 }
@@ -120,7 +165,8 @@ static void aNPC_pc_mp_follow(NPC_ACTOR* nactorx, GAME_PLAY* play) {
     s16 angle;
     int act, flags;
 
-    if (idx < 0 || !pc_mp_npc_target(idx, npc_id, &x, &y, &z, &angle, &act, &flags)) {
+    if (idx < 0 || aNPC_pc_mp_hold(nactorx, idx, npc_id) ||
+        !pc_mp_npc_target(idx, npc_id, &x, &y, &z, &angle, &act, &flags)) {
         return;
     }
     if ((flags & aNPC_PC_MP_HIDDEN) || !aNPC_pc_mp_free(nactorx)) {
@@ -167,6 +213,9 @@ static void aNPC_pc_mp_follow(NPC_ACTOR* nactorx, GAME_PLAY* play) {
     } else {
         aNPC_set_request_act(nactorx, 3, aNPC_ACT_WAIT, aNPC_ACT_TYPE_DEFAULT, aNPC_req_default_data);
         nactorx->movement.mv_angl = angle;
+        if (flags & aNPC_PC_MP_TALK) {
+            aNPC_pc_mp_talk_pose(nactorx); /* (talking with the host, or with another guest) */
+        }
     }
     (void)play;
 }

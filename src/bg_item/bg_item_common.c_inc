@@ -7,6 +7,12 @@
 #define bIT_CLIP (CLIP(bg_item_clip))
 #endif
 
+#ifdef TARGET_PC
+/* afe-port pc_mp_fx.c (m_field_info.c): another player's effects, only shown */
+extern int mFI_pc_fg_hold;
+extern int mFI_pc_fx_visual;
+#endif
+
 static void bit_cmn_single_drawS(GAME* game, bg_item_common_info_c* common_info, mActor_name_t fg_item, xyz_t* pos,
                                  s_xyz* angle, xyz_t* scale, u8 alpha, bIT_DRAW_BF_PROC draw_bf,
                                  bIT_DRAW_AF_PROC draw_af, rgba_t* col);
@@ -748,6 +754,9 @@ static int bIT_actor_drop_entry_main(const bg_item_drop_table_c* drop_info, bg_i
     for (i = 0; i < drop_info->count; i++, drop++) {
         if (drop->move_proc == NULL) {
             bcopy(src_drop, drop, sizeof(bg_item_drop_c));
+#ifdef TARGET_PC
+            drop->pc_visual = mFI_pc_fx_visual != 0;
+#endif
             drop->display_fg_item = src_drop->fg_item;
             drop->mode = 0;
 
@@ -1220,6 +1229,9 @@ static int bIT_actor_hole_effect_entry(bg_item_hole_c* hole, mActor_name_t fg_it
                 }
 
                 if (res) {
+#ifdef TARGET_PC
+                    hole->pc_visual = mFI_pc_fx_visual != 0;
+#endif
                     hole->mode = mode;
                     xyz_t_move(&hole->position, &target_pos);
                     hole->counter = 0;
@@ -1478,6 +1490,12 @@ static void bIT_actor_drop_move(bg_item_drop_table_c* drop_info) {
     int i;
 
     for (i = 0; i < drop_info->count; i++, drop++) {
+#ifdef TARGET_PC
+        int visual = drop->move_proc != NULL && drop->pc_visual;
+
+        mFI_pc_fg_hold += visual;
+        mFI_pc_fx_visual += visual;
+#endif
         if (drop->layer > 0) {
             drop->layer--;
         } else if (drop->wait_counter > 0) {
@@ -1490,6 +1508,10 @@ static void bIT_actor_drop_move(bg_item_drop_table_c* drop_info) {
             xyz_t_move(&drop->offset, &ZeroVec);
             drop->move_proc(drop);
         }
+#ifdef TARGET_PC
+        mFI_pc_fg_hold -= visual;
+        mFI_pc_fx_visual -= visual;
+#endif
     }
 }
 
@@ -1499,8 +1521,18 @@ static void bIT_actor_drop_destruct(bg_item_drop_table_c* drop_info) {
 
     for (i = 0; i < drop_info->count; i++, drop++) {
         if (drop->move_proc != NULL && drop->dt_proc != NULL) {
+#ifdef TARGET_PC
+            int visual = drop->pc_visual;
+
+            mFI_pc_fg_hold += visual;
+            mFI_pc_fx_visual += visual;
+#endif
             drop->dt_proc(drop);
             drop->dt_proc = NULL;
+#ifdef TARGET_PC
+            mFI_pc_fg_hold -= visual;
+            mFI_pc_fx_visual -= visual;
+#endif
         }
     }
 }
@@ -2806,7 +2838,23 @@ static void bg_item_common_renew_draw_and_crs_data_perfect(GAME_PLAY* play, bg_i
 static void bg_item_common_destruct(GAME_PLAY* play, ACTOR* actorx, bg_item_common_c* common) {
     bIT_actor_drop_destruct(&common->drop_info);
     bIT_actor_drop_destruct(&common->fruit_drop_info);
+#ifdef TARGET_PC
+    {
+        int i;
+
+        for (i = 0; i < bIT_HOLE_NUM; i++) {
+            int visual = common->hole[i].pc_visual;
+
+            mFI_pc_fg_hold += visual;
+            mFI_pc_fx_visual += visual;
+            bIT_actor_hole_effect_destruct(&common->hole[i]);
+            mFI_pc_fg_hold -= visual;
+            mFI_pc_fx_visual -= visual;
+        }
+    }
+#else
     bIT_actor_hole_effect_destruct(common->hole);
+#endif
     bIT_actor_pit_destruct(common->pit);
     bIT_actor_ten_coin_destruct(common->ten_coin);
 }
@@ -2904,7 +2952,19 @@ static void bg_item_common_move(GAME_PLAY* play, ACTOR* actorx, bg_item_common_c
 
     bIT_actor_drop_move(&common->drop_info);
     bIT_actor_drop_move(&common->fruit_drop_info);
+#ifdef TARGET_PC
+    for (i = 0; i < bIT_HOLE_NUM; i++) {
+        int visual = common->hole[i].pc_visual;
+
+        mFI_pc_fg_hold += visual;
+        mFI_pc_fx_visual += visual;
+        bIT_actor_hole_effect_move(&common->hole[i]);
+        mFI_pc_fg_hold -= visual;
+        mFI_pc_fx_visual -= visual;
+    }
+#else
     bIT_actor_hole_effect_move(common->hole);
+#endif
     bIT_actor_shin_effect_move((GAME*)play, common->shin);
     bIT_actor_pit_move((GAME*)play, common->pit);
     bIT_actor_ten_coin_move((GAME*)play, common->ten_coin);
@@ -3174,7 +3234,17 @@ static void bg_item_common_draw(GAME_PLAY* play, bg_item_common_c* common, bg_it
 
     bIT_actor_drop_draw(game, &common->common_info, &common->drop_info);
     bIT_actor_drop_draw(game, &common->common_info, &common->fruit_drop_info);
+#ifdef TARGET_PC
+    {
+        int i;
+
+        for (i = 0; i < bIT_HOLE_NUM; i++) {
+            bIT_actor_hole_effect_draw(game, &common->common_info, &common->hole[i]);
+        }
+    }
+#else
     bIT_actor_hole_effect_draw(game, &common->common_info, common->hole);
+#endif
     bIT_actor_pit_draw(game, &common->common_info, common->pit);
     bIT_actor_ten_coin_draw(game, &common->common_info, common->ten_coin, shadow_pos, &shadow_color);
     bIT_actor_fade_draw(game, &common->common_info, common->fade);
