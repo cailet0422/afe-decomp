@@ -7843,8 +7843,13 @@ static int mTG_pc_touch_move(Submenu* submenu, mSM_MenuInfo_c* menu_info, mTG_ta
     int ok;
 
     mTG_pc_touch_table = -1;
-    if (table < 0 || menu_info->menu_type != mSM_OVL_INVENTORY || menu_info->data0 != mSM_IV_OPEN_NORMAL ||
-        inv_ovl == NULL || inv_ovl->page_order[0] != mIV_PAGE_INVENTORY) {
+    if (table < 0 || menu_info->menu_type != mSM_OVL_INVENTORY || inv_ovl == NULL ||
+        inv_ovl->page_order[0] != mIV_PAGE_INVENTORY) {
+        return FALSE;
+    }
+    /* the pockets opened to sell, give, send, ...: the stick stays in its
+     * table (mTG_move_cursol_between_table_inventory), so does a finger */
+    if (menu_info->data0 != mSM_IV_OPEN_NORMAL && menu_info->data0 != mSM_IV_OPEN_EXCHANGE && table != tag->table) {
         return FALSE;
     }
     if (table == tag->table && col == tag->tag_col && row == tag->tag_row) {

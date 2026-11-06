@@ -2452,11 +2452,13 @@ static void aMR_PC_SyncRoom(ACTOR* actorx, GAME* game) {
         return;
     }
 
+    if (touch) {
+        aMR_SaveHaniwaStepData(my_room); /* (the gyroids' steps move with them; before the furniture is gone) */
+    }
     /* as the destructor: what the furniture keeps goes back to the save */
     aMR_AllFurnitureDestruct(actorx);
     aMR_SaveSwitchData(my_room);
     if (touch) {
-        aMR_SaveHaniwaStepData(my_room); /* (the gyroids' steps move with them) */
         pc_touch_room_apply_edits(&Save_Get(homes[house]).floors[floor]);
     }
     if (mp && pc_mp_room_apply_changes(house, floor) && CLIP(my_indoor_clip) != NULL &&
