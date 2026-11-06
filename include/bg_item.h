@@ -12,11 +12,16 @@ extern "C" {
 #endif
 
 #define bIT_PIT_NUM 13
+#ifdef TARGET_PC
+/* the entries after the GameCube's (as many again; for the hole, 3) are for
+ * another player's, only shown (afe-port pc_mp_fx.c): this game's own keep
+ * the GameCube's, whatever the others do */
+#define bIT_DROP_NUM (19 * 2)
+#define bIT_FRUIT_DROP_NUM (6 * 2)
+#define bIT_HOLE_NUM 4
+#else
 #define bIT_DROP_NUM 19
 #define bIT_FRUIT_DROP_NUM 6
-#ifdef TARGET_PC
-#define bIT_HOLE_NUM 4 /* (with another player's holes shown: afe-port pc_mp_fx.c) */
-#else
 #define bIT_HOLE_NUM 1
 #endif
 #define bIT_SHIN_NUM 1

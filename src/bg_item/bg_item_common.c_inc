@@ -272,7 +272,11 @@ static int bIT_actor_ten_coin_entryR(bg_item_ten_coin_c* ten_coin, mActor_name_t
             bIT_actor_drop_entry(&bIT_CLIP->bg_item_common_p->drop_info, fg_money_item, &target_pos, &set_pos, 1, 0);
             sAdo_OngenTrgStart(sfx_no, &target_pos);
 
-            if (!mFI_CheckInIsland()) {
+            if (!mFI_CheckInIsland()
+#ifdef TARGET_PC
+                && mFI_pc_fg_hold == 0 && mFI_pc_fx_visual == 0 /* (not another player's, shown here) */
+#endif
+            ) {
                 mISL_SetNowPlayerAction(mISL_VILLAGE_PLAYER_ACTION_HIT_ROCK);
             }
         }
@@ -635,7 +639,11 @@ static int bIT_common_bury_after(mActor_name_t fg_bury_item, mActor_name_t fg_ho
 
             res = bIT_BURY_ACTION_PLANT;
 
-            if (!mFI_CheckInIsland()) {
+            if (!mFI_CheckInIsland()
+#ifdef TARGET_PC
+                && mFI_pc_fg_hold == 0 && mFI_pc_fx_visual == 0 /* (not another player's, shown here) */
+#endif
+            ) {
                 mISL_SetNowPlayerAction(mISL_VILLAGE_PLAYER_ACTION_PLANT_MONEY_TREE);
             }
         }
@@ -680,7 +688,11 @@ static void bIT_common_hole_throw(mActor_name_t fg_item, mActor_name_t fg_hole_i
                 if (fg_item != EMPTY_NO) {
                     mFI_Wpos2DepositON(*pos);
 
-                    if (!mFI_CheckInIsland()) {
+                    if (!mFI_CheckInIsland()
+#ifdef TARGET_PC
+                && mFI_pc_fg_hold == 0 && mFI_pc_fx_visual == 0 /* (not another player's, shown here) */
+#endif
+                    ) {
                         if (mFAs_CheckDust(buried_item) == TRUE) {
                             mISL_SetNowPlayerAction(mISL_VILLAGE_PLAYER_ACTION_BURY_DUST);
                             mISL_UnsetNowPlayerAction(mISL_VILLAGE_PLAYER_ACTION_PICKUP_DUST);
@@ -751,7 +763,16 @@ static int bIT_actor_drop_entry_main(const bg_item_drop_table_c* drop_info, bg_i
     int res = FALSE;
     int i;
 
+#ifdef TARGET_PC
+    /* this game's own in the first half, another player's shown ones in the second */
+    int first = mFI_pc_fx_visual ? drop_info->count / 2 : 0;
+    int last = mFI_pc_fx_visual ? drop_info->count : drop_info->count / 2;
+
+    drop += first;
+    for (i = first; i < last; i++, drop++) {
+#else
     for (i = 0; i < drop_info->count; i++, drop++) {
+#endif
         if (drop->move_proc == NULL) {
             bcopy(src_drop, drop, sizeof(bg_item_drop_c));
 #ifdef TARGET_PC
@@ -921,7 +942,11 @@ static int fruit_set(mActor_name_t fg_item, int ut_x, int ut_z, s16 num, int dro
                 if (drop.fg_item == HONEYCOMB && drop_res) {
                     drop.flags |= 0x400; // honeycomb flag
 
-                    if (!mFI_CheckInIsland()) {
+                    if (!mFI_CheckInIsland()
+#ifdef TARGET_PC
+                && mFI_pc_fg_hold == 0 && mFI_pc_fx_visual == 0 /* (not another player's, shown here) */
+#endif
+                    ) {
                         mISL_SetNowPlayerAction(mISL_VILLAGE_PLAYER_ACTION_SHAKE_BEES);
                     }
                 }
@@ -1209,7 +1234,16 @@ static int bIT_actor_hole_effect_entry(bg_item_hole_c* hole, mActor_name_t fg_it
 
         mFI_Wpos2UtCenterWpos(&target_pos, *pos);
         target_pos.y = mCoBG_GetBgY_OnlyCenter_FromWpos2(*pos, -1.0f);
+#ifdef TARGET_PC
+        /* this game's own in the first (as on the GameCube), another player's shown ones after */
+        int first = mFI_pc_fx_visual ? 1 : 0;
+        int last = mFI_pc_fx_visual ? bIT_HOLE_NUM : 1;
+
+        hole += first;
+        for (i = first; res == FALSE && i < last; i++, hole++) {
+#else
         for (i = 0; res == FALSE && i < bIT_HOLE_NUM; i++, hole++) {
+#endif
             if (hole->mode == 0) {
                 switch (mode) {
                     case 1:

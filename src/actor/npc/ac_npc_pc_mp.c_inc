@@ -93,6 +93,14 @@ static void aNPC_pc_mp_talk_pose(NPC_ACTOR* nactorx) {
     }
 }
 
+/* that talk over: its own standing again */
+static void aNPC_pc_mp_untalk_pose(NPC_ACTOR* nactorx) {
+    if (nactorx->action.idx == aNPC_ACT_WAIT && nactorx->action.step != aNPC_ACTION_END_STEP &&
+        nactorx->condition_info.action == aNPC_ACTION_TYPE_TALK && !aNPC_pc_mp_talking_here(nactorx)) {
+        aNPC_setupAction(nactorx, aNPC_get_wait_action(nactorx, aNPC_get_feel_info(nactorx)));
+    }
+}
+
 /* another player talks with it here: it goes where it stands in that
  * player's game (there at once when far or out of sight) and stands there,
  * turned to them */
@@ -103,6 +111,7 @@ static int aNPC_pc_mp_hold(NPC_ACTOR* nactorx, int idx, mActor_name_t npc_id) {
 
     if (aNPC_pc_mp_talking_here(nactorx) || !aNPC_pc_mp_free(nactorx) ||
         !pc_mp_npc_talk_hold(idx, npc_id, &x, &y, &z, &angle)) {
+        aNPC_pc_mp_untalk_pose(nactorx);
         return FALSE;
     }
     dx = x - actorx->world.position.x;
@@ -174,7 +183,9 @@ static void aNPC_pc_mp_report(NPC_ACTOR* nactorx) {
     if (aNPC_pc_mp_free(nactorx)) {
         flags |= aNPC_PC_MP_FREE;
     }
-    if (talking || pc_mp_npc_talk_hold(idx, npc_id, &hold_x, &hold_y, &hold_z, &hold_angle)) {
+    /* (held: standing for another's talk, as aNPC_pc_mp_hold has it) */
+    if (talking || (aNPC_pc_mp_free(nactorx) &&
+                    pc_mp_npc_talk_hold(idx, npc_id, &hold_x, &hold_y, &hold_z, &hold_angle))) {
         flags |= aNPC_PC_MP_TALK;
         act = aNPC_PC_MP_STAND;
     }
@@ -244,6 +255,8 @@ static void aNPC_pc_mp_follow(NPC_ACTOR* nactorx, GAME_PLAY* play) {
         nactorx->movement.mv_angl = angle;
         if (flags & aNPC_PC_MP_TALK) {
             aNPC_pc_mp_talk_pose(nactorx); /* (talking with the host, or with another guest) */
+        } else {
+            aNPC_pc_mp_untalk_pose(nactorx);
         }
     }
     (void)play;
