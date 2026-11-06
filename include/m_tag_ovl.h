@@ -298,6 +298,14 @@ extern int mTG_mark_main(Submenu*, mSM_MenuInfo_c*, int, int*);
 extern int mTG_mark_mainX(Submenu*, const mSM_MenuInfo_c*, int, int, int, int*);
 
 extern void mTG_tag_ovl_construct(Submenu* submenu);
+
+#ifdef TARGET_PC
+/* The port's full touch mode: the cursor to a slot of the pockets (table -1:
+ * none), a line of the open command list chosen, the list's place */
+extern void mTG_PC_touch_cursor(int table, int col, int row);
+extern void mTG_PC_touch_select_row(int row);
+extern int mTG_PC_select_geometry(Submenu* submenu, mSM_MenuInfo_c* menu_info, f32* x, f32* y, f32* row_h, int* lines);
+#endif
 extern void mTG_tag_ovl_destruct(Submenu* submenu);
 
 #ifdef __cplusplus
