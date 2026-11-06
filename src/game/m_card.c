@@ -7203,13 +7203,15 @@ extern int mCD_PC_LandFileInfo(const char** name, int* file_size, int* save_ofs0
  * data and the checksum; the copy-protect code and the reset code are left
  * as they are), with what live actors keep out of the Save put back in the
  * copy (play: the frame's actors; NULL between scenes, when there are none).
- * FALSE when the gyroid would not save either: no save yet, a visitor, the
- * first day before the first save, Mr. Resetti's visit, a trip starting. */
+ * FALSE when the gyroid would not save either: no save yet, a visitor, a
+ * player on the first day before they have met a villager, Mr. Resetti's
+ * visit, a trip starting. */
 extern void Actor_info_PC_restore_fgdata_copy(GAME_PLAY* play, void* copy);
 
 extern int mCD_PC_AutoSaveSnapshot(Save* out, GAME_PLAY* play) {
     Private_c* priv = Common_Get(now_private);
     int player_no = Common_Get(player_no);
+    mHm_hs_c* home;
     int house;
 
     if (priv == NULL || !Save_Get(save_exist) || player_no < 0 || player_no >= mPr_FOREIGNER ||
@@ -7218,8 +7220,20 @@ extern int mCD_PC_AutoSaveSnapshot(Save* out, GAME_PLAY* play) {
         return FALSE;
     }
     house = mHS_get_arrange_idx(player_no);
-    if (house < 0 || (!Save_Get(homes[house]).flags.has_saved && mEv_CheckFirstJob())) {
+    if (house < 0) {
         return FALSE;
+    }
+    home = Save_GetPointer(homes[house]);
+    if (!home->flags.has_saved && mEv_CheckFirstJob()) {
+        /* A player who has never saved (a new resident of a town that has a
+         * file), on the first job: the gyroid saves them once they have met
+         * a villager (aHNW_decide_msg_idx_dance), and marks their house as
+         * saved first (aHNW_set_save_permission). */
+        if (mNpc_GetFriendAnimalNum(&priv->player_ID) == 0 || mPr_NullCheckPersonalID(&priv->player_ID) ||
+            !mPr_CheckCmpPersonalID(&priv->player_ID, &home->ownerID)) {
+            return FALSE;
+        }
+        home->flags.has_saved = TRUE;
     }
     mCkRh_SavePlayTime(player_no);
     Save_Set(travel_hard_time, lbRTC_HardTime());
@@ -7235,6 +7249,27 @@ extern int mCD_PC_AutoSaveSnapshot(Save* out, GAME_PLAY* play) {
     out->save.save_check.checksum = 0;
     out->save.save_check.checksum = mFRm_GetFlatCheckSum((u16*)out, sizeof(Save), out->save.save_check.checksum);
     return TRUE;
+}
+
+/* The port's autosave (pc_autosave.c): TRUE while the player has never
+ * saved (a new town that has no file yet, or a new resident whose house was
+ * never saved) and the gyroid would now save them: on the first day, once
+ * they have met a villager. The autosave then makes that first save as soon
+ * as the moment is quiet, rather than on its timer. */
+extern int mCD_PC_FirstSaveDue(void) {
+    Private_c* priv = Common_Get(now_private);
+    int player_no = Common_Get(player_no);
+    int house;
+
+    if (priv == NULL || player_no < 0 || player_no >= PLAYER_NUM || Common_Get(reset_flag) || l_keepSave_set ||
+        mEv_CheckFirstIntro() || !mLd_CheckThisLand(priv->player_ID.land_name, priv->player_ID.land_id)) {
+        return FALSE;
+    }
+    house = mHS_get_arrange_idx(player_no);
+    if (house < 0 || (Save_Get(save_exist) && Save_Get(homes[house]).flags.has_saved)) {
+        return FALSE;
+    }
+    return mNpc_GetFriendAnimalNum(&priv->player_ID) != 0;
 }
 
 /* The port's autosave of a town that has no file on a card yet (a new game
