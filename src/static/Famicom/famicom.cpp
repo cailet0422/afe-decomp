@@ -2480,6 +2480,10 @@ static void famicom_draw() {
     GXSetTevOrder(GX_TEVSTAGE0, GX_TEXCOORD0, GX_TEXMAP0, GX_COLOR_NULL);
     GXSetTevOp(GX_TEVSTAGE0, GX_REPLACE);
     GXSetAlphaCompare(GX_ALWAYS, 0, GX_AOP_AND, GX_ALWAYS, 0);
+#ifndef TARGET_PC
+    /* (the PC port draws the NES picture with FixNES, pc_fixnes_render_frame:
+     * result_bufp, where the GameCube's emulator leaves its picture, is never
+     * filled there, so this quad would be a white box over the game) */
     GXBegin(GX_QUADS, GX_VTXFMT0, 4);
 
     int n2; // r0
@@ -2519,6 +2523,7 @@ static void famicom_draw() {
     GXTexCoord2u16(0, 0);
 
     GXEnd();
+#endif
 
     ksNesDrawEnd();
 }
