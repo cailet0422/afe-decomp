@@ -101,6 +101,10 @@ static void aNPC_pc_mp_untalk_pose(NPC_ACTOR* nactorx) {
     }
 }
 
+#ifndef aNPC_NPC2
+static u8 aNPC_pc_mp_no_greet[ANIMAL_NUM_MAX]; /* (greetings stopped for another's talk, here) */
+#endif
+
 /* another player talks with it here: it goes where it stands in that
  * player's game (there at once when far or out of sight) and stands there,
  * turned to them */
@@ -108,12 +112,25 @@ static int aNPC_pc_mp_hold(NPC_ACTOR* nactorx, int idx, mActor_name_t npc_id) {
     ACTOR* actorx = (ACTOR*)nactorx;
     f32 x, y, z, dx, dz, d2;
     s16 angle;
+    int d;
 
     if (aNPC_pc_mp_talking_here(nactorx) || !aNPC_pc_mp_free(nactorx) ||
         !pc_mp_npc_talk_hold(idx, npc_id, &x, &y, &z, &angle)) {
         aNPC_pc_mp_untalk_pose(nactorx);
+#ifndef aNPC_NPC2
+        if (aNPC_pc_mp_no_greet[idx]) {
+            aNPC_pc_mp_no_greet[idx] = FALSE;
+            if (nactorx->palActorIgnoreTimer == -1 && !pc_mp_npc_target(idx, npc_id, &x, &y, &z, &angle, &d, &d)) {
+                nactorx->palActorIgnoreTimer = 600; /* (that talk over: greetings again, as after a talk) */
+            }
+        }
+#endif
         return FALSE;
     }
+#ifndef aNPC_NPC2
+    nactorx->palActorIgnoreTimer = -1; /* (in a talk: no greetings with other villagers meanwhile) */
+    aNPC_pc_mp_no_greet[idx] = TRUE;
+#endif
     dx = x - actorx->world.position.x;
     dz = z - actorx->world.position.z;
     d2 = dx * dx + dz * dz;
@@ -140,6 +157,16 @@ static int aNPC_pc_mp_hold(NPC_ACTOR* nactorx, int idx, mActor_name_t npc_id) {
         aNPC_pc_mp_talk_pose(nactorx);
     }
     return TRUE;
+}
+
+/* another player talks with it (it calls nobody else meanwhile: ac_npc_talk.c_inc) */
+static int aNPC_pc_mp_held(NPC_ACTOR* nactorx) {
+    mActor_name_t npc_id;
+    int idx = aNPC_pc_mp_index(nactorx, &npc_id);
+    f32 x, y, z;
+    s16 angle;
+
+    return idx >= 0 && pc_mp_npc_talk_hold(idx, npc_id, &x, &y, &z, &angle);
 }
 
 /* the host: this villager's state after its move */

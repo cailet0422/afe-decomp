@@ -23,6 +23,12 @@ static int aNPC_check_talk_now(NPC_ACTOR* nactorx) {
 static int aNPC_force_call_req_proc(NPC_ACTOR* nactorx, int msg_no) {
     int ret = FALSE;
 
+#ifdef TARGET_PC
+    if (aNPC_pc_mp_held(nactorx)) {
+        return FALSE; /* (talking with another player in a multiplayer room) */
+    }
+#endif
+
     if (nactorx->think.force_call_flag == aNPC_FORCE_CALL_NONE &&
         nactorx->condition_info.talk_condition == aNPC_TALK_TYPE_NONE && mDemo_CAN_ACTOR_TALK((ACTOR*)nactorx)) {
         nactorx->think.force_call_flag = aNPC_FORCE_CALL_REQUEST;
