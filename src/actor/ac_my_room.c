@@ -2341,6 +2341,16 @@ static void My_Room_Actor_dt(ACTOR* actorx, GAME* game) {
  * room's constructor does. */
 extern int pc_mp_room_changes_pending(int house, int floor);
 extern int pc_mp_room_apply_changes(int house, int floor); /* 1 if the wallpaper or carpet changed */
+/* The full touch mode's furniture mode (pc/src/pc_touch_room.c): an edit of
+ * the room (a piece moved, turned, put away or taken out of the pockets),
+ * made on the save's floor in the same place */
+extern int pc_touch_room_edits_pending(int house, int floor);
+extern void pc_touch_room_apply_edits(mHm_flr_c* floor);
+
+/* The most pieces this room builds (aMR_MakeOneFurniture skips any more) */
+extern int aMR_PC_FurnitureMax(void) {
+    return aMR_GetSceneFurnitureMax();
+}
 
 static int aMR_PC_RoomQuiet(MY_ROOM_ACTOR* my_room, GAME* game) {
     GAME_PLAY* play = (GAME_PLAY*)game;
@@ -2428,20 +2438,28 @@ static void aMR_PC_SyncRoom(ACTOR* actorx, GAME* game) {
     int field_id = mFI_GetFieldId();
     int house;
     int floor;
+    int mp;
+    int touch;
 
     if (mFI_GET_TYPE(field_id) != mFI_FIELD_PLAYER0_ROOM) {
         return;
     }
     house = mFI_GET_PLAYER_ROOM_NO(field_id);
     floor = mFI_GetNowPlayerHouseFloorNo();
-    if (!pc_mp_room_changes_pending(house, floor) || !aMR_PC_RoomQuiet(my_room, game)) {
+    mp = pc_mp_room_changes_pending(house, floor);
+    touch = pc_touch_room_edits_pending(house, floor);
+    if ((!mp && !touch) || !aMR_PC_RoomQuiet(my_room, game)) {
         return;
     }
 
     /* as the destructor: what the furniture keeps goes back to the save */
     aMR_AllFurnitureDestruct(actorx);
     aMR_SaveSwitchData(my_room);
-    if (pc_mp_room_apply_changes(house, floor) && CLIP(my_indoor_clip) != NULL &&
+    if (touch) {
+        aMR_SaveHaniwaStepData(my_room); /* (the gyroids' steps move with them) */
+        pc_touch_room_apply_edits(&Save_Get(homes[house]).floors[floor]);
+    }
+    if (mp && pc_mp_room_apply_changes(house, floor) && CLIP(my_indoor_clip) != NULL &&
         CLIP(my_indoor_clip)->my_indoor_actor_p != NULL) {
         MY_INDOOR_ACTOR* my_indoor = CLIP(my_indoor_clip)->my_indoor_actor_p;
 
