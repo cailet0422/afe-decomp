@@ -768,9 +768,20 @@ extern ACTOR* Actor_info_make_child_actor(Actor_info* actor_info, ACTOR* parent_
     return actor;
 }
 
+#ifdef TARGET_PC
+extern int pc_mp_fg_quiet; /* pc_mp_game.c: item-layer writes not shared */
+#endif
+
 static void restore_fgdata(ACTOR* actor, GAME_PLAY* play) {
     mActor_name_t name = actor->npc_id;
 
+#ifdef TARGET_PC
+    /* a snowman or a ball put back where its actor was: each game's own, not
+     * a change to share (aBC_setupOtherActor took it out quietly too) */
+    int quiet = ITEM_NAME_GET_TYPE(name) == NAME_TYPE_ITEM2 || (name >= SNOWMAN0 && name <= SNOWMAN8);
+
+    pc_mp_fg_quiet += quiet;
+#endif
     if (name != EMPTY_NO && actor->move_actor_list_idx == -1 && actor->block_x >= 0 && actor->block_z >= 0) {
         if (ITEM_NAME_GET_TYPE(name) == NAME_TYPE_ITEM2) {
             xyz_t pos;
@@ -784,6 +795,9 @@ static void restore_fgdata(ACTOR* actor, GAME_PLAY* play) {
             mFI_SetFG_common(name, actor->home.position, FALSE);
         }
     }
+#ifdef TARGET_PC
+    pc_mp_fg_quiet -= quiet;
+#endif
 }
 
 static int restore_flag[ACTOR_PART_NUM] = {
@@ -828,7 +842,22 @@ extern void Actor_info_PC_restore_fgdata_copy(GAME_PLAY* play, void* copy) {
             }
             unit = mFI_GetUnitFG(actor->home.position);
             if (unit != NULL && (u8*)unit >= base && (u8*)unit < base + sizeof(Save_t)) {
-                *(mActor_name_t*)((u8*)copy + ((u8*)unit - base)) = name;
+                /* (a passing train leaves its rails empty: ac_train0.c, ac_train1.c) */
+                *(mActor_name_t*)((u8*)copy + ((u8*)unit - base)) =
+                    (name >= TRAIN0 && name <= TRAIN1) ? EMPTY_NO : name;
+            }
+            if (actor->id == mAc_PROFILE_HOUSE) {
+                /* a villager's house keeps the unit before its door too
+                 * (RSV_NO), which it empties when it goes (ac_house_move.c_inc
+                 * change_FGUnit) */
+                xyz_t door = actor->world.position;
+
+                door.z += 2 * mFI_UT_WORLDSIZE_Z_F;
+                unit = mFI_GetUnitFG(door);
+                if (unit != NULL && (u8*)unit >= base && (u8*)unit < base + sizeof(Save_t) &&
+                    *(mActor_name_t*)((u8*)copy + ((u8*)unit - base)) == RSV_NO) {
+                    *(mActor_name_t*)((u8*)copy + ((u8*)unit - base)) = EMPTY_NO;
+                }
             }
         }
     }

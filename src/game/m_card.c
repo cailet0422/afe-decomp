@@ -39,6 +39,30 @@
 #include "m_plus_data.h"
 #ifdef TARGET_PC
 #include "pc_bswap.h"
+#include "m_play.h"
+
+/* The port keeps the acres around the player alive (seamless acres): the
+ * buildings of the next acres are actors there, and each keeps a placeholder
+ * (RSV_NO, a DUMMY_...) in its unit of the Save while it exists. The game
+ * only had actors in the player's own acre when it copies the town to write
+ * it to a card (the station master, the gyroid), and the station master puts
+ * the names back before (Actor_info_save_actor). With the next acres' actors
+ * the copy could keep placeholders where their buildings stand, and the file
+ * lose them: the houses of the plaza gone after a trip by train. The copy
+ * gets the names of every live actor's unit back, as the autosave's
+ * (Actor_info_PC_restore_fgdata_copy); the live Save is left as it is. */
+extern void Actor_info_PC_restore_fgdata_copy(GAME_PLAY* play, void* copy);
+extern int pc_card_slot_b_is_net(void);
+
+static void mCD_PC_PutBackNames(void* copy) {
+    GAME* game = gamePT;
+
+    /* (in any field, as restore_fgdata_all on a scene change: the actors
+     * map their position to the unit the same way they wrote it) */
+    if (game != NULL && game->exec == play_main) {
+        Actor_info_PC_restore_fgdata_copy((GAME_PLAY*)game, copy);
+    }
+}
 #endif
 
 typedef struct card_bg_info {
@@ -3399,6 +3423,9 @@ static int mCD_SaveHome_bg_set_data(mCD_memMgr_c* mgr, mCD_memMgr_fileInfo_c* fi
             Save_Set(nukegara_time, lbRTC_HardTime());
         }
         bcopy(&Common_Get(save).save, save, sizeof(Save_t));
+#ifdef TARGET_PC
+        mCD_PC_PutBackNames(save);
+#endif
         save->save_check.version = mFRm_VERSION;
         mFRm_SetSaveCheckData(&save->save_check);
         save->save_check.checksum = mFRm_GetFlatCheckSum((u16*)save, sizeof(Save), save->save_check.checksum);
@@ -4931,6 +4958,9 @@ static int mCD_InitGameStart_bg_set_data(mCD_memMgr_c* mgr, mCD_memMgr_fileInfo_
         mgr->workArea_size = mCD_get_size(mgr->loaded_file_type);
         bzero(save, mgr->workArea_size);
         bcopy(Common_GetPointer(save), save, sizeof(Save_t));
+#ifdef TARGET_PC
+        mCD_PC_PutBackNames(save);
+#endif
         save->save_check.version = 6;
         mFRm_SetSaveCheckData(&save->save_check);
         save->save_check.checksum = mFRm_GetFlatCheckSum((u16*)save, sizeof(Save), save->save_check.checksum);
@@ -6312,6 +6342,14 @@ static int mCD_SaveStation_NextLand_set_data(mCD_memMgr_c* mgr, mCD_memMgr_fileI
         mCD_ClearResetCode();
         mHm_KeepHouseSize(Common_Get(player_no));
         in_animal = mNpc_GetInAnimalP();
+#ifdef TARGET_PC
+        /* a trip to a multiplayer room's copy of the host's town: a villager
+         * moving out would move into that copy, which is thrown away, and be
+         * gone from both towns; it stays (still moving out) instead */
+        if (pc_card_slot_b_is_net()) {
+            mNpc_ClearInAnimal();
+        } else
+#endif
         mNpc_GetRemoveAnimal(&in_animal->animal, in_animal->compress_data, TRUE);
         mQst_ClearLostQuest();
         mCD_SetForeignerFile(&l_mcd_foreigner_file.file, priv, in_animal);
@@ -6337,6 +6375,9 @@ static int mCD_SaveStation_NextLand_set_data(mCD_memMgr_c* mgr, mCD_memMgr_fileI
         Common_Set(copy_protect, copy_protect);
         Save_Set(copy_protect, copy_protect);
         bcopy(Common_GetPointer(save), save, sizeof(Save));
+#ifdef TARGET_PC
+        mCD_PC_PutBackNames(save);
+#endif
         save->save_check.version = 6;
         mFRm_SetSaveCheckData(&save->save_check);
         save->save_check.checksum = mFRm_GetFlatCheckSum((u16*)save, sizeof(Save), save->save_check.checksum);
@@ -6645,6 +6686,14 @@ static int mCD_SaveStation_Passport_set_data(mCD_memMgr_c* mgr, mCD_memMgr_fileI
         mCD_ClearResetCode();
         mHm_KeepHouseSize(Common_Get(player_no));
         in_animal = mNpc_GetInAnimalP();
+#ifdef TARGET_PC
+        /* a trip to a multiplayer room's copy of the host's town: a villager
+         * moving out would move into that copy, which is thrown away, and be
+         * gone from both towns; it stays (still moving out) instead */
+        if (pc_card_slot_b_is_net()) {
+            mNpc_ClearInAnimal();
+        } else
+#endif
         mNpc_GetRemoveAnimal(&in_animal->animal, in_animal->compress_data, TRUE);
         mQst_ClearLostQuest();
         mCD_SetForeignerFile(&l_mcd_foreigner_file.file, priv, in_animal);
@@ -6665,6 +6714,9 @@ static int mCD_SaveStation_Passport_set_data(mCD_memMgr_c* mgr, mCD_memMgr_fileI
         Save_Set(copy_protect, copy_protect);
         bzero(save, sizeof(Save));
         bcopy(Common_GetPointer(save), save, sizeof(Save));
+#ifdef TARGET_PC
+        mCD_PC_PutBackNames(save);
+#endif
         save->save_check.version = 6;
         mFRm_SetSaveCheckData(&save->save_check);
         save->save_check.checksum = mFRm_GetFlatCheckSum((u16*)save, sizeof(Save), save->save_check.checksum);
@@ -7179,11 +7231,19 @@ extern int mCD_SaveStation_Passport_bg(s32* chan) {
 }
 
 #ifdef TARGET_PC
+/* The multiplayer (pc_mp_game.c): a trip by train is under way (the town
+ * the station saved for it kept until the next town is in): the other slot
+ * must stay as it is until the player is home */
+extern int mCD_PC_TripPending(void) {
+    return l_keepSave_set;
+}
+
 /* The multiplayer (pc_mp_game.c): the town as it is now, as the save part of
  * a town file on a card (what the station reads from the other slot), and
  * where that part lies in the file */
 extern void mCD_PC_SnapshotSave(Save* out) {
     bcopy(&Common_Get(save).save, out, sizeof(Save_t));
+    mCD_PC_PutBackNames(out); /* (the buildings out as actors: their names, not placeholders) */
     out->save.save_check.version = mFRm_VERSION;
     mFRm_SetSaveCheckData(&out->save.save_check);
     out->save.save_check.checksum = 0;
@@ -7206,8 +7266,6 @@ extern int mCD_PC_LandFileInfo(const char** name, int* file_size, int* save_ofs0
  * FALSE when the gyroid would not save either: no save yet, a visitor, a
  * player on the first day before they have met a villager, Mr. Resetti's
  * visit, a trip starting. */
-extern void Actor_info_PC_restore_fgdata_copy(GAME_PLAY* play, void* copy);
-
 extern int mCD_PC_AutoSaveSnapshot(Save* out, GAME_PLAY* play) {
     Private_c* priv = Common_Get(now_private);
     int player_no = Common_Get(player_no);
