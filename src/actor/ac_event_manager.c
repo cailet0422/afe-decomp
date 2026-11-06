@@ -1385,7 +1385,13 @@ static mEv_place_data_c* make_FG_somewhere_lot4sale(EVENT_MANAGER_ACTOR* evmgr, 
     if (common_place_data != NULL) {
         mFI_GetBlockUtNum2FG(&reserve_item, common_place_data->block.x, common_place_data->block.z, common_place_data->unit.x, common_place_data->unit.z);
 
-        if (!mNT_IS_RESERVE(reserve_item)) {
+        if (!mNT_IS_RESERVE(reserve_item)
+#ifdef TARGET_PC
+            /* (the event's own tent or car on the lot already: in multiplayer
+             * the host's, which came with its town) */
+            && reserve_item != common_place_data->actor_name
+#endif
+        ) {
             // the selected lot doesn't have a reserve item so re-roll event lot
             common_place_data = NULL;
         }
@@ -1396,7 +1402,11 @@ static mEv_place_data_c* make_FG_somewhere_lot4sale(EVENT_MANAGER_ACTOR* evmgr, 
         if (save_area != NULL) {
             memcpy(&place_data, save_area, sizeof(mEv_place_data_c));
             mFI_GetBlockUtNum2FG(&reserve_item, place_data.block.x, place_data.block.z, place_data.unit.x, place_data.unit.z);
-            if (!mNT_IS_RESERVE(reserve_item)) {
+            if (!mNT_IS_RESERVE(reserve_item)
+#ifdef TARGET_PC
+                && reserve_item != place_data.actor_name /* (the host's tent, as above) */
+#endif
+            ) {
                 // reset save area because it's also not a free lot anymore
                 mEv_clear_save_area(ctrl->type, mEv_EVENT_NONE);
                 save_area = NULL;

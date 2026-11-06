@@ -177,6 +177,205 @@ static void mFM_SetFgUtPtoSaveData(mFM_block_info_c* block_info, u8 bx_max, u8 b
     }
 }
 
+
+#ifdef TARGET_PC
+#include "m_event.h"
+#include "m_npc.h"
+#include <stdio.h>
+#include <stdlib.h>
+
+/* afe-port: towns damaged by an earlier version. The port keeps the actors of
+ * the acres around the player alive (seamless acres), and each building
+ * actor keeps a placeholder (RSV_NO, a DUMMY_...) in its unit while it
+ * exists; up to 1.5.1 the station master's and other card saves could copy
+ * those placeholders into the town file, so buildings near the player were
+ * gone from the town after a trip by train (the plaza's houses, mailboxes
+ * and gyroids, villagers' houses, signs ...). A placeholder is never in a
+ * building's own unit of a town loaded for play: put the building back
+ * there, from the acre's original layout (RESOURCE_FGDATA, as a new town
+ * gets it, mFM_InitFgCombiSaveData) or, for a villager's house and its
+ * signboard, from the villager's home (mNpc_BuildHouse), unless the town has
+ * that building elsewhere (the shop after it grew). */
+static mFM_fg_data_c* l_pc_fg_data = NULL;
+static mFM_fg_data_c** l_pc_fg_sorted = NULL;
+
+static int mFM_PC_HoldsActor(mActor_name_t it) {
+    return it == RSV_NO || (it >= DUMMY_START && it <= DUMMY_MONUMENT_FOUNTAIN);
+}
+
+/* the buildings and props a layout puts down whose actors keep a placeholder
+ * (not the lot signs, below) */
+static int mFM_PC_IsBuilding(mActor_name_t it) {
+    if ((it >= TRAIN0 && it <= TRAIN1) || (it >= SIGN00 && it <= SIGN20)) {
+        return FALSE; /* (the train comes and goes) */
+    }
+    return (it >= STRUCTURE_START && it <= STRUCTURE_START + 0xFF) ||
+           (it >= ACTOR_PROP_MAILBOX0 && it <= ACTOR_PROP_HANIWA3) || it == TRAIN_DOOR;
+}
+
+/* a villager's house stands there (its unit is a lot's, mNpc_BuildHouse) */
+static int mFM_PC_VillagerHouseAt(int bx, int bz, int ux, int uz) {
+    int i;
+
+    for (i = 0; i < ANIMAL_NUM_MAX; i++) {
+        Animal_c* animal = Save_GetPointer(animals[i]);
+        Anmhome_c* home = &animal->home_info;
+
+        if (!mNpc_CheckFreeAnimalInfo(animal) && home->bx == bx + 1 && home->bz == bz + 1 && home->ux == ux &&
+            home->uz == uz + 1) {
+            return TRUE;
+        }
+    }
+    return FALSE;
+}
+
+/* a unit beside a building or a villager's house (whose RSV_NO it may be) */
+static int mFM_PC_NextToBuilding(mActor_name_t* items, int ux, int uz) {
+    int dx, dz;
+
+    for (dz = -1; dz <= 1; dz++) {
+        for (dx = -1; dx <= 1; dx++) {
+            int x = ux + dx, z = uz + dz;
+
+            if ((dx != 0 || dz != 0) && x >= 0 && x < UT_X_NUM && z >= 0 && z < UT_Z_NUM &&
+                items[z * UT_X_NUM + x] >= NPC_HOUSE_START && items[z * UT_X_NUM + x] <= STRUCTURE_START + 0xFF) {
+                return TRUE;
+            }
+        }
+    }
+    return FALSE;
+}
+
+static int mFM_PC_TownHas(mActor_name_t name) {
+    int lo = name, hi = name;
+    int b, u;
+
+    if (name >= SHOP0 && name <= SHOP3) {
+        lo = SHOP0; /* the shop of any size */
+        hi = SHOP3;
+    }
+    for (b = 0; b < FG_BLOCK_TOTAL_NUM; b++) {
+        mActor_name_t* items = Save_Get(fg[b / FG_BLOCK_X_NUM][b % FG_BLOCK_X_NUM]).items[0];
+
+        for (u = 0; u < UT_TOTAL_NUM; u++) {
+            if (items[u] >= lo && items[u] <= hi) {
+                return TRUE;
+            }
+        }
+    }
+    return FALSE;
+}
+
+static int mFM_PC_LoadLayouts(void) {
+    size_t size;
+    size_t aligned;
+    void* raw;
+    int n;
+
+    if (l_pc_fg_sorted != NULL) {
+        return TRUE;
+    }
+    size = JW_GetResSizeFileNo(RESOURCE_FGDATA);
+    aligned = ALIGN_NEXT(size, 32);
+    raw = malloc(aligned + 32);
+    l_pc_fg_sorted = (mFM_fg_data_c**)malloc(mFM_FG_NUM * sizeof(mFM_fg_data_c*));
+    if (raw == NULL || l_pc_fg_sorted == NULL || size == 0) {
+        free(raw);
+        free(l_pc_fg_sorted);
+        l_pc_fg_sorted = NULL;
+        return FALSE;
+    }
+    l_pc_fg_data = (mFM_fg_data_c*)ALIGN_NEXT((uintptr_t)raw, 32);
+    n = (int)(size / sizeof(mFM_fg_data_c));
+    _JW_GetResourceAram(JW_GetAramAddress(RESOURCE_FGDATA), (u8*)l_pc_fg_data, aligned);
+    mFM_ByteSwapFGData(l_pc_fg_data, n);
+    mFM_SortFGData(l_pc_fg_sorted, l_pc_fg_data, mFM_FG_NUM, n, 0);
+    return TRUE;
+}
+
+static int mFM_PC_PutBack(mActor_name_t* unit, mActor_name_t name, int bx, int bz, int ux, int uz) {
+    /* (the shop grows into another of its layouts' places: not twice) */
+    if (!mFM_PC_HoldsActor(*unit) || (name >= SHOP0 && name <= SHOP3 && mFM_PC_TownHas(name))) {
+        return 0;
+    }
+    printf("[PC] town repaired: %04X back at acre %d,%d unit %d,%d (was %04X)\n", name, bx + 1, bz + 1, ux, uz, *unit);
+    *unit = name;
+    return 1;
+}
+
+static void mFM_PC_RepairTown(void) {
+    mFM_combination_c* combi = Save_Get(combi_table[0]);
+    int bx, bz, ux, uz, i;
+    int n = 0;
+
+    if (mEv_CheckTitleDemo() != 0 || !mFM_PC_LoadLayouts()) {
+        return;
+    }
+    /* the villagers' houses first: the house above the home's door, its
+     * signboard below left (mNpc_BuildHouse); the house stands on a lot */
+    for (i = 0; i < ANIMAL_NUM_MAX; i++) {
+        Animal_c* animal = Save_GetPointer(animals[i]);
+        Anmhome_c* home = &animal->home_info;
+        mActor_name_t house;
+        mActor_name_t* items;
+
+        if (mNpc_CheckFreeAnimalInfo(animal) || ITEM_NAME_GET_TYPE(animal->id.npc_id) != NAME_TYPE_NPC ||
+            home->bx < 1 || home->bx > FG_BLOCK_X_NUM || home->bz < 1 || home->bz > FG_BLOCK_Z_NUM ||
+            home->ux < 1 || home->ux > UT_X_NUM - 2 || home->uz < 2 || home->uz > UT_Z_NUM - 1) {
+            continue;
+        }
+        items = Save_Get(fg[home->bz - 1][home->bx - 1]).items[0];
+        house = animal->id.npc_id - NPC_START + NPC_HOUSE_START;
+        n += mFM_PC_PutBack(&items[(home->uz - 1) * UT_X_NUM + home->ux], house, home->bx - 1, home->bz - 1, home->ux,
+                            home->uz - 1);
+        if (items[(home->uz - 1) * UT_X_NUM + home->ux] == house &&
+            mFM_PC_HoldsActor(items[home->uz * UT_X_NUM + home->ux - 1])) {
+            printf("[PC] town repaired: %04X back at acre %d,%d unit %d,%d (was %04X)\n",
+                   ACTOR_PROP_VILLAGER_SIGNBOARD, home->bx, home->bz, home->ux - 1, home->uz,
+                   items[home->uz * UT_X_NUM + home->ux - 1]);
+            items[home->uz * UT_X_NUM + home->ux - 1] = ACTOR_PROP_VILLAGER_SIGNBOARD;
+            n++;
+        }
+    }
+    for (bz = 0; bz < FG_BLOCK_Z_NUM; bz++) {
+        for (bx = 0; bx < FG_BLOCK_X_NUM; bx++) {
+            int type = combi[(bz + 1) * BLOCK_X_NUM + (bx + 1)].combination_type;
+            int fg_id = data_combi_table[type].fg_id;
+            mFM_fg_data_c* layout;
+            mActor_name_t* items = Save_Get(fg[bz][bx]).items[0];
+
+            if (fg_id < 0 || fg_id >= mFM_FG_NUM || (layout = l_pc_fg_sorted[fg_id]) == NULL) {
+                continue;
+            }
+            for (uz = 0; uz < UT_Z_NUM; uz++) {
+                for (ux = 0; ux < UT_X_NUM; ux++) {
+                    mActor_name_t name = layout->items[uz][ux];
+
+                    if (mFM_PC_IsBuilding(name)) {
+                        n += mFM_PC_PutBack(&items[uz * UT_X_NUM + ux], name, bx, bz, ux, uz);
+                    } else if (name == SIGN00 && mFM_PC_HoldsActor(items[uz * UT_X_NUM + ux]) &&
+                               !mFM_PC_VillagerHouseAt(bx, bz, ux, uz) && !mFM_PC_NextToBuilding(items, ux, uz)) {
+                        /* a lot's sign: named as the game names a new lot (the
+                         * layouts have SIGN00 at every lot, renamed for the town) */
+                        mActor_name_t sign = mFM_GetReseveName(bx + 1, bz + 1);
+
+                        if (mNT_IS_RESERVE(sign)) {
+                            printf("[PC] town repaired: lot sign %04X back at acre %d,%d unit %d,%d (was %04X)\n", sign,
+                                   bx + 1, bz + 1, ux, uz, items[uz * UT_X_NUM + ux]);
+                            items[uz * UT_X_NUM + ux] = sign;
+                            n++;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    if (n > 0) {
+        printf("[PC] town repaired: %d units\n", n);
+    }
+}
+#endif
+
 static void mFM_SetFgUtPtoHomeInfo(mFM_block_info_c* block_info, u8 bx_max, u8 bz_max, mActor_name_t house_no,
                                    int floor) {
     int bz;
@@ -893,6 +1092,9 @@ static mFM_fdinfo_c* mFM_MakeField(u16 scene, u16 bg_max, u8 bg_num) {
 
     if (Save_Get(scene_no) == SCENE_FG) {
         combi = Save_Get(combi_table[0]);
+#ifdef TARGET_PC
+        mFM_PC_RepairTown();
+#endif
         mFM_SetFgUtPtoSaveData(field_info->block_info, field_info->block_x_max, field_info->block_z_max,
                                island_x_blocks);
     } else if (mSc_IS_SCENE_PLAYER_ROOM(Save_Get(scene_no))) {

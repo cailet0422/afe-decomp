@@ -42,6 +42,7 @@
 #ifdef TARGET_PC
 #include "pc_diag.h"
 #include "pc_platform.h"
+extern int pc_card_slot_b_is_net(void);
 #endif
 
 #define Game_play_HYRAL_SIZE 0x3E800 // 256,000 bytes
@@ -515,6 +516,11 @@ extern void play_init(GAME* game) {
     mEv_2nd_init(&play->event);
     mTD_player_keydata_init(play);
     Balloon_init(play);
+#ifdef TARGET_PC
+    /* (a visitor in a multiplayer room's copy of the host's town: the host's
+     * game posts the board's notices, which come with its board) */
+    if (Common_Get(player_no) != mPr_FOREIGNER || !pc_card_slot_b_is_net())
+#endif
     mNtc_set_auto_nwrite_data();
     banti_ct();
     watch_my_step_ct();

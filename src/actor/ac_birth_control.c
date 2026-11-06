@@ -4,6 +4,9 @@
 #include "m_field_info.h"
 #include "m_common_data.h"
 #include "GBA2/gba2.h"
+#ifdef TARGET_PC
+extern int pc_mp_fg_quiet; /* pc_mp_game.c: item-layer writes not shared */
+#endif
 
 static void aBC_actor_ct(ACTOR*, GAME*);
 static void aBC_actor_dt(ACTOR*, GAME*);
@@ -102,7 +105,13 @@ static int aBC_setupOtherActor(GAME_PLAY* play, mActor_name_t actor_id, s16 prof
 
     if (actor != NULL) {
         actor->restore_fg = TRUE;
+#ifdef TARGET_PC
+        pc_mp_fg_quiet++; /* (the actor made from the unit: not a pickup to share) */
+#endif
         mFI_SetFG_common(clear_item, pos, FALSE);
+#ifdef TARGET_PC
+        pc_mp_fg_quiet--;
+#endif
     } else {
         res = TRUE;
     }
