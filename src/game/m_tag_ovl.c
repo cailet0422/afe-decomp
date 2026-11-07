@@ -7816,9 +7816,9 @@ static void mTG_move_change(Submenu* submenu, mSM_MenuInfo_c* menu_info, mTG_tag
 
 #ifdef TARGET_PC
 /* The port's full touch mode (pc/src/pc_touch_menu.c): a slot of the
- * pockets tapped, or dragged over, takes the cursor there at the point where
- * the stick would move it, under the same rules for what the hand holds; a
- * line of a command list tapped is chosen as with A on it. */
+ * pockets (or of the mailbox) tapped, or dragged over, takes the cursor there
+ * at the point where the stick would move it, under the same rules for what
+ * the hand holds; a line of a command list tapped is chosen as with A on it. */
 static int mTG_pc_touch_table = -1;
 static int mTG_pc_touch_col;
 static int mTG_pc_touch_row;
@@ -7843,8 +7843,27 @@ static int mTG_pc_touch_move(Submenu* submenu, mSM_MenuInfo_c* menu_info, mTG_ta
     int ok;
 
     mTG_pc_touch_table = -1;
-    if (table < 0 || menu_info->menu_type != mSM_OVL_INVENTORY || inv_ovl == NULL ||
-        inv_ovl->page_order[0] != mIV_PAGE_INVENTORY) {
+    if (table < 0) {
+        return FALSE;
+    }
+    if (menu_info->menu_type == mSM_OVL_MAILBOX) {
+        /* the mailbox's letters and the player's: 2 x 5 each; to the mailbox
+         * only with an empty hand (mTG_move_cursol_between_table_mailbox) */
+        if ((table != mTG_TABLE_MBOX && table != mTG_TABLE_MAIL) || col < 0 || col >= 2 || row < 0 || row >= 5) {
+            return FALSE;
+        }
+        if (table == tag->table && col == tag->tag_col && row == tag->tag_row) {
+            return FALSE;
+        }
+        if (table != tag->table && table == mTG_TABLE_MBOX && !mTG_check_hand_condition(submenu)) {
+            return FALSE;
+        }
+        tag->table = table;
+        tag->tag_col = col;
+        tag->tag_row = row;
+        return TRUE;
+    }
+    if (menu_info->menu_type != mSM_OVL_INVENTORY || inv_ovl == NULL || inv_ovl->page_order[0] != mIV_PAGE_INVENTORY) {
         return FALSE;
     }
     /* the pockets opened to sell, give, send, ...: the stick stays in its
