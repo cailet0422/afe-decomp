@@ -7814,10 +7814,121 @@ static void mTG_move_change(Submenu* submenu, mSM_MenuInfo_c* menu_info, mTG_tag
     }
 }
 
+#ifdef TARGET_PC
+/* The port's full touch mode (pc/src/pc_touch_menu.c): a slot of the
+ * pockets tapped, or dragged over, takes the cursor there at the point where
+ * the stick would move it, under the same rules for what the hand holds; a
+ * line of a command list tapped is chosen as with A on it. */
+static int mTG_pc_touch_table = -1;
+static int mTG_pc_touch_col;
+static int mTG_pc_touch_row;
+static int mTG_pc_touch_sel_row = -1;
+
+void mTG_PC_touch_cursor(int table, int col, int row) {
+    mTG_pc_touch_table = table;
+    mTG_pc_touch_col = col;
+    mTG_pc_touch_row = row;
+}
+
+void mTG_PC_touch_select_row(int row) {
+    mTG_pc_touch_sel_row = row;
+}
+
+static int mTG_pc_touch_move(Submenu* submenu, mSM_MenuInfo_c* menu_info, mTG_tag_c* tag) {
+    mHD_Ovl_c* hand_ovl = submenu->overlay->hand_ovl;
+    mIV_Ovl_c* inv_ovl = submenu->overlay->inventory_ovl;
+    int table = mTG_pc_touch_table;
+    int col = mTG_pc_touch_col;
+    int row = mTG_pc_touch_row;
+    int ok;
+
+    mTG_pc_touch_table = -1;
+    if (table < 0 || menu_info->menu_type != mSM_OVL_INVENTORY || inv_ovl == NULL ||
+        inv_ovl->page_order[0] != mIV_PAGE_INVENTORY) {
+        return FALSE;
+    }
+    /* the pockets opened to sell, give, send, ...: the stick stays in its
+     * table (mTG_move_cursol_between_table_inventory), so does a finger */
+    if (menu_info->data0 != mSM_IV_OPEN_NORMAL && menu_info->data0 != mSM_IV_OPEN_EXCHANGE && table != tag->table) {
+        return FALSE;
+    }
+    if (table == tag->table && col == tag->tag_col && row == tag->tag_row) {
+        return FALSE;
+    }
+    /* a letter in hand stays among the letters (mTG_move_cursol_between_table_inventory) */
+    if (table != mTG_TABLE_MAIL && !mMl_check_not_used_mail(&hand_ovl->info.mail)) {
+        return FALSE;
+    }
+    switch (table) {
+        case mTG_TABLE_ITEM:
+            ok = col >= 0 && col < 5 && row >= 0 && row < 3;
+            break;
+        case mTG_TABLE_MAIL:
+            ok = col >= 0 && col < 2 && row >= 0 && row < 5;
+            break;
+        case mTG_TABLE_PLAYER:
+        case mTG_TABLE_MONEY:
+        case mTG_TABLE_BG:
+            ok = col == 0 && row == 0;
+            break;
+        default:
+            ok = FALSE;
+            break;
+    }
+    if (!ok || !mTG_move_check_hand_item(submenu, table)) {
+        return FALSE;
+    }
+    tag->table = table;
+    tag->tag_col = col;
+    tag->tag_row = row;
+    return TRUE;
+}
+
+/* Where the open command list's lines are, as mTG_set_character draws them
+ * (320x240, the first line's top left), and how many */
+int mTG_PC_select_geometry(Submenu* submenu, mSM_MenuInfo_c* menu_info, f32* x, f32* y, f32* row_h, int* lines) {
+    mTG_Ovl_c* tag_ovl = submenu->overlay->tag_ovl;
+    mTG_tag_c* tag;
+    f32 scale;
+    f32 pos_x;
+    f32 pos_y;
+    int extra = 0;
+
+    if (tag_ovl == NULL || tag_ovl->sel_tag_idx < 1 || tag_ovl->sel_tag_idx >= mTG_TAG_NUM) {
+        return FALSE;
+    }
+    tag = &tag_ovl->tags[tag_ovl->sel_tag_idx];
+    if (tag->type == mTG_TYPE_NONE || tag->type == mTG_TYPE_HANIWA_PRICE || tag->scale < 1.0f) {
+        return FALSE;
+    }
+    scale = tag->scale * mTG_TAG_WIDTH_POS_SCALE;
+    pos_x = 160.0f + (tag->base_pos[0] + menu_info->position[0] + tag->scale * (tag->body_ofs[0] + tag->text_ofs[0]));
+    pos_y = 120.0f - (tag->base_pos[1] + menu_info->position[1] + tag->scale * (tag->body_ofs[1] + tag->text_ofs[1]));
+    if (tag->type == mTG_TYPE_CP_DELETE2 || tag->type == mTG_TYPE_TAG_PUT_CHK) {
+        extra = 2;
+    } else if (tag->type == mTG_TYPE_DUMP_MAIL || tag->type == mTG_TYPE_DUMP_ITEM ||
+               tag->type == mTG_TYPE_DUMP_MAIL_MARK_CONF) {
+        extra = 1;
+    }
+    *x = pos_x;
+    *y = pos_y + extra * 16.0f * scale;
+    *row_h = 16.0f * scale;
+    *lines = mTG_label_table[tag->type].lines;
+    return TRUE;
+}
+#endif
+
 static void mTG_move_move(Submenu* submenu, mSM_MenuInfo_c* menu_info, mTG_tag_c* tag) {
     mHD_Ovl_c* hand_ovl = submenu->overlay->hand_ovl;
 
     if (hand_ovl->info.act == mHD_ACTION_CLOSE_KEEP || hand_ovl->info.act == mHD_ACTION_SASU) {
+#ifdef TARGET_PC
+        if (mTG_pc_touch_move(submenu, menu_info, tag)) {
+            mTG_init_tag_data_item_win(submenu);
+            sAdo_SysTrgStart(NA_SE_CURSOL);
+            return;
+        }
+#endif
         if (mTG_move_cursol_base(submenu, tag, menu_info)) {
             mTG_init_tag_data_item_win(submenu);
             sAdo_SysTrgStart(NA_SE_CURSOL);
@@ -8091,6 +8202,18 @@ static void mTG_move_delete(Submenu* submenu, mTG_tag_c* tag) {
 static void mTG_select_tag_base(Submenu* submenu, mSM_MenuInfo_c* menu_info, mTG_tag_c* tag) {
     u32 trigger = submenu->overlay->menu_control.trigger;
 
+#ifdef TARGET_PC
+    if (mTG_pc_touch_sel_row >= 0) {
+        int row = mTG_pc_touch_sel_row;
+
+        mTG_pc_touch_sel_row = -1;
+        if (row < mTG_label_table[tag->type].lines) {
+            tag->tag_row = row;
+            mTG_label_table[tag->type].words[row]->move_proc(submenu, menu_info);
+            return;
+        }
+    }
+#endif
     if (trigger & (BUTTON_B | BUTTON_START | BUTTON_Y)) {
         if (menu_info->menu_type == mSM_OVL_INVENTORY && menu_info->data0 == mSM_IV_OPEN_QUEST) {
             mTG_close_window(submenu, menu_info, TRUE);
