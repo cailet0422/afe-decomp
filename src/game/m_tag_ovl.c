@@ -7816,9 +7816,11 @@ static void mTG_move_change(Submenu* submenu, mSM_MenuInfo_c* menu_info, mTG_tag
 
 #ifdef TARGET_PC
 /* The port's full touch mode (pc/src/pc_touch_menu.c): a slot of the
- * pockets (or of the mailbox) tapped, or dragged over, takes the cursor there
- * at the point where the stick would move it, under the same rules for what
- * the hand holds; a line of a command list tapped is chosen as with A on it. */
+ * pockets (or of the mailbox, the catalog, the designs, the music, the
+ * gyroid's, the memory card's) tapped, or dragged over, takes the cursor
+ * there at the point where the stick would move it, under the same rules for
+ * what the hand holds; a line of a command list tapped is chosen as with A
+ * on it. */
 static int mTG_pc_touch_table = -1;
 static int mTG_pc_touch_col;
 static int mTG_pc_touch_row;
@@ -7863,7 +7865,60 @@ static int mTG_pc_touch_move(Submenu* submenu, mSM_MenuInfo_c* menu_info, mTG_ta
         tag->tag_row = row;
         return TRUE;
     }
-    if (menu_info->menu_type != mSM_OVL_INVENTORY || inv_ovl == NULL || inv_ovl->page_order[0] != mIV_PAGE_INVENTORY) {
+    /* the other menus of tables: where the stick could go, within their
+     * tables (mTG_move_cursol_between_table_* for what the hand may carry) */
+    if (menu_info->menu_type != mSM_OVL_INVENTORY) {
+        int empty_hand = mTG_check_hand_condition(submenu);
+
+        switch (menu_info->menu_type) {
+            case mSM_OVL_CATALOG: {
+                /* the names on the page (one there), the tabs */
+                mCL_Ovl_c* cl = submenu->overlay->catalog_ovl;
+                mCL_Menu_c* page = &cl->menu_data[cl->page_order[0]];
+
+                ok = (table == mTG_TABLE_CATALOG && col == 0 && row >= 0 && row < 7 &&
+                      page->top_idx + row < page->item_count) ||
+                     (table == mTG_TABLE_CATALOG_WC && col == 0 && row >= 0 && row < mCL_MENU_NUM);
+                break;
+            }
+            case mSM_OVL_NEEDLEWORK:
+                ok = table == mTG_TABLE_NEEDLEWORK && col >= 0 && col < 2 && row >= 0 && row < 4;
+                break;
+            case mSM_OVL_MUSIC:
+                ok = table == mTG_TABLE_MUSIC_MAIN && col >= 0 && col < 2 && row >= 0 && row < 7;
+                break;
+            case mSM_OVL_HANIWA:
+                ok = (table == mTG_TABLE_HANIWA && col >= 0 && col < 4 && row == 0) ||
+                     (table == mTG_TABLE_ITEM && col >= 0 && col < 5 && row >= 0 && row < 3);
+                break;
+            case mSM_OVL_CPORIGINAL:
+                ok = (table == mTG_TABLE_CPORIGINAL_NW && col >= 0 && col < 2 && row >= 0 && row < 4) ||
+                     (table == mTG_TABLE_CPORIGINAL && col >= 0 && col < 3 && row >= 0 && row < 4) ||
+                     (table == mTG_TABLE_CPORIGINAL_WC && col == 0 && row >= 0 && row < 8) ||
+                     (table == mTG_TABLE_CPORIGINAL_TI && col == 0 && row == 0 && empty_hand);
+                break;
+            case mSM_OVL_CPMAIL:
+                ok = (table == mTG_TABLE_CPMAIL && col >= 0 && col < 4 && row >= 0 && row < 5) ||
+                     (table == mTG_TABLE_CPMAIL_WC && col == 0 && row >= 0 && row < 8) ||
+                     (table == mTG_TABLE_CPMAIL_TI && col == 0 && row == 0 && empty_hand) ||
+                     (table == mTG_TABLE_MAIL && col >= 0 && col < 2 && row >= 0 && row < 5);
+                break;
+            default:
+                ok = FALSE;
+                break;
+        }
+        if (!ok || (table == tag->table && col == tag->tag_col && row == tag->tag_row)) {
+            return FALSE;
+        }
+        tag->table = table;
+        tag->tag_col = col;
+        tag->tag_row = row;
+        if (table == mTG_TABLE_CATALOG) {
+            submenu->overlay->catalog_ovl->change_flag = TRUE; /* (the picked name and its picture follow) */
+        }
+        return TRUE;
+    }
+    if (inv_ovl == NULL || inv_ovl->page_order[0] != mIV_PAGE_INVENTORY) {
         return FALSE;
     }
     /* the pockets opened to sell, give, send, ...: the stick stays in its

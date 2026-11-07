@@ -2712,3 +2712,93 @@ extern void mDE_design_ovl_construct(Submenu* submenu) {
 extern void mDE_design_ovl_destruct(Submenu* submenu) {
     submenu->overlay->design_ovl = NULL;
 }
+
+#ifdef TARGET_PC
+/* The port's full touch mode (pc/src/pc_touch_menus.c): the cursor put on a
+ * pixel tapped; the pen drawn along a finger's way between two frames (the
+ * game draws only where the cursor is, once a frame, while A is held); a
+ * colour or another palette picked by a tap. */
+void mDE_PC_set_cursor(Submenu* submenu, int x, int y) {
+    mDE_Ovl_c* design_ovl = submenu->overlay->design_ovl;
+
+    if (design_ovl == NULL) {
+        return;
+    }
+    x = x < mDE_POS_MIN ? mDE_POS_MIN : (x > mDE_POS_MAX ? mDE_POS_MAX : x);
+    y = y < mDE_POS_MIN ? mDE_POS_MIN : (y > mDE_POS_MAX ? mDE_POS_MAX : y);
+    design_ovl->cursor_x = x;
+    design_ovl->cursor_y = y;
+    design_ovl->_650 = 5 * x;
+    design_ovl->_654 = -5 * y;
+    design_ovl->_660 = design_ovl->_650 + 2.5f;
+    design_ovl->_664 = design_ovl->_654 - 2.5f;
+}
+
+static void mDE_pc_pen_dot(mDE_Ovl_c* design_ovl, int x, int y) {
+    switch (design_ovl->_6A0) {
+        case 1:
+            /* (as the cursor is kept for a bigger pen: x below its right edge, y past its top) */
+            mDE_set_texture_template(design_ovl, mDE_pen_2, x > mDE_POS_MAX - 1 ? mDE_POS_MAX - 1 : x,
+                                     y < mDE_POS_MIN + 1 ? mDE_POS_MIN + 1 : y, 2, 2, 0, 1);
+            break;
+        case 2:
+            mDE_set_texture_template(design_ovl, mDE_pen_3, x > mDE_POS_MAX - 2 ? mDE_POS_MAX - 2 : x,
+                                     y < mDE_POS_MIN + 2 ? mDE_POS_MIN + 2 : y, 3, 3, 0, 2);
+            break;
+        default:
+            mDE_set_pal_on_cursor(design_ovl, x, y, design_ovl->_6A4);
+            break;
+    }
+}
+
+void mDE_PC_pen_line(Submenu* submenu, int x0, int y0, int x1, int y1) {
+    mDE_Ovl_c* design_ovl = submenu->overlay->design_ovl;
+    int dx, dy, sx, sy, err;
+
+    if (design_ovl == NULL) {
+        return;
+    }
+    dx = x1 > x0 ? x1 - x0 : x0 - x1;
+    dy = y1 > y0 ? y0 - y1 : y1 - y0;
+    sx = x0 < x1 ? 1 : -1;
+    sy = y0 < y1 ? 1 : -1;
+    err = dx + dy;
+    for (;;) {
+        if (x0 >= mDE_POS_MIN && x0 <= mDE_POS_MAX && y0 >= mDE_POS_MIN && y0 <= mDE_POS_MAX) {
+            mDE_pc_pen_dot(design_ovl, x0, y0);
+        }
+        if (x0 == x1 && y0 == y1) {
+            break;
+        }
+        if (2 * err >= dy) {
+            err += dy;
+            x0 += sx;
+        }
+        if (2 * err <= dx) {
+            err += dx;
+            y0 += sy;
+        }
+    }
+}
+
+void mDE_PC_set_color(Submenu* submenu, int idx) {
+    mDE_Ovl_c* design_ovl = submenu->overlay->design_ovl;
+
+    if (design_ovl != NULL && idx >= 1 && idx < 16) {
+        design_ovl->_6A4 = idx;
+        sAdo_SysTrgStart(0x45a);
+    }
+}
+
+void mDE_PC_palette_step(Submenu* submenu, int dir) {
+    mDE_Ovl_c* design_ovl = submenu->overlay->design_ovl;
+
+    if (design_ovl == NULL) {
+        return;
+    }
+    design_ovl->palette_no = (design_ovl->palette_no + (dir < 0 ? 15 : 1)) & 15;
+    design_ovl->palette_p = mNW_PaletteIdx2Palette(design_ovl->palette_no);
+    mDE_pallet_RGB5A3_to_RGB24(design_ovl);
+    sAdo_SysTrgStart(0x458);
+}
+#endif
