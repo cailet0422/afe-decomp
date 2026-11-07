@@ -375,4 +375,13 @@ static void My_Room_Actor_draw(ACTOR* actorx, GAME* game) {
     aMR_DrawFurniture(my_room, play, FALSE, FTR_TAK_TOUDAI); /* lighthouse model */
     aMR_DrawFurniture(my_room, play, TRUE, FTR_TAK_TOUDAI);  /* lighthouse model */
     aMR_DrawLeaf(my_room, play);
+#ifdef TARGET_PC
+    {
+        /* the port's furniture mode: the name of the piece picked, in the
+         * game's font (pc/src/pc_touch_room.c) */
+        extern void pc_touch_room_draw(GAME* game);
+
+        pc_touch_room_draw(game);
+    }
+#endif
 }
