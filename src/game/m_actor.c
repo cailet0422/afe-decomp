@@ -281,18 +281,27 @@ extern int Actor_draw_actor_no_culling_check2(ACTOR* actor, xyz_t* camera_pos, f
         /* Widescreen hor+ widens the rendered frustum.  The projection matrix
          * used to compute camera_pos is the original 4:3 one, so the NDC X
          * edge (1.0) is too narrow.  Extend by the aspect ratio correction. */
-        f32 x_edge = (f32)g_pc_window_w / (f32)g_pc_window_h
-                   / ((f32)PC_GC_WIDTH / (f32)PC_GC_HEIGHT);
+        /* (and a window taller than 4:3, vert+, the Y edge: pc_gx_3d_scale) */
+        f32 sx, sy, x_edge, y_edge;
+        pc_gx_3d_scale(&sx, &sy);
+        x_edge = 1.0f / sx;
+        y_edge = 1.0f / sy;
         if (x_edge < 1.0f) x_edge = 1.0f;
+        if (y_edge < 1.0f) y_edge = 1.0f;
         int width_OK = (m * (fabsf(camera_pos->x) - actor->cull_width)) < x_edge;
+
+        if (width_OK &&
+            (m * (camera_pos->y + actor->cull_height)) > -y_edge && (m * (camera_pos->y - actor->cull_radius) < y_edge)) {
+            res = TRUE;
+        }
 #else
         int width_OK = (m * (fabsf(camera_pos->x) - actor->cull_width)) < 1.0f;
-#endif
 
         if (width_OK &&
             (m * (camera_pos->y + actor->cull_height)) > -1.0f && (m * (camera_pos->y - actor->cull_radius) < 1.0f)) {
             res = TRUE;
         }
+#endif
     }
 
     return res;

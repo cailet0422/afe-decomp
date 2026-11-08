@@ -902,8 +902,27 @@ static void Game_play_draw(GAME_PLAY* play) {
 #ifdef TARGET_PC
             PC_DIAG(3, "Game_play_draw: bump done, drawing\n");
 #endif
+#ifdef TARGET_PC
+            /* in a window taller than 4:3: what is under the player's feet
+             * at the top, the clock at the bottom (pc_platform.h) */
+            OPEN_DISP(graph);
+            gDPNoOpTag(NOW_FONT_DISP++, PC_NOOP_UI_PLACE + PC_UI_PLACE_TOP);
+            CLOSE_DISP(graph);
+#endif
             watch_my_step_draw(play);
+#ifdef TARGET_PC
+            OPEN_DISP(graph);
+            gDPNoOpTag(NOW_FONT_DISP++, PC_NOOP_UI_PLACE + PC_UI_PLACE_BOTTOM);
+            gDPNoOpTag(NOW_POLY_OPA_DISP++, PC_NOOP_UI_PLACE + PC_UI_PLACE_BOTTOM);
+            CLOSE_DISP(graph);
+#endif
             banti_draw(play);
+#ifdef TARGET_PC
+            OPEN_DISP(graph);
+            gDPNoOpTag(NOW_FONT_DISP++, PC_NOOP_UI_PLACE + PC_UI_PLACE_BAND);
+            gDPNoOpTag(NOW_POLY_OPA_DISP++, PC_NOOP_UI_PLACE + PC_UI_PLACE_BAND);
+            CLOSE_DISP(graph);
+#endif
             mSM_submenu_draw(&play->submenu, (GAME*)play);
         }
     }

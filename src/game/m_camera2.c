@@ -9,6 +9,9 @@
 #include "m_collision_bg.h"
 #include "m_scene_table.h"
 #include "m_common_data.h"
+#ifdef TARGET_PC
+#include "pc_platform.h"
+#endif
 
 #if VERSION >= VER_GAFU01_00
 #define CAMERA2_STAFFROLL_CENTER_X_ROT_STEP_DIVISOR 3333
@@ -497,6 +500,12 @@ static void Camera2_Get_GoalDistanceAndDirection(GAME_PLAY* play, f32* dist, s_x
     }
 
     Camera2_main_Normal_AdjustDistanceAndDirection(play, dist, dir);
+#ifdef TARGET_PC
+    /* the full touch mode held upright: nearer and lower (pc_portrait_camera) */
+    if ((main_index == CAMERA2_PROCESS_NORMAL || main_index == CAMERA2_PROCESS_WADE) && pc_portrait_layout()) {
+        pc_portrait_camera(dist, &dir->x, Camera2_InDoorCheck());
+    }
+#endif
 }
 
 static void Camera2_SetPos_fromStartEnd(GAME_PLAY* play, const xyz_t* start, const xyz_t* end, f32 now_time,
