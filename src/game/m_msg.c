@@ -29,6 +29,7 @@
 #ifdef TARGET_PC
 #include "pc_bswap.h"
 #include "pc_ko.h"
+#include "pc_platform.h"
 #endif
 
 static u32 Msg_rom_start = 0;
@@ -102,8 +103,20 @@ static void mMsg_Main_Window(mMsg_Window_c* msg_p, GAME* game) {
     }
 }
 
+#ifdef TARGET_PC
+/* The 2D drawn next placed in a window taller than 4:3 (pc_platform.h) */
+static void mMsg_pc_place(GAME* game, int place) {
+    OPEN_DISP(game->graph);
+    gDPNoOpTag(NOW_FONT_DISP++, PC_NOOP_UI_PLACE + place);
+    CLOSE_DISP(game->graph);
+}
+#endif
+
 static void mMsg_Draw_Window(mMsg_Window_c* msg_p, GAME* game) {
     if (msg_p->draw_flag && msg_p->data_loaded) {
+#ifdef TARGET_PC
+        mMsg_pc_place(game, PC_UI_PLACE_MSG);
+#endif
         mFont_SetMatrix(game->graph, mFont_MODE_FONT);
         mMsg_SetMatrix(msg_p, game, mFont_MODE_FONT);
         mMsg_DrawWindowBody(msg_p, game, mFont_MODE_FONT);
@@ -114,7 +127,14 @@ static void mMsg_Draw_Window(mMsg_Window_c* msg_p, GAME* game) {
             mMsg_draw_font(msg_p, game);
         }
 
+#ifdef TARGET_PC
+        mMsg_pc_place(game, PC_UI_PLACE_CHOICE);
+        if (!pc_portrait_choice_buttons()) /* (drawn as buttons by the full touch mode) */
+#endif
         mChoice_Draw(&msg_p->choice_window, game, mFont_MODE_FONT);
+#ifdef TARGET_PC
+        mMsg_pc_place(game, PC_UI_PLACE_BAND);
+#endif
     }
 }
 

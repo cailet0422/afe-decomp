@@ -5455,6 +5455,11 @@ void emu64::dl_G_NOOP() {
                 g_pc_widescreen_stretch = 2; /* pillarbox mode for UI */
                 break;
             }
+            if (this->gfx.words.w1 >= PC_NOOP_UI_PLACE && this->gfx.words.w1 < PC_NOOP_UI_PLACE + PC_UI_PLACE_NUM) {
+                /* the 2D drawn next is placed (a window taller than 4:3) */
+                pc_gx_set_ui_place((int)(this->gfx.words.w1 - PC_NOOP_UI_PLACE));
+                break;
+            }
 #endif
             if (this->gfx.words.w1 == 0) {
                 EMU64_LOG("gsDPNoOp(),");
