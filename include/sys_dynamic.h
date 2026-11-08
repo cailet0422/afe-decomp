@@ -24,6 +24,21 @@ extern "C" {
 #define FONT_SIZE 256
 */
 
+#ifdef TARGET_PC
+/* afe-port: room for what the GameCube never drew (the full touch mode held
+ * upright sees far: more ground blocks and their items, pc_portrait.c) */
+#define POLY_OPA_SIZE (9824 * 3)
+#define POLY_XLU_SIZE (2048 * 2)
+#define OVERLAY_SIZE 1024
+#define WORK_SIZE 128
+#define UNK_BUF0_SIZE 32
+#define FONT_SIZE 1792
+#define SHADOW_SIZE 512
+#define LIGHT_SIZE 256
+#define NEW0_SIZE (512 * 4)
+#define NEW1_SIZE (256 * 4)
+#define NEW2_SIZE 128
+#else
 #define POLY_OPA_SIZE 9824
 #define POLY_XLU_SIZE 2048
 #define OVERLAY_SIZE 1024
@@ -35,6 +50,7 @@ extern "C" {
 #define NEW0_SIZE 512
 #define NEW1_SIZE 256
 #define NEW2_SIZE 128
+#endif
 
 typedef struct dynamic_s {
     u16 start_magic;

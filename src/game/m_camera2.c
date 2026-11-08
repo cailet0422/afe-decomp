@@ -212,6 +212,12 @@ static void Camera2_SetView(GAME_PLAY* play) {
             }
 
             camera->perspective.far = 1600.0f;
+#ifdef TARGET_PC
+            /* the full touch mode held upright sees nearly to the horizon */
+            if (pc_portrait_far_view()) {
+                camera->perspective.far = PC_PORTRAIT_FAR;
+            }
+#endif
         }
     }
 
