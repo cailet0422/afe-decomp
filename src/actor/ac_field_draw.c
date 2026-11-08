@@ -8,6 +8,9 @@
 #include "m_common_data.h"
 #include "m_rcp.h"
 #include "sys_matrix.h"
+#ifdef TARGET_PC
+#include "pc_platform.h"
+#endif
 
 static void Bg_Draw_Actor_ct(ACTOR* actorx, GAME* game);
 static void Bg_Draw_Actor_dt(ACTOR* actorx, GAME* game);
@@ -545,6 +548,31 @@ static void Bg_Draw_Actor_draw(ACTOR* actorx, GAME* game) {
         aFD_DrawBlock(block, actorx, game);
         block++;
     }
+#ifdef TARGET_PC
+    /* held upright the camera sees farther than the nine blocks around the
+     * player: the ground of the others in view too (pc_portrait.c) */
+    {
+        int bxs[40];
+        int bzs[40];
+        int n = pc_portrait_view_blocks(game, bxs, bzs, 40);
+        int cx = field_draw->block[4].bx;
+        int cz = field_draw->block[4].bz;
+
+        for (i = 0; i < n; i++) {
+            aFD_block_c far_block;
+
+            if (ABS(bxs[i] - cx) <= 1 && ABS(bzs[i] - cz) <= 1) {
+                continue; /* (drawn above) */
+            }
+            far_block.bx = bxs[i];
+            far_block.bz = bzs[i];
+            mFI_BkNum2WposXZ(&far_block.wpos.x, &far_block.wpos.z, far_block.bx, far_block.bz);
+            far_block.wpos.y = mFI_BkNum2BaseHeight(far_block.bx, far_block.bz);
+            far_block.exist = TRUE;
+            aFD_DrawBlock(&far_block, actorx, game);
+        }
+    }
+#endif
 
     OPEN_DISP(game->graph);
 

@@ -8,6 +8,8 @@
 #endif
 
 #ifdef TARGET_PC
+#include "pc_platform.h"
+#include "TwoHeadArena.h"
 /* afe-port pc_mp_fx.c (m_field_info.c): another player's effects, only shown */
 extern int mFI_pc_fg_hold;
 extern int mFI_pc_fx_visual;
@@ -3220,6 +3222,84 @@ static void bIT_actor_pit_draw(GAME* game, bg_item_common_info_c* common_info, b
     }
 }
 
+#ifdef TARGET_PC
+/* afe-port (pc_portrait.c): held upright the camera sees blocks beyond the
+ * four this actor keeps draw tables for. Their items are drawn one by one,
+ * as bg_item_common_classifyitemDataTable places them (no shadows; buried
+ * ones are left under the ground), while the graph has room. */
+static void bg_item_common_pc_draw_far(GAME_PLAY* play, bg_item_common_c* common) {
+    static xyz_t scale = { 0.01f, 0.01f, 0.01f }; /* (as bg_item_common_outPutData) */
+    GAME* game = (GAME*)play;
+    bg_item_common_info_c* info = &common->common_info;
+    int bxs[40];
+    int bzs[40];
+    int n = pc_portrait_view_blocks(play, bxs, bzs, 40);
+    int k;
+
+    for (k = 0; k < n; k++) {
+        bg_item_draw_table_c* draw_table = common->draw_table;
+        int bx = bxs[k];
+        int bz = bzs[k];
+        int i;
+        int skip = FALSE;
+        mActor_name_t* fg_p;
+        mCoBG_Collision_u* col;
+        u16* deposit;
+        f32 bx_pos;
+        f32 bz_pos;
+        int ut_x;
+        int ut_z;
+
+        for (i = 0; i < mFM_VISIBLE_BLOCK_NUM; i++, draw_table++) {
+            if (draw_table->draw_flag == TRUE && draw_table->bx == bx && draw_table->bz == bz) {
+                skip = TRUE; /* (drawn by the game) */
+            }
+        }
+        fg_p = mFI_BkNumtoUtFGTop(bx, bz);
+        if (skip || fg_p == NULL || !mFI_BkNum2WposXZ(&bx_pos, &bz_pos, bx, bz)) {
+            continue;
+        }
+        col = mFI_UtNum2UtCol(bx * UT_X_NUM, bz * UT_Z_NUM);
+        deposit = mFI_GetDepositP(bx, bz);
+        if (col == NULL) {
+            continue;
+        }
+        for (ut_z = 0; ut_z < UT_Z_NUM; ut_z++) {
+            if (THA_getFreeBytes(&game->graph->polygon_opaque_thaga.tha) < 0x4000 ||
+                THA_getFreeBytes(&game->graph->polygon_translucent_thaga.tha) < 0x1000) {
+                return; /* (the graph is nearly full: the rest stays away) */
+            }
+            for (ut_x = 0; ut_x < UT_X_NUM; ut_x++, fg_p++, col++) {
+                bg_item_type_data_c type_data;
+                xyz_t pos;
+
+                if (!bIT_individual_draw_check(*fg_p) || *fg_p == EMPTY_NO ||
+                    (deposit != NULL && ((*deposit >> ut_x) & 1) != 0)) {
+                    continue;
+                }
+                fg_no2fg_type(*fg_p, &type_data, col, info->type_data_table_p);
+                if (type_data.type == bIT_DRAW_TYPE_NONE || type_data.type < 0) {
+                    continue;
+                }
+                pos.x = bx_pos + type_data.pos_x_tbl_p[ut_x];
+                pos.z = bz_pos + type_data.pos_z_tbl_p[ut_z];
+                if ((draw_part_table_a[type_data.type].flags & 2)) {
+                    pos.x += rnd_data_x[ut_x & 3][ut_z & 3];
+                    pos.z += rnd_data_z[ut_x & 3][ut_z & 3];
+                }
+                /* (the units' heights the game keeps, keep_h, are there only
+                 * for its four blocks: the ground's, from the collision) */
+                pos.y = mCoBG_GetBgY_OnlyCenter_FromWpos(pos, 0.0f) + 1.0f;
+                bit_cmn_single_draw_BT(game, info, &type_data, &pos, &ZeroSVec, &scale, 255, NULL, NULL, NULL);
+            }
+            if (deposit != NULL) {
+                deposit++;
+            }
+        }
+    }
+}
+#endif
+
 static void bg_item_common_draw(GAME_PLAY* play, bg_item_common_c* common, bg_item_draw_part_table_c* draw_part_table) {
     GAME* game = (GAME*)play;
     Kankyo* kankyo = &play->kankyo;
@@ -3265,6 +3345,9 @@ static void bg_item_common_draw(GAME_PLAY* play, bg_item_common_c* common, bg_it
             }
         }
     }
+#ifdef TARGET_PC
+    bg_item_common_pc_draw_far(play, common);
+#endif
 
     bIT_actor_drop_draw(game, &common->common_info, &common->drop_info);
     bIT_actor_drop_draw(game, &common->common_info, &common->fruit_drop_info);

@@ -275,7 +275,13 @@ extern int Actor_draw_actor_no_culling_check(ACTOR* actor) {
 extern int Actor_draw_actor_no_culling_check2(ACTOR* actor, xyz_t* camera_pos, f32 camera_w) {
     int res = FALSE;
 
+#ifdef PC_ENHANCEMENTS
+    /* (held upright the camera sees farther: pc_portrait_cull_scale) */
+    if (-actor->cull_radius < camera_pos->z &&
+        camera_pos->z < actor->cull_distance * pc_portrait_cull_scale() + actor->cull_radius) {
+#else
     if (-actor->cull_radius < camera_pos->z && camera_pos->z < actor->cull_distance + actor->cull_radius) {
+#endif
         f32 m = camera_w < 1.0f ? 1.0f : 1.0f / camera_w;
 #ifdef PC_ENHANCEMENTS
         /* Widescreen hor+ widens the rendered frustum.  The projection matrix
